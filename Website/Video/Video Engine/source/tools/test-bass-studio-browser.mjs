@@ -398,8 +398,8 @@ try {
   const audioStream = probe.streams.find((stream) => stream.codec_type === 'audio');
   assert.ok(videoStream, 'Bass output has no video stream');
   assert.equal(audioStream, undefined, 'Bass output claims an audio track the engine cannot make');
-  assert.equal(videoStream.width, 720, 'Portrait bass video width is wrong');
-  assert.equal(videoStream.height, 1280, 'Portrait bass video height is wrong');
+  assert.equal(videoStream.width, 1080, 'Portrait bass video width is wrong');
+  assert.equal(videoStream.height, 1920, 'Portrait bass video height is wrong');
   // The Plan's length rule, with no cap of the page's own.
   const scoreSeconds = Number(probe.format.duration);
   assert.ok(Math.abs(scoreSeconds - 4) < 0.4, `Bass video is not the score's length: ${scoreSeconds}s instead of 4s`);
@@ -541,8 +541,8 @@ print(moved, width * height)
     })(),
   ])).stdout);
   const precisionStream = precisionProbe.streams.find((stream) => stream.codec_type === 'video');
-  assert.equal(precisionStream.width, 1280, 'Landscape bass video width is wrong');
-  assert.equal(precisionStream.height, 720, 'Landscape bass video height is wrong');
+  assert.equal(precisionStream.width, 1920, 'Landscape bass video width is wrong');
+  assert.equal(precisionStream.height, 1080, 'Landscape bass video height is wrong');
 
   // The Plan's last part of the length: the Thank You clip closes the video
   // and is counted in it. The clip is two seconds, so four becomes six.

@@ -176,6 +176,13 @@ Run every command from `Website/Notation/Notation Engine/`.
   per-file ask, no "should I write this" pause. A message that opens with
   "do not write code" describes that one pass only; the next instruction
   that asks for work is enough to resume writing.
+- **Permission is standing — reaffirmed at the start of the session after
+  that read-only pass.** The owner asked for it to be recorded first, before
+  any work: full code-writing permission, push what is already written
+  before continuing, then continue from the Plan and push again. Recorded
+  here as the standing default, as asked. The push order is part of the
+  agreement: existing work lands first, the next Plan item lands in a second
+  push, and Plan items still open are filled in later.
 - The Plan under `Website/Video/Video Engine Plan/PLAN.md` is reviewed and
   updated roughly every five hours. Work is landed in small pushes: push
   whatever is written first, then continue from the Plan, then push again.

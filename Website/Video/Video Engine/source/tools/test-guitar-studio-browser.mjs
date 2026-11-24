@@ -358,8 +358,8 @@ try {
   const audioStream = probe.streams.find((stream) => stream.codec_type === 'audio');
   assert.ok(videoStream, 'Guitar output has no video stream');
   assert.equal(audioStream, undefined, 'Guitar output claims an audio track the engine cannot make');
-  assert.equal(videoStream.width, 720, 'Portrait guitar video width is wrong');
-  assert.equal(videoStream.height, 1280, 'Portrait guitar video height is wrong');
+  assert.equal(videoStream.width, 1080, 'Portrait guitar video width is wrong');
+  assert.equal(videoStream.height, 1920, 'Portrait guitar video height is wrong');
   // The Plan's length rule, with no cap of the page's own: two 4/4 bars at
   // the default 120 BPM are four seconds, and no 12-second cap applies.
   const scoreSeconds = Number(probe.format.duration);

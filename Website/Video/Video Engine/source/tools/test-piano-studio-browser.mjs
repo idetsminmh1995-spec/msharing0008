@@ -387,8 +387,8 @@ try {
   // The Plan's piano adapter is silent no longer: the score's own notes are
   // synthesized, so the export must carry an audio track.
   assert.ok(audioStream, 'Piano output has no audio track, so the score is not heard');
-  assert.equal(videoStream.width, 720, 'Portrait piano video width is wrong');
-  assert.equal(videoStream.height, 1280, 'Portrait piano video height is wrong');
+  assert.equal(videoStream.width, 1080, 'Portrait piano video width is wrong');
+  assert.equal(videoStream.height, 1920, 'Portrait piano video height is wrong');
   // The Plan's length rule, with no cap of the page's own: two 4/4 bars at
   // the default 120 BPM are four seconds, and no 12-second cap applies.
   const scoreSeconds = Number(probe.format.duration);
@@ -530,8 +530,28 @@ def runs(y, test):
     return out
 black = lambda pixel: sum(pixel) < 160
 white = lambda pixel: pixel[0] > 200
-blacks = [count for dark, count in runs(int(height * 0.86), black) if dark and count > 4]
-whites = [count for lit, count in runs(height - 20, white) if lit and count > 4]
+# The keyboard's rows are found rather than assumed: the band's height
+# follows the delivery size and the score's range, so a fixed fraction of
+# the frame lands on the notation at 1080p.
+def widths_at(y, test):
+    return [count for hit, count in runs(y, test) if hit and count > 4]
+# Below the black keys a row is white keys and nothing else; above them the
+# same row carries both colours. So the whites are found first, from the
+# bottom up, and the blacks are then looked for above that row.
+white_row = next(
+    (y for y in range(height - 1, height // 2, -1)
+     if len(widths_at(y, white)) >= 15 and len(widths_at(y, black)) <= 4),
+    None,
+)
+assert white_row is not None, 'no row of white keys was found in the frame'
+blacks, black_row = [], None
+for y in range(white_row - 1, height // 2, -1):
+    found = widths_at(y, black)
+    if len(found) >= 12:
+        blacks, black_row = found, y
+        break
+assert black_row is not None, 'no row of black keys was found above the white keys'
+whites = widths_at(white_row, white)
 print(len(blacks), len(whites), (sum(blacks) / len(blacks)) if blacks else 0, (sum(whites) / len(whites)) if whites else 0)
 `]);
   const [blackCount, whiteCount, blackWidth, whiteWidth] = keyWidths.trim().split(/\s+/).map(Number);

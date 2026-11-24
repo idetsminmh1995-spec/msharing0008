@@ -2027,6 +2027,36 @@
 
   const LAYOUT_GUTTER = 0.02;
 
+  /**
+   * The one place a delivery picture size is written.
+   *
+   * The Plan gives every video -- Metronome included -- the same three
+   * sizes, so a page asks for a ratio and takes the pixels from here
+   * instead of carrying its own table. Two tables drift: one studio
+   * ships 720p while the rest ship 1080p, and nothing notices until the
+   * exports are compared.
+   */
+  const DELIVERY_SIZES = {
+    '16:9': { width: 1920, height: 1080 },
+    '1:1': { width: 1080, height: 1080 },
+    '9:16': { width: 1080, height: 1920 },
+  };
+
+  /**
+   * Picture size for a ratio name. Pages spell the name either `16:9` or
+   * `16x9`; both reach the same entry, so a page never has to agree with
+   * this engine about a separator.
+   */
+  function sizeFor(ratio) {
+    const name = String(ratio ?? '').replace('x', ':');
+    const size = DELIVERY_SIZES[name];
+    if (!size) throw new RangeError(`"${ratio}" is not a supported video ratio`);
+    return { ...size };
+  }
+
+  /** Every ratio this engine delivers, in the order the Plan lists them. */
+  const ratioNames = () => Object.keys(DELIVERY_SIZES);
+
   /** The ratio name a frame's own dimensions are closest to. */
   function ratioOf(width, height) {
     if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
@@ -2355,6 +2385,11 @@
     muxWebM,
     layoutFor,
     ratioOf,
+    // One table of delivery sizes for every studio; a page asks for a
+    // ratio name and gets the pixels the Plan specifies.
+    sizeFor,
+    ratioNames,
+    DELIVERY_SIZES,
     composeFrame,
     requireAsset,
     resolveRequired,

@@ -46,7 +46,7 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 
 အသေးစိတ်ကို Main Plan ၏ `Create Video — Final video layout` နှင့် `Video ထုတ်လုပ်ပုံ အသေးစိတ်` section များတွင် ကြည့်ပါ။ ဤ phase သည် instrument adapter များ (Phase 1–5) မတိုင်မီ Video Engine ဘက်မှ လိုအပ်သော shared အလုပ်များ ဖြစ်သည်။
 
-1. **စံ output အရွယ်:** Video အားလုံး (Metronome အပါအဝင်) သည် **1920×1080 (16:9) / 1080×1080 (1:1) / 1080×1920 (9:16)** ဖြစ်ရမည်။ အရွယ်ကို Video Engine ၏ shared setting တစ်ခုတည်းမှ သတ်မှတ်ရမည်။ လက်ရှိ Metronome adapter သည် 1280×720 / 720×720 / 720×1280 ဖြစ်သဖြင့် ပြောင်းရမည်၊ Metronome frame renderer သည် အရွယ်ကို parameter အဖြစ် လက်ခံရမည်။ 1080p အတွက် memory budget နှင့် H.264 level ကို ပြန်စစ်ရမည်။
+1. **စံ output အရွယ်:** Video အားလုံး (Metronome အပါအဝင်) သည် **1920×1080 (16:9) / 1080×1080 (1:1) / 1080×1920 (9:16)** ဖြစ်ရမည်။ အရွယ်ကို Video Engine ၏ shared setting တစ်ခုတည်းမှ သတ်မှတ်ရမည်။ **ပြီးစီး (2026-11-18):** adapter ခုနစ်ခုလုံးသည် ဤဇယားကို ကိုယ်ပိုင် မထားတော့ဘဲ `engine.sizeFor(ratio)` ကို ခေါ်သည် (engine တွင် `DELIVERY_SIZES` + `ratioNames()`); Metronome ၏ ကိုယ်ပိုင် `DIMENSIONS` ကို ဖျက်ထားသည်။ 1080p memory budget နှင့် H.264 level ကို ဆက်လက်စစ်ရန် ကျန်သည်။
 2. **၃ ပိုင်း layout template:** Title / Info၊ Notation၊ တူရိယာ အပိုင်း ၃ ခုကို data ဖြင့်ကြေညာ၍ တူရိယာအလိုက် နေရာပြောင်းနိုင်ရမည် (Drum/Piano — Title အပေါ်၊ တူရိယာအောက်။ Guitar — တူရိယာအပေါ်၊ Title အောက်။ Violin — ဘေးတစ်ဖက်၊ Title အောက်)။ Ratio ၃ မျိုးအလိုက် အချိုးကို Main Plan ၏ ဇယားအတိုင်း (default)။ Metronome tool ၏ video တွင် Title / Info အပိုင်း မပါ။
 3. **Video အရှည်** = Count Voice (အစ၊ count-in) + MusicXML အရှည် + Thank You video။ `MAX_SECONDS = 12` (Drum) နှင့် Metronome ၏ ၁၂ စက္ကန့် ကန့်သတ်ချက်ကို ဖယ်ပြီး memory guard ကိုသာ safety အဖြစ်ထားရမည်။
 4. **Thank You segment:** R2 ထဲရှိ Landscape / Portrait / Square သီးခြားဖိုင်ကို output ratio အလိုက်ရွေး၍ Video အဆုံးတွင် ဆက်ရမည်။ ဖိုင်အမည်၊ path နှင့် ဖိုင်မရလျှင် လုပ်ပုံသည် Video Engine ၏ တာဝန်ဖြစ်ပြီး §3 Adapter Contract (လိုအပ်သော asset မရလျှင် export မစရ) ကို လိုက်နာရမည်။
@@ -154,11 +154,11 @@ The standard video output is now `1920×1080` for the 16:9 option. Square and po
 
 Create Video ရှိ Metronome card ကို dedicated `studio-metronome.js` adapter နှင့် shared Video Engine သို့ ချိတ်ထားသည်။ `studio-video.js` သည် Metronome route တွင် Drum workflow ကို မစတင်စေပါ။ Metronome Engine IIFE bundle (`window.MetronomeDesigns`) ကို `Website/Website/assets/metronome-engine.js` တွင် serve လုပ်ပြီး `sync-metronome-engine.mjs` က `dist` source နှင့် sync ကိုစစ်သည်။
 
-Adapter သည် Engine design 11 မျိုး၊ 16:9/9:16/1:1, quarter-note BPM, meter နှင့် bars ကို အသုံးပြုသည်။ Frame time မှ beat/bar/phase ကို deterministic တွက်ပြီး SVG ကို Video Engine canvas သို့ဆွဲသည်။ 30 FPS output အရွယ်အစားများသည် 1280×720, 720×1280, 720×720 ဖြစ်သည်။ 12 sec ကျော်သော setting ကို ပိတ်ထားသည်။
+Adapter သည် Engine design 11 မျိုး၊ 16:9/9:16/1:1, quarter-note BPM, meter နှင့် bars ကို အသုံးပြုသည်။ Frame time မှ beat/bar/phase ကို deterministic တွက်ပြီး SVG ကို Video Engine canvas သို့ဆွဲသည်။ **(2026-11-18 တွင် ပြောင်းပြီး)** Output အရွယ်သည် Video Engine ၏ shared `sizeFor()` မှ 1920×1080 / 1080×1920 / 1080×1080 ဖြစ်ပြီး 12 sec ကန့်သတ်ချက်ကို ဖယ်ထားသည်။
 
 Audio သည် Engine shared sound capability မဟုတ်ပါ။ Adapter က `OfflineAudioContext` မှ downbeat accent ပါသော click track `AudioBuffer` ဖန်တီး၍ shared Video Engine render ထဲထည့်သည်။ Preview, progress/cancel, play/seek/download ပါဝင်သည်။
 
-**စမ်းသပ်မှု:** Engine 20/20, Video Engine muxer 15/15, cleanup/safety 5/5; Chromium Engine MP4 smoke, latest Drum Studio MP4 export/regression နှင့် Metronome homepage-card-to-export flow pass. Metronome output သည် 3/8, quarter-note 96 BPM, 1 bar တွင် 28 frames/0.933 sec, 720×1280 VP8 နှင့် 48 kHz mono Opus ဖြစ်ကြောင်း `ffprobe` ဖြင့်စစ်ထားသည်။ Phone 375×812, desktop 1280×900 layout တွင် overflow မရှိ။
+**စမ်းသပ်မှု:** Engine 20/20, Video Engine muxer 15/15, cleanup/safety 5/5; Chromium Engine MP4 smoke, latest Drum Studio MP4 export/regression နှင့် Metronome homepage-card-to-export flow pass. Metronome output သည် 3/8, quarter-note 96 BPM, 1 bar တွင် 28 frames/0.933 sec, 1080×1920 VP8 နှင့် 48 kHz mono Opus ဖြစ်ကြောင်း `ffprobe` ဖြင့်စစ်ထားသည်။ Phone 375×812, desktop 1280×900 layout တွင် overflow မရှိ။
 
 **လက်ကျန်:** ဖုန်းအစစ်/Safari/Firefox နှင့် MediaRecorder-only fallback; logo asset policy; Engine source input/XML escaping edge cases. **design 11 မျိုး browser visual snapshots — ပြီးပါပြီ (2026-11-18):** `test-metronome-studio-browser.mjs` က design တစ်ခုချင်းစီကို page ၏ preview လမ်းကြောင်းဖြင့် ဆွဲပြီး 240×240 canvas သို့ ချကာ လင်းနေသော sample အရေအတွက် (အလွတ် မဖြစ်ရ) နှင့် hash ကို စစ်သည်။ design နှစ်ခု တူညီသော frame ဆွဲလျှင် ကျရှုံးသည် — တစ်ခု အလုပ်မလုပ်နေခြင်းကို ဖမ်းရန်။ Guitar ကို နောက်ဦးစားပေးအဖြစ် ဆက်လုပ်ပြီး Piano, Bass, Strings, Voice ကို သီးခြား adapter ဖြင့်သာ ချိတ်ဆက်ရန်။
 
@@ -198,14 +198,14 @@ Plan ၏ Phase 3, 4, 5 ကို adapter သုံးခုဖြင့် ခ�
 1. **Fretted bass အဖြစ် ဆုံးဖြတ်ပြီး** Guitar Engine ကို ပြန်သုံးသည်။ `JAZZ_BASS_DRAWN` နှင့် `PRECISION_BASS_DRAWN` တို့၏ measured ကို အသုံးပြုပြီး ကြိုး ၄ ကြိုး/ဖရက် ၂၀ ကို ဆွဲသည်။ ကြိုးလိုင်းများကို ပုံ၏ ကိုယ်ပိုင် တိုင်းထားချက်မှ ဖြန့်သဖြင့် နှစ်ခု မထပ်ပါ၊ ပုံ၏ လည်ပင်းအပြင် မရောက်ပါ။
 2. **Note အရင်းအမြစ်** — `<string>`/`<fret>` အတွဲကို ရေးထားသည့်အတိုင်း သုံးသည်။ Tablature မပါသော note ကို pitch မှ အနိမ့်ဆုံး fret အဖြစ် တွက်သည် (Bass Engine တွင် `analyzeBass` မရှိသေးသဖြင့် ထို စည်းမျဉ်းသည် adapter ထဲတွင် ရှိသည်)။ E1 အောက် မရောက်သော score ကို ငြင်းသည် — လည်ပင်း အလွတ် မဆွဲပါ။
 3. **အသံ မထုတ်ပါ** (silent)။
-4. **စမ်းသပ်မှု** — `tools/test-bass-studio-browser.mjs` က Chromium တွင် တကယ့် page ကို မောင်းပြီး ffprobe ဖြင့် တိုင်းသည်: 720×1280 portrait၊ score ၏ 4.00 s၊ audio stream မပါ၊ Thank You clip ၏ အရှည်နှင့် အသံ ပါ၊ ကြိုး ၄ ကြိုး/ဖရက် ၂၀၊ shape determinism၊ cancel လုပ်လျှင် ဖိုင် မကျန်၊ ဖုန်း/desktop တွင် overflow မရှိ။ **PASS**။
+4. **စမ်းသပ်မှု** — `tools/test-bass-studio-browser.mjs` က Chromium တွင် တကယ့် page ကို မောင်းပြီး ffprobe ဖြင့် တိုင်းသည်: 1080×1920 portrait၊ score ၏ 4.00 s၊ audio stream မပါ၊ Thank You clip ၏ အရှည်နှင့် အသံ ပါ၊ ကြိုး ၄ ကြိုး/ဖရက် ၂၀၊ shape determinism၊ cancel လုပ်လျှင် ဖိုင် မကျန်၊ ဖုန်း/desktop တွင် overflow မရှိ။ **PASS**။
 
 ### Strings — `studio-violin.js` (drawing-only)
 
 1. **Violin ပုံ တစ်ပုံသာ** ရှိသည် (`assets/violin/violin.svg`)။ ထို ပုံကို ဆွဲသည်။
 2. **ဘာမှ အမှတ်အသား မထားပါ** — violin တွင် ဖရက် မရှိ၊ fingering engine မရှိသဖြင့် နေရာ ခန့်မှန်း မထည့်ပါ။ Summary တွင် ထို အချက်ကို ပြသည်။
 3. **Layout** — `violin` template၊ 16:9/1:1 တွင် notation ဘယ်/violin ညာ၊ 9:16 တွင် အပေါ်အောက် ထပ်၍ အောက်ဆုံးတွင် Title/Info။
-4. **စမ်းသပ်မှု** — `tools/test-violin-studio-browser.mjs`။ 9:16 က 720×1280/4.00 s၊ 16:9 က 1280×720၊ 2 s Thank You clip ဖြင့် 6.00 s နှင့် clip အသံ ပါ။ Violin ၏ band/column ကို pixel ဖြင့် ရေတွက်သဖြင့် အလွတ် မဖြတ်နိုင်ပါ။ **PASS**။
+4. **စမ်းသပ်မှု** — `tools/test-violin-studio-browser.mjs`။ 9:16 က 1080×1920/4.00 s၊ 16:9 က 1920×1080၊ 2 s Thank You clip ဖြင့် 6.00 s နှင့် clip အသံ ပါ။ Violin ၏ band/column ကို pixel ဖြင့် ရေတွက်သဖြင့် အလွတ် မဖြတ်နိုင်ပါ။ **PASS**။
 
 ### Voice — `studio-voice.js` (audible)
 

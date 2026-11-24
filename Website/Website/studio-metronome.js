@@ -33,8 +33,11 @@
   const timeline = document.querySelector('[data-video-timeline]');
   const playButton = document.querySelector('[data-video-play]');
   const stage = document.querySelector('[data-video-stage]');
-  const MAX_EXPORT_SECONDS = 12;
   const FPS = 30;
+  // The pixel size of each ratio is the Video Engine's, not this page's:
+  // the Plan gives every video the same three delivery sizes.
+  const sizeFor = (aspect) => engine.sizeFor(aspect);
+
   // The files a design's mark name resolves to. A blob SVG cannot load a
   // file path -- the browser treats the blob as its own base and refuses
   // every href inside it -- so the mark has to travel IN the document,
@@ -47,11 +50,6 @@
   // marks exist, every design carries the house mark.
   const LOGO_ASSETS = { sharing: 'assets/logo/m-sharing-mark.svg' };
   const HOUSE_LOGO = 'sharing';
-  const DIMENSIONS = {
-    '16x9': { width: 1280, height: 720 },
-    '9x16': { width: 720, height: 1280 },
-    '1x1': { width: 720, height: 720 },
-  };
 
   let isRendering = false;
   let cancelRequested = false;
@@ -115,14 +113,17 @@
     if (!Number.isInteger(bars) || bars < 1 || bars > 16) throw new RangeError('Bars must be an integer from 1 to 16.');
     if (!Number.isInteger(numerator) || numerator < 1 || numerator > 12) throw new RangeError('Beats per bar must be an integer from 1 to 12.');
     if (![2, 4, 8, 16].includes(denominator)) throw new RangeError('Choose a supported beat unit.');
-    if (!DIMENSIONS[aspect]) throw new RangeError('Choose a supported video orientation.');
+    const size = sizeFor(aspect);
     const beatSeconds = (60 * 4) / (bpm * denominator);
     const totalBeats = bars * numerator;
     const seconds = beatSeconds * totalBeats;
-    if (!Number.isFinite(seconds) || seconds <= 0 || seconds > MAX_EXPORT_SECONDS) {
-      throw new RangeError(`Choose settings that keep the video at or below ${MAX_EXPORT_SECONDS} seconds.`);
+    // No page-side length cap: the Plan fixes the video's length as the
+    // sum of its parts, and the Video Engine's memory guard is the safety
+    // net. Only a length that cannot be rendered at all is refused here.
+    if (!Number.isFinite(seconds) || seconds <= 0) {
+      throw new RangeError('Choose settings that give the metronome a length.');
     }
-    return { bpm, bars, numerator, denominator, design, aspect, beatSeconds, totalBeats, seconds, ...DIMENSIONS[aspect] };
+    return { bpm, bars, numerator, denominator, design, aspect, beatSeconds, totalBeats, seconds, ...size };
   }
 
   function frameAt(settings, atSeconds) {

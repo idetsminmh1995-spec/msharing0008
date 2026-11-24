@@ -21,11 +21,6 @@
   const timeline = document.querySelector('[data-video-timeline]');
   const playButton = document.querySelector('[data-video-play]');
   const FPS = 30;
-  const DIMENSIONS = {
-    '16x9': { width: 1280, height: 720 },
-    '9x16': { width: 720, height: 1280 },
-    '1x1': { width: 720, height: 720 },
-  };
   // The two basses the Guitar Engine measured. Both are FOUR-string
   // drawings, which is why this page offers no five-string choice.
   const PHOTO_FILES = {
@@ -96,8 +91,7 @@
     const photo = photoSelect.value;
     const aspect = aspectSelect.value;
     if (!PHOTO_FILES[photo]) throw new RangeError('Choose a bass picture.');
-    if (!DIMENSIONS[aspect]) throw new RangeError('Choose a supported video orientation.');
-    const size = DIMENSIONS[aspect];
+    const size = engine.sizeFor(aspect);
     return {
       photo,
       aspect,

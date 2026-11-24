@@ -183,17 +183,28 @@ try {
   assert.ok(desktopLayout.scrollWidth <= desktopLayout.width, `Metronome Studio overflows at desktop width: ${JSON.stringify(desktopLayout)}`);
   assert.equal(desktopLayout.columns.trim().split(/\s+/).length, 2, 'Metronome Studio did not use two columns on desktop');
 
-  await evaluate("(() => { const bpm = document.querySelector('[data-metronome-bpm]'); bpm.value = '30'; bpm.dispatchEvent(new Event('input', {bubbles:true})); })()");
-  const invalidSettings = JSON.parse(await evaluate("JSON.stringify({disabled:document.querySelector('[data-studio-generate]').disabled,status:document.querySelector('[data-studio-status]').textContent})"));
-  assert.ok(invalidSettings.disabled, 'Metronome render was not blocked above the 12-second limit');
-  assert.match(invalidSettings.status, /12 seconds/);
+  // The Plan fixes a video's length as the sum of its parts, so the page
+  // must not cap it: a long metronome setting has to stay exportable and
+  // report its real length. Only the Video Engine's memory guard may stop it.
+  await evaluate("(() => { const set = (selector, value) => { const el = document.querySelector(selector); el.value = value; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }; set('[data-metronome-bpm]', '30'); set('[data-metronome-bars]', '16'); set('[data-metronome-numerator]', '12'); })()");
+  const longReadyAt = Date.now();
+  let longSettings = null;
+  while (Date.now() - longReadyAt < 10000) {
+    longSettings = JSON.parse(await evaluate("JSON.stringify({disabled:document.querySelector('[data-studio-generate]').disabled,estimate:document.querySelector('[data-metronome-duration]').textContent,status:document.querySelector('[data-studio-status]').textContent})"));
+    if (/384\.00 sec/.test(longSettings.estimate)) break;
+    await sleep(100);
+  }
+  assert.equal(longSettings.disabled, false, `Metronome render is still capped by the page: ${longSettings.status}`);
+  assert.match(longSettings.estimate, /384\.00 sec/, `The page does not report the full length: ${longSettings.estimate}`);
 
   await evaluate("(() => { const set = (selector, value) => { const el = document.querySelector(selector); el.value = value; el.dispatchEvent(new Event('input', {bubbles:true})); el.dispatchEvent(new Event('change', {bubbles:true})); }; set('[data-metronome-design]', 'sweep-dial'); set('[data-metronome-aspect]', '9x16'); set('[data-metronome-bpm]', '96'); set('[data-metronome-bars]', '1'); set('[data-metronome-numerator]', '3'); set('[data-metronome-denominator]', '8'); })()");
   const previewReadyAt = Date.now();
   let preview = null;
   while (Date.now() - previewReadyAt < 10000) {
     preview = JSON.parse(await evaluate("JSON.stringify({src:document.querySelector('[data-metronome-preview]').src,visible:!document.querySelector('[data-metronome-preview]').hidden,naturalWidth:document.querySelector('[data-metronome-preview]').naturalWidth,estimate:document.querySelector('[data-metronome-duration]').textContent,status:document.querySelector('[data-studio-status]').textContent})"));
-    if (preview.visible && preview.naturalWidth > 0) break;
+    // The previous settings' preview is already on screen, so wait for the
+    // label to describe the settings just chosen rather than for any frame.
+    if (preview.visible && preview.naturalWidth > 0 && /0\.94 sec/.test(preview.estimate)) break;
     await sleep(100);
   }
   assert.ok(preview?.visible && preview.naturalWidth > 0, 'Metronome SVG preview did not decode');
@@ -242,8 +253,8 @@ try {
   const audioStream = probe.streams.find((stream) => stream.codec_type === 'audio');
   assert.ok(videoStream, 'Metronome output has no video stream');
   assert.ok(audioStream, 'Metronome output has no synthesized click-track audio');
-  assert.equal(videoStream.width, 720, 'Portrait video width is wrong');
-  assert.equal(videoStream.height, 1280, 'Portrait video height is wrong');
+  assert.equal(videoStream.width, 1080, 'Portrait video width is wrong');
+  assert.equal(videoStream.height, 1920, 'Portrait video height is wrong');
   assert.ok(Math.abs(Number(probe.format.duration) - 0.9375) < 0.2, 'Video duration does not match 3/8 at quarter-note 96 BPM');
 
   // Frame determinism (Plan §5). The same settings rendered twice have to

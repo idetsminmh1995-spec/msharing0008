@@ -45,7 +45,7 @@ UI တွင် BPM ကို **quarter-note BPM** အဖြစ် သတ်မ�
 
 စုစုပေါင်း beat အရေအတွက်မှာ `bars × beatsPerBar` ဖြစ်ပြီး စုစုပေါင်းအချိန်မှာ `beatSeconds × bars × beatsPerBar` ဖြစ်သည်။ Adapter သည် frame time မှ `beat`, `bar`, `phase` ကို တွက်၍ downbeat ကို bar တစ်ခုစီတွင် ပြန်စတင်သည်။ အရှည်ကို **12 sec အများဆုံး** သတ်မှတ်ထားပြီး ကျော်လွန်လျှင် render မလုပ်ဘဲ form status တွင် အကြောင်းပြသည်။
 
-Video canvas အရွယ်အစားများမှာ Landscape `1280×720`, Portrait `720×1280`, Square `720×720`; frame rate `30 FPS` ဖြစ်သည်။ SVG Engine သည် မိမိ၏ aspect-specific viewBox ကို ထိန်းထားပြီး Video Engine canvas ထဲသို့ အချိုးမှန်ဆွဲသည်။
+Video canvas အရွယ်အစားများကို adapter ကိုယ်တိုင် မသတ်မှတ်တော့ဘဲ Video Engine ၏ shared `sizeFor()` မှ ယူသည် — Landscape `1920×1080`, Portrait `1080×1920`, Square `1080×1080`; frame rate `30 FPS` ဖြစ်သည်။ SVG Engine သည် မိမိ၏ aspect-specific viewBox ကို ထိန်းထားပြီး Video Engine canvas ထဲသို့ အချိုးမှန်ဆွဲသည်။
 
 ## Click audio
 
@@ -70,7 +70,7 @@ Package တွင် lockfile မရှိသေးသဖြင့် clean inst
 - Video Engine cleanup/safety Node tests **5/5 pass**.
 - Chromium Video Engine smoke test: `ffprobe` က MP4/H.264, 320×180, 30 frames, 1.0 sec ကို ဖတ်နိုင်သည်။
 - Drum Studio browser regression: default-pattern workflow က MP4/H.264 1920×1080 landscape export နှင့် 1080×1920 portrait export ထုတ်နိုင်ပြီး Drum export ၏ silent behavior မပြောင်းပါ။
-- Metronome Studio browser integration: Create Video ရှိ Metronome card ကိုနှိပ်ပြီး Studio route သို့ရောက်ကြောင်း စစ်သည်။ 12 စက္ကန့်ကျော်သော setting ကို export မစမီ ပိတ်ကြောင်းလည်း အတည်ပြုထားသည်။ `sweep-dial`, 9:16, quarter-note 96 BPM, 3/8, 1 bar ကို render လုပ်ပြီး **28 frames, 0.933 sec**, 720×1280 VP8 video နှင့် 48 kHz mono Opus audio ထွက်သည်။ `ffprobe` က video/audio stream နှစ်ခုလုံးကို ဖတ်နိုင်သည်။
+- Metronome Studio browser integration: Create Video ရှိ Metronome card ကိုနှိပ်ပြီး Studio route သို့ရောက်ကြောင်း စစ်သည်။ 12 စက္ကန့်ကျော်သော setting ကို export မစမီ ပိတ်ကြောင်းလည်း အတည်ပြုထားသည်။ `sweep-dial`, 9:16, quarter-note 96 BPM, 3/8, 1 bar ကို render လုပ်ပြီး **28 frames, 0.933 sec**, 1080×1920 VP8 video နှင့် 48 kHz mono Opus audio ထွက်သည်။ `ffprobe` က video/audio stream နှစ်ခုလုံးကို ဖတ်နိုင်သည်။
 - Metronome controls နှင့် Studio layout: 375×812 phone viewport တွင် 1-column, 1280×900 desktop viewport တွင် 2-column ဖြစ်ပြီး horizontal overflow မရှိ။ Metronome route တွင် shared Drum settings form ကို ဖျောက်ထားကြောင်း စစ်ဆေးထားသည်။
 - Video Engine source/production sync နှင့် Metronome Engine source/production sync နှစ်ခုစလုံး pass.
 
@@ -90,7 +90,7 @@ Design တစ်ခုချင်း၏ မူလ visual identity နှင့�
 - **Bounce Ball:** runway/pad hierarchy, adaptive labels နှင့် current/total beat readout.
 - **Stack Blocks:** motion ကို beat တစ်ခုလုံးအတွင်း ဆက်ပြပြီး active block highlight.
 
-11×3 = **33 SVG layout previews** ကို Chromium gallery ဖြင့် manual visual review လုပ်ထားသည်။ 12/8, beat 12/12, 240 BPM stress frame-ээр 2-digit number болон dense 12-beat arrangement ကိုလည်း ထပ်စစ်ထားသည်။ Metronome Engine `npm run verify` တွင် **22/22 tests** pass бөгөөд production/static website bundle sync ဖြစ်သည်။ Video Engine Chromium end-to-end test သည် `sweep-dial` portrait 3/8 example ကို **28 frames, 720×1280 VP8 video + 48 kHz mono Opus** အဖြစ် ထုတ်ပေးပြီး pass ဖြစ်သည်။ Automated pixel/snapshot visual regression ကို မထည့်ရသေးပါ။
+11×3 = **33 SVG layout previews** ကို Chromium gallery ဖြင့် manual visual review လုပ်ထားသည်။ 12/8, beat 12/12, 240 BPM stress frame-ээр 2-digit number болон dense 12-beat arrangement ကိုလည်း ထပ်စစ်ထားသည်။ Metronome Engine `npm run verify` တွင် **22/22 tests** pass бөгөөд production/static website bundle sync ဖြစ်သည်။ Video Engine Chromium end-to-end test သည် `sweep-dial` portrait 3/8 example ကို **28 frames, 1080×1920 VP8 video + 48 kHz mono Opus** အဖြစ် ထုတ်ပေးပြီး pass ဖြစ်သည်။ Automated pixel/snapshot visual regression ကို မထည့်ရသေးပါ။
 
 ## လက်ကျန်ကန့်သတ်ချက်များ
 

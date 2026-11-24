@@ -377,8 +377,8 @@ try {
   const audioStream = probe.streams.find((stream) => stream.codec_type === 'audio');
   assert.ok(videoStream, 'Voice output has no video stream');
   assert.ok(audioStream, `Voice output has no audio stream, so the video is silent: ${JSON.stringify(probe.streams)}`);
-  assert.equal(videoStream.width, 720, 'Portrait voice video width is wrong');
-  assert.equal(videoStream.height, 1280, 'Portrait voice video height is wrong');
+  assert.equal(videoStream.width, 1080, 'Portrait voice video width is wrong');
+  assert.equal(videoStream.height, 1920, 'Portrait voice video height is wrong');
   assert.equal(Number(audioStream.channels), 1, 'The mono recording did not stay mono');
   const seconds = Number(probe.format.duration);
   assert.ok(Math.abs(seconds - TONE_SECONDS) < 0.4, `Voice video is not the recording's length: ${seconds}s instead of ${TONE_SECONDS}s`);
@@ -453,14 +453,19 @@ def mean_thickness(left, right):
     return total / max(1, columns)
 
 lit = sum(1 for y in range(0, height, 2) for x in range(0, width, 2) if bright(x, y))
-print(mean_thickness(0, middle), mean_thickness(middle, width), lit)
+print(mean_thickness(0, middle), mean_thickness(middle, width), lit, bottom - top)
 `]);
-  const [quietThickness, loudThickness, litPixels] = ink.trim().split(/\s+/).map(Number);
+  const [quietThickness, loudThickness, litPixels, bandHeight] = ink.trim().split(/\s+/).map(Number);
+  // Thickness is measured against the band it is drawn in, not in fixed
+  // pixels: the frame is 1080p now, so the same drawing is half again as
+  // many pixels tall as it was when these numbers were written.
+  const quietFraction = quietThickness / bandHeight;
+  const loudFraction = loudThickness / bandHeight;
   assert.ok(litPixels > 0, 'The voice frame has nothing drawn on it');
-  assert.ok(loudThickness > 8,
-    `The loud half of the waveform is not drawn: it is ${loudThickness.toFixed(1)} px thick`);
-  assert.ok(quietThickness < 4,
-    `The silent half of the recording is drawn as sound: it is ${quietThickness.toFixed(1)} px thick`);
+  assert.ok(loudFraction > 0.05,
+    `The loud half of the waveform is not drawn: it is ${(loudFraction * 100).toFixed(1)}% of the band`);
+  assert.ok(quietFraction < 0.02,
+    `The silent half of the recording is drawn as sound: it is ${quietThickness.toFixed(1)} px thick, ${(quietFraction * 100).toFixed(1)}% of the band`);
   assert.ok(loudThickness > quietThickness * 5,
     `The waveform does not follow the recording: quiet ${quietThickness.toFixed(1)} px, loud ${loudThickness.toFixed(1)} px`);
 

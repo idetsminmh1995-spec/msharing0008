@@ -167,3 +167,22 @@ test('composeFrame refuses a caller with no parts map', async () => {
   const { composeFrame } = loadEngine();
   await assert.rejects(() => composeFrame({}, { instrument: 'drums', width: 1920, height: 1080 }), TypeError);
 });
+
+test('the engine is the one place a delivery size is written', () => {
+  const { sizeFor, ratioNames, DELIVERY_SIZES } = loadEngine();
+  assert.deepEqual(ratioNames().sort(), Object.keys(SIZES).sort());
+  for (const [ratio, size] of Object.entries(SIZES)) {
+    assert.deepEqual({ ...sizeFor(ratio) }, size, `${ratio} is not the Plan's delivery size`);
+    assert.deepEqual({ ...DELIVERY_SIZES[ratio] }, size);
+    // Pages spell the ratio with a colon or an x; both name the same frame.
+    assert.deepEqual({ ...sizeFor(ratio.replace(':', 'x')) }, size);
+  }
+});
+
+test('an unknown ratio is refused, and the caller cannot edit the table', () => {
+  const { sizeFor, DELIVERY_SIZES } = loadEngine();
+  assert.throws(() => sizeFor('4:3'), /not a supported video ratio/);
+  const size = sizeFor('16:9');
+  size.width = 1;
+  assert.equal(DELIVERY_SIZES['16:9'].width, 1920, 'sizeFor handed out the table itself');
+});

@@ -24,11 +24,6 @@
   const playButton = document.querySelector('[data-video-play]');
   const stage = document.querySelector('[data-video-stage]');
   const FPS = 30;
-  const DIMENSIONS = {
-    '16x9': { width: 1280, height: 720 },
-    '9x16': { width: 720, height: 1280 },
-    '1x1': { width: 720, height: 720 },
-  };
   // The pictures the Guitar Engine measured, and the names it knows them by.
   const PHOTO_FILES = {
     'acoustic-drawn': 'assets/guitar/acoustic-drawn.svg',
@@ -96,8 +91,7 @@
     const picking = pickingSelect?.value === 'fingers' ? 'fingers' : 'pick';
     const handLegend = handLegendInput?.checked === true;
     if (!PHOTO_FILES[photo]) throw new RangeError('Choose a guitar picture.');
-    if (!DIMENSIONS[aspect]) throw new RangeError('Choose a supported video orientation.');
-    const size = DIMENSIONS[aspect];
+    const size = engine.sizeFor(aspect);
     return {
       photo,
       aspect,

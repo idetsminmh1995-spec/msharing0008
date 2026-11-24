@@ -23,11 +23,6 @@
   const timeline = document.querySelector('[data-video-timeline]');
   const playButton = document.querySelector('[data-video-play]');
   const FPS = 30;
-  const DIMENSIONS = {
-    '16x9': { width: 1280, height: 720 },
-    '9x16': { width: 720, height: 1280 },
-    '1x1': { width: 720, height: 720 },
-  };
   // One drawing, and it is the same file in all three shapes. A violin is a
   // single tall object rather than a kit filed per crop, so there is no
   // per-shape picture to choose between.
@@ -64,8 +59,7 @@
 
   function readSettings() {
     const aspect = aspectSelect.value;
-    if (!DIMENSIONS[aspect]) throw new RangeError('Choose a supported video orientation.');
-    const size = DIMENSIONS[aspect];
+    const size = engine.sizeFor(aspect);
     return {
       aspect,
       ...size,

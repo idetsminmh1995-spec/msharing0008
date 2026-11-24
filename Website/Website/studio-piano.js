@@ -20,17 +20,12 @@
   const timeline = document.querySelector('[data-video-timeline]');
   const playButton = document.querySelector('[data-video-play]');
   const FPS = 30;
-  const DIMENSIONS = {
-    '16x9': { width: 1280, height: 720 },
-    '9x16': { width: 720, height: 1280 },
-    '1x1': { width: 720, height: 720 },
-  };
   // The parts this page draws, in the order the Piano layout stacks them.
   const PARTS = ['title', 'notation', 'instrument'];
-  // White keys a frame shows at once. A whole 88-key keyboard in a
-  // 720-pixel-wide frame is 8 pixels a key: no player reads that. A short
-  // passage is shown on this many keys rather than on a handful of giant
-  // ones, so the keyboard still looks like a keyboard.
+  // White keys a frame shows at once. A whole 88-key keyboard is 12 pixels
+  // a key even at 1080 wide: no player reads that. A short passage is shown
+  // on this many keys rather than on a handful of giant ones, so the
+  // keyboard still looks like a keyboard.
   const VISIBLE_WHITES = 29;
   const MIN_VISIBLE_WHITES = 21;
 
@@ -62,8 +57,7 @@
 
   function readSettings() {
     const aspect = aspectSelect.value;
-    if (!DIMENSIONS[aspect]) throw new RangeError('Choose a supported video orientation.');
-    const size = DIMENSIONS[aspect];
+    const size = engine.sizeFor(aspect);
     return {
       aspect,
       ...size,

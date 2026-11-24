@@ -343,8 +343,8 @@ try {
   const audioStream = probe.streams.find((stream) => stream.codec_type === 'audio');
   assert.ok(videoStream, 'Violin output has no video stream');
   assert.equal(audioStream, undefined, 'Violin output claims an audio track the engine cannot make');
-  assert.equal(videoStream.width, 720, 'Portrait violin video width is wrong');
-  assert.equal(videoStream.height, 1280, 'Portrait violin video height is wrong');
+  assert.equal(videoStream.width, 1080, 'Portrait violin video width is wrong');
+  assert.equal(videoStream.height, 1920, 'Portrait violin video height is wrong');
   // The Plan's length rule, with no cap of the page's own.
   const scoreSeconds = Number(probe.format.duration);
   assert.ok(Math.abs(scoreSeconds - 4) < 0.4, `Violin video is not the score's length: ${scoreSeconds}s instead of 4s`);
@@ -465,8 +465,8 @@ print(moved, width * height)
   const landscapeProbe = JSON.parse((await exec('ffprobe', ['-v', 'error',
     '-show_entries', 'stream=codec_type,width,height', '-of', 'json', landscapePath])).stdout);
   const landscapeStream = landscapeProbe.streams.find((stream) => stream.codec_type === 'video');
-  assert.equal(landscapeStream.width, 1280, 'Landscape violin video width is wrong');
-  assert.equal(landscapeStream.height, 720, 'Landscape violin video height is wrong');
+  assert.equal(landscapeStream.width, 1920, 'Landscape violin video width is wrong');
+  assert.equal(landscapeStream.height, 1080, 'Landscape violin video height is wrong');
 
   // In landscape the violin is the right-hand column, so ink must be there
   // and the left column must be the notation's panel.

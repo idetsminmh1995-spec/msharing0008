@@ -20,11 +20,6 @@
   const timeline = document.querySelector('[data-video-timeline]');
   const playButton = document.querySelector('[data-video-play]');
   const FPS = 30;
-  const DIMENSIONS = {
-    '16x9': { width: 1280, height: 720 },
-    '9x16': { width: 720, height: 1280 },
-    '1x1': { width: 720, height: 720 },
-  };
   /**
    * The longest recording this page will turn into a video. A decoded
    * AudioBuffer is held whole, so the limit is about memory rather than
@@ -68,8 +63,7 @@
 
   function readSettings() {
     const aspect = aspectSelect.value;
-    if (!DIMENSIONS[aspect]) throw new RangeError('Choose a supported video orientation.');
-    const size = DIMENSIONS[aspect];
+    const size = engine.sizeFor(aspect);
     return { aspect, ...size, color: 'black' };
   }
 
