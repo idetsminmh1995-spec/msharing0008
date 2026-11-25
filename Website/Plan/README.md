@@ -610,7 +610,7 @@ Drum မဟုတ်သော instrument များအတွက် Studio သ�
 
 | အရာ | အခြေအနေ |
 |---|---|
-| Drum ပုံများ | R2 မှ ယူသုံးရမည် (ဖိုင်စာရင်း မသတ်မှတ်ရသေး) |
+| Drum ပုံများ | R2 မှ ယူသုံးရမည် — `drums/{Brand}/{Model}/{ratio}/…` (§၁၃.၁)၊ public URL `https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev` |
 | Logo default | R2 ထဲတွင် အမြဲရှိ၊ user ကလည်း ကိုယ်ပိုင်တင်နိုင် |
 | Thank You video | R2 ထဲ ရှိပြီးသား၊ Landscape / Portrait / Square သီးခြားဖိုင်၊ Video Engine ၏ တာဝန် |
 | SoundFont | R2 versioned prefix (အထက်ပါ Sound Engine section) |
@@ -665,9 +665,11 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 | **V11** | **Drum kit ပုံ + highlight overlay ကို R2 မှ** ယူသုံး — Notation Engine → Drum Human Stick Engine → Drum Animation Engine → Video Engine ချိတ်ဆက် (§၁၃)၊ `drawInstrumentPart` ၏ drum lane ကို ပုံဖြင့် အစားထိုး | အချိန် `t` တွင် မှန်သော overlay လင်း၊ ပုံမရှိသော stroke ကို ကျော်ပြီး အရေအတွက် ပြ၊ base kit ပုံ မရလျှင် export မစ |
 | **V12** | **Info ကွက် TIME / BPM / COUNT** (§၁၃) — COUNT ကွက် beat တိုင်း ပြောင်း | ရည်ညွှန်းပုံနှင့် ကိုက်၊ Count display option အတိုင်း (`1` / `1&` / `1e&a`) |
 | **V13** | **Video Color** (Black/White) ပြောင်းလျှင် အကုန်ပြောင်း (§၁၄) | Background၊ Notation၊ ကွက်များ၊ စာသား၊ Logo၊ cursor အားလုံး မှန်၊ Preview တွင် ချက်ချင်းပြောင်း |
+| **V14** | **Notation ကို ကိုယ့်ဧရိယာထဲတွင်သာ ပြ** (clip၊ rect ထဲ ကိုက်အောင်ညှိ) (§၁၃.၂) | Rect အပြင် pixel ကွာခြားမှု ၀၊ Ratio ၃ မျိုး × Page/Horizontal |
+| **V15** | **Drum Brand → Model → ratio ကို manifest မှ ရွေး** — hard-code list ဖယ်၊ Brand ရွေးမှ ၎င်း၏ Model များသာပေါ်၊ ratio ကိုက် ပုံ set ယူ (§၁၃.၁) | Brand/Model/Ratio ပြောင်းလျှင် Preview ၌ ပုံ set ပြောင်း၊ Brand အသစ်ထည့်သော manifest ဖြင့် code မပြင်ဘဲ ပေါ် |
 | **V10** | **Doc** — Video Engine Doc တွင် layout API (`layoutFor`, `composeFrame`, `requireAsset`) နှင့် Drum Studio ၏ Title/Notation/Preview ကို မှတ် | Doc ထဲ ရှိ၊ Doc index တွင် link |
 
-**MVP ပြီးသည်ဟု သတ်မှတ်ရန်:** V1 – V7၊ V10 – V13။ V8 (Thank You) နှင့် V9 (အသံ) သည် ဆက်လက်လုပ်မည့် အဆင့်များ ဖြစ်သော်လည်း Video ပြည့်စုံရန် လိုအပ်ချက်ဖြစ်သည်။
+**MVP ပြီးသည်ဟု သတ်မှတ်ရန်:** V1 – V7၊ V10 – V15။ V8 (Thank You) နှင့် V9 (အသံ) သည် ဆက်လက်လုပ်မည့် အဆင့်များ ဖြစ်သော်လည်း Video ပြည့်စုံရန် လိုအပ်ချက်ဖြစ်သည်။
 
 ### ၉။ ပြီးစီးမှု အခြေအနေ (Doc + code စစ်ဆေးချက် — 2026-11-23)
 
@@ -740,7 +742,7 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 | 9:16 | ၈% | ၄၂% | ၅၀% |
 
    **Violin (ဘေးတစ်ဖက်):** 16:9 နှင့် 1:1 တွင် Notation ကို ဘယ်ဘက် ~၆၀%၊ Violin ကို ညာဘက် ~၄၀% ထားပြီး အောက်ဆုံးတွင် Title / Info အကျယ်အပြည့်။ 9:16 (Portrait) တွင် ဘေးချင်းယှဉ်လျှင် ကျဉ်းလွန်းသဖြင့် Notation အပေါ်၊ Violin အောက် ထပ်၍ အောက်ဆုံးတွင် Title / Info။
-7. **Drum ပုံများ** — ဖိုင်စာရင်း/အမည်/path ကို Plan ထဲ မသတ်မှတ်၊ R2 ထဲက manifest မှ Drum Animation Engine က ဖတ်မည်။ **Thank You ဖိုင်အမည်/path** သည် Video Engine ထဲတွင်သာ။
+7. **Drum ပုံများ** — R2 path ပုံစံ (`drums/{Brand}/{Model}/{ratio}/`) ကို §၁၃.၁ တွင် သတ်မှတ်ပြီး၊ ဖိုင်စာရင်းကို manifest မှ Drum Animation Engine က ဖတ်မည်။ **Thank You ဖိုင်အမည်/path** သည် Video Engine ထဲတွင်သာ။
 8. **Video ကို Preview Play လို့ရရမည်** (အသုံးပြုသူ လိုအပ်ချက်) — Live Preview နှင့် Rendered playback နှစ်မျိုးလုံး (§၁၂)။
 9. **Drum video MVP** = Title / Info နှင့် Notation ပါသော MP4 export + Preview Play (§၈)။
 10. Count-in အရှည် = အစ bar တစ်ခု (default)။ Thank You ကို Live Preview ထဲလည်း ထည့်။
@@ -802,7 +804,7 @@ MusicXML ─► Notation Engine ── score + playback timeline
 ```
 
 - **ပုံအမျိုးအစား:** (က) **kit base ပုံ** — drum kit တစ်ခုလုံး၊ (ခ) **highlight overlay ပုံ** — တီးနေသော drum ကို တီးသောဘက် (ဘယ်/ညာ) မှ stick သို့မဟုတ် ခြေ ပါသော frame အပြည့် overlay။ Drum Human Stick Engine ၏ Doc အရ overlay ပုံများကို `R{gmNote}.png` / `L{gmNote}.png` ဟု အမည်ပေးထားသည် — **ဘယ်/ညာ (side)** ကို ဖိုင်အမည်က ဖော်ပြသည်၊ ခြေလက်(limb) မဟုတ် (ဥပမာ kick = ညာခြေ = `R36.png`)။ ယင်း Doc တွင်ပင် ခြေပုံကို `{gmNote}.png` ဟုလည်း ဖော်ပြထားသဖြင့် **အမည်ပေးပုံ မညီ** — R2 ထဲက အမှန်တကယ် ဖိုင်အမည်ကို Manus AI/user က အတည်ပြုရန် (အောက်ပါ မေးခွန်း)။
-- **Kit ရွေးချယ်ခြင်း:** ပုံများသည် **kit တစ်ခုချင်းစီ** (Drum Brand / Model) အလိုက် ရှိမည်ဟု Doc က ဆိုသည်။ Studio ၏ `Drum Brand / Drum Model` ရွေးချယ်မှုက ပုံ set ကို ရွေးမည် (default — အတည်ပြုရန်)။
+- **Kit ရွေးချယ်ခြင်း (အတည်ပြုပြီး):** ပုံများသည် **Brand → Model → ratio** အလိုက် R2 ထဲတွင် ရှိပြီး Studio ၏ `Drum Brand` / `Drum Model` ရွေးချယ်မှုက ပုံ set ကို ရွေးသည် — အသေးစိတ်ကို §၁၃.၁ တွင် ကြည့်ပါ။
 - **စည်းကမ်းများ** (Drum Human Stick Engine ၏ ရှိပြီးသား ဆုံးဖြတ်ချက်များ):
   - Velocity ကို **ဆင်းသက်၍ရ** (MusicXML တွင် မပါ) — လက်ရှိ dynamic marking နှင့် note ၏ accent မှ။ မဖန်တီးရ။
   - `<midi-unpitched>` မရှိသော note ကို **ကျော်** — GM နံပါတ်ကို မခန့်မှန်းရ။
@@ -812,6 +814,36 @@ MusicXML ─► Notation Engine ── score + playback timeline
 - **အခြေအနေ:** ဤ bridge သည် မူလ project (Drum video page) တွင် page ထဲမှာ ရှိခဲ့သည်။ ယခု restart repo ၏ Studio ၌ **ချိတ်ဆက်မှု မရှိသေးပါ** (`drawInstrumentPart` သည် canvas drum lane ကိုသာ ဆွဲ)။ Engine တစ်ခုက အလုပ်တစ်မျိုးသာလုပ်ရမည်ဟူသော မူအရ bridge ကို page ထဲမထားဘဲ **Drum Animation Engine** ထဲ ထားမည်။
 - **Overlay ပြချိန် (default):** note စသည့်အချိန်မှ ပုံသေ အချိန်တိုတို (~၁၂၀ ms၊ note ၏ အရှည်ထက်မကျော်) လင်းပြီး ပျောက် — video အစစ်ကိုကြည့်၍ ညှိမည်။
 - **အပိုင်း အချိုး (ပုံမှ ခန့်မှန်း):** Title / Info ≈ ၂၀%၊ Notation ≈ ၃၃%၊ Drum kit ≈ ၄၇% (§၄ တွင် ညှိရန် ဖော်ပြပြီး)။
+
+### ၁၃.၁ Drum ပုံ — R2 အဆောက်အဦ
+
+(user ပြောပြချက်အရ။ r2.dev ကို Claude ဘက်မှ တိုက်ရိုက် ဖွင့်စစ်၍ မရသဖြင့် အောက်ပါအချက်များကို user ပြောသည့်အတိုင်း မှတ်ထားခြင်း ဖြစ်သည်။)
+
+- **Bucket:** `msharing0008` (public)၊ public URL `https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev`၊ prefix `drums/`။
+- **Path ပုံစံ:** `drums/{Brand}/{Model}/{ratio}/{ဖိုင်}`။
+  - **Brand** (ယခု) — `MSDrums`၊ `RolandDrums`။ **နောက်ပိုင်း Brand အသစ်များ ထပ်ထည့်မည်။**
+  - **Model** — Brand တစ်ခုအောက်တွင် model များ၊ ဥပမာ `MSDrums/MS Drum 1`၊ `MSDrums/MS Drum 2`။ (RolandDrums ၏ model ကို Studio ၏ လက်ရှိ option `VAD716` ဟု မြင်ရသည်။)
+  - **ratio** — `16x9`၊ `1x1`၊ `9x16` (Video Ratio နှင့် တူညီ)။ **ratio တစ်ခုချင်းစီသည် ကိုယ်ပိုင် ပုံ set** ရှိပြီး **မိမိ ratio ၏ ပုံကိုသာ** ယူသုံးရမည် (ratio တစ်ခု၏ ပုံကို အခြား ratio တွင် ဆွဲချဲ့/ချုံ့၍ မသုံးရ)။
+- **Base ပုံ:** `Drum Bg.png` — ratio folder တိုင်းတွင် **ရှိပြီး** (ဥပမာ `drums/MSDrums/MS Drum 1/16x9/Drum Bg.png`)။
+- **Highlight ပုံများ:** ဖိုင်အမည်ကို **MIDI number** ဖြင့် ပေးထားသည် (§၁၃ ၏ Drum Human Stick Engine Doc ပါ GM note နံပါတ်နှင့် ကိုက်)။ **အမည်ပုံစံအတိအကျ** (`R{n}.png` / `L{n}.png` / `{n}.png`) ကို အတည်ပြုရန် (မေးခွန်း ၁)။
+- **ဘယ် Brand/Model ရှိသလဲ** ကို code ထဲ hard-code မလုပ်ရ။ ယခု Studio တွင် `Drum Brand` (`RolandDrums`, `MSDrums`) နှင့် `Drum Model` (`VAD716`, `MS Drum 1`, `MS Drum 2`) ကို တိုက်ရိုက်ကြေညာထားသော list ဖြစ်ပြီး၊ Brand မည်သည်ကို ရွေးသည်နှင့် မသက်ဆိုင်ဘဲ model အားလုံးပေါ်နေသည်။ ပြင်ရမည် —
+  1. **Manifest** (အဆိုပြု `drums/manifest.json`) ကို public bucket ထဲ ထားပြီး Brand → Model → ratio → ဖိုင်စာရင်း ပါရမည်။ r2.dev သည် folder စာရင်းကို မပေးသဖြင့် manifest မရှိလျှင် Brand အသစ်ထည့်တိုင်း code ပြင်ရမည်။
+  2. Studio ၏ `Drum Brand` ကို manifest မှ ဖြည့်၊ Brand ရွေးလျှင် ၎င်း၏ **Model များသာ** ပေါ်၊ Video Ratio ရွေးလျှင် ratio folder ကို အလိုအလျောက် ရွေး။
+  3. Manifest ကို ထိန်းရန် (Brand အသစ်ထည့်သည့်အခါ update) ကို Manus AI ၏ R2 အလုပ်အဖြစ် သတ်မှတ်ရန် (§ Handoff)။
+- **Drum Animation Engine** က Brand/Model/ratio ကို လက်ခံ၍ manifest မှ ဖိုင်စာရင်းကို ဖတ်ပြီး **ရှိသမျှ မကျန်အောင်** ပြရမည်။ Base ပုံ (`Drum Bg.png`) မရလျှင် export မစရ။
+- Studio ၏ **Brand/Model/Ratio ပြောင်းလျှင် Live Preview ၌ ပုံ set ပြောင်း**ရမည် (§၁၂)။
+
+### ၁၃.၂ Notation — ကိုယ့်ဧရိယာထဲတွင်သာ ပြခြင်း
+
+Drum video ၏ Notation ကို **Notation အပိုင်း၏ ဧရိယာ (rect) အတွင်းတွင်သာ** ပြရမည်။ ဘာကြောင့်ဆိုသော် Notation သည် ရွေ့ (scroll) နေခြင်းကြောင့် အပြင်သို့ ကျော်ထွက်၍ Title / Info သို့မဟုတ် Drum kit အပိုင်းများပေါ် မထပ်ရ။
+
+- Notation ကို ဆွဲသည့်အခါ Notation rect ကို **clip** (`ctx.save(); ctx.beginPath(); ctx.rect(…); ctx.clip();` ... `ctx.restore()`) လုပ်ပြီးမှ ဆွဲရမည်။
+- Notation ၏ **အရွယ်ကို rect အတွင်း ကိုက်အောင်** ချိန် (staff အမြင့်ကို rect အမြင့်နှင့် margin ဖြင့် ညှိ)။
+- **Horizontal** (ညာမှဘယ်ရွေ့) တွင် ဘယ်/ညာ အစွန်းမှ ထွက်သော အပိုင်းကို ဖြတ်၊ **Page** (အောက်မှအပေါ်ရွေ့) တွင် အပေါ်/အောက် အစွန်းမှ ထွက်သော အပိုင်းကို ဖြတ်။ **Cursor ကွက်လည်း** rect ထဲတွင်သာ။
+- Notation rect နှင့် Drum kit rect သည် **မထပ်ရ**။ (ရည်ညွှန်းပုံတွင် kit ၏ အပေါ်ပိုင်း cymbal သည် Notation အောက်နားနှင့် အနည်းငယ် ထပ်ဝင်နေသော်လည်း Notation သည် ကိုယ့်ဧရိယာအပြင် မဆွဲရ — layout ညှိရာတွင် မထပ်စေရန် သို့မဟုတ် kit ပုံအပေါ်တွင် Notation မဆွဲရ။)
+- Ratio ၃ မျိုး (16:9 / 1:1 / 9:16) အားလုံးတွင် တူညီစွာ။
+
+**ပြီးစီးမှု စံနှုန်း:** Notation မဆွဲဘဲ ဆွဲထားသော frame နှင့် Notation ဆွဲထားသော frame ကို နှိုင်းယှဉ်လျှင် **Notation rect အပြင်ဘက် pixel များ ကွာခြားမှု ၀** ဖြစ်ရမည်။ Ratio ၃ မျိုး × Page / Horizontal × ရှည်သော score (scroll အဆုံးအထိ) ကို စစ်။
 
 ### ၁၄။ Video Color — ပြောင်းလျှင် အကုန်ပြောင်းရမည်
 
@@ -836,11 +868,11 @@ MusicXML ─► Notation Engine ── score + playback timeline
 
 ### မဖြေရှင်းရသေးသော အချက်များ (Video ထုတ်လုပ်ပုံ)
 
-1. **R2 ထဲက Drum ပုံ ဖိုင်အမည်အတိအကျ** — Doc တွင် `R{gmNote}.png` / `L{gmNote}.png` နှင့် ခြေပုံ `{gmNote}.png` ဟု မညီဘဲ ဖော်ပြထား၍ အမှန်ကို အတည်ပြုရန်၊ kit base ပုံအမည်၊ kit (Brand/Model) အလိုက် folder/prefix ပုံစံ (Drum Animation Engine စတင်ချိန်တွင် manifest ပုံစံကိုပါ ဆုံးဖြတ်)။
-2. `Drum Brand / Drum Model` ရွေးချယ်မှုက ပုံ set (kit) ကို ရွေးမည်ဟု ယူဆထားသည် — အတည်ပြုရန်။
-3. Logo ၏ **အမှောင်နောက်ခံ ပုံကွဲ** (Black Video Color အတွက်) ကို R2 ထဲ ထည့်ရန်၊ Drum kit ပုံများ၏ နောက်ခံ ဖောက်ထွင်း (transparent) ဖြစ်မဖြစ် စစ်ရန်။
+1. **Highlight ပုံ ဖိုင်အမည်ပုံစံအတိအကျ** (`R{n}.png` / `L{n}.png` / `{n}.png` — MIDI number ဖြင့်ရေးထားသည်ဟုသိရ) နှင့် Drum Bg.png နှင့် highlight ပုံများ၏ **pixel အရွယ်** (ratio အလိုက်)။ ၎င်းတို့ကို မသိသေးသဖြင့် Drum kit rect ၏ အချိုးကို ပုံ၏ အချိုးနှင့် ညှိရန် မဆုံးဖြတ်နိုင်သေး။
+2. **Manifest** (`drums/manifest.json`) ကို ဘယ်သူ ဖန်တီး/ထိန်းမလဲ — အဆိုပြု Manus AI (§၁၃.၁)။
+3. Logo ၏ **အမှောင်နောက်ခံ ပုံကွဲ** (Black Video Color အတွက်) ကို R2 ထဲ ထည့်ရန်၊ Drum kit/overlay ပုံများ၏ နောက်ခံ ဖောက်ထွင်း (transparent) ဖြစ်မဖြစ် စစ်ရန်။
 4. ကျန်တူရိယာများ (Piano၊ Guitar ...) တွင် `Key` ကွက် ထည့်မလား (Drum တွင် မပါ)။
-5. ယခု ဆုံးဖြတ်ထားသော default များ (Overlay ~၁၂၀ ms၊ Count-in အရှည်၊ အပိုင်းအချိုး) ကို အသုံးပြုသူသည် **ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်ပြီးမှ** ပြင်ဆင်မည်။
+5. ဆုံးဖြတ်ထားသော default များ (Overlay ~၁၂၀ ms၊ Count-in အရှည်၊ အပိုင်းအချိုး) ကို အသုံးပြုသူသည် **ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်ပြီးမှ** ပြင်ဆင်မည်။
 
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
 
@@ -1086,6 +1118,8 @@ OpenHands က Code ရေးသူဖြစ်သည်။ အောက်ပါ
 | **B13** | **Drum video ၏ R2 ပုံ + highlight** — Drum Animation Engine ကို တည်ဆောက်ပြီး Sticking Engine နှင့် ချိတ် (§၁၃)၊ Drum အပိုင်းကို ရည်ညွှန်းပုံ အချိုးနှင့် ညှိ | Overlay မှန်လင်း၊ ပုံမရှိ stroke ကို ကျော်ပြီး ရေတွက်ပြ |
 | **B14** | **Info ကွက် TIME / BPM / COUNT** (V12) | ရည်ညွှန်းပုံနှင့် ကိုက် |
 | **B15** | **Video Color** (V13) — Black/White ပြောင်းလျှင် အကုန်ပြောင်း၊ Logo အလင်း/အမှောင်ပုံ | §၁၄ စံနှုန်း |
+| **B16** | **Notation ကို ကိုယ့်ဧရိယာထဲတွင်သာ ပြ** (V14) | §၁၃.၂ စံနှုန်း |
+| **B17** | **Drum Brand/Model/ratio ကို manifest မှ ရွေး** (V15) — Manifest (`drums/manifest.json`) ကို Manus AI ဖန်တီး/ထိန်း | §၁၃.၁ |
 | **B12** | **Live Preview** (§၁၂ — Export မလုပ်ဘဲ real time play၊ seek၊ Full screen) | §၁၂ ၏ စံနှုန်း ၆ ချက် |
 
 **မှတ်ချက် (2026-11-23):** B2 နှင့် B3/B5/B6 ၏ code အများစု ရှိပြီးဖြစ်၍ **B0 (E2E စစ်ဆေးမှု) ကို ပထမဆုံးလုပ်ရန်**၊ ထို့နောက် B4 → B12 (Live Preview) → B7 အစဉ်ကို အကြံပြုသည် (user က ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်နိုင်ရန်)။ အသေးစိတ်အဆင့် V1–V10 ကို Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် §၈ တွင် ကြည့်ပါ။ Video အပိုင်း အချိုးများ၊ Metronome icon တို့သည် default ဖြစ်ပြီး user က video အစစ်ကိုကြည့်ပြီးမှ ညှိမည်။
