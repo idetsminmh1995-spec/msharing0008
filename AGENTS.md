@@ -504,5 +504,9 @@ commits stay local and must be reported as unpushed.
     `403 Resource not accessible by integration`, although
     `GET /repos/{owner}/{repo}` reports `push: true`. The owner's
     fine-grained PAT from the previous pass is not in this session's
-    environment, so the work sits one commit ahead of
+    environment, so the work sits ahead of
     `origin/feat/guitar-video-adapter` until one is supplied.
+  - Also this pass: the Brand/Model selects are held to the manifest in
+    the test (Roland offers only `VAD716`, MSDrums only its two models, and
+    a never-seen brand reaches the select with its display name from a
+    served manifest alone), and a stray tracked `nohup.out` was removed.
