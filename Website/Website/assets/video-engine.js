@@ -601,6 +601,16 @@
       name,
       u16(0x0018), u16(0xffff),
       box('avcC', video.description),
+      // The encoder hands back full-range YUV, and a file that does not say
+      // so is decoded as limited range: the export then looks darker and
+      // flatter than the frame the preview drew from the same canvas.
+      // `nclx` states the range, and BT.709 primaries with the sRGB transfer
+      // for the matrix the encoder used.
+      box('colr', [
+        ascii('nclx'),
+        u16(1), u16(13), u16(1),
+        u8(0x80),
+      ]),
     ]);
 
     const mp4a = !audio
@@ -2490,22 +2500,28 @@
   // older copy, byte for byte the same files. Both are tried, in that
   // order, so renaming either one does not silence the count.
   // ---------------------------------------------------------------
-  const COUNT_VOICE_BASES = [
-    'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/Counts%20%20vocal',
-    'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/Voices',
-  ];
+  const COUNT_VOICE_ROOT = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev';
+  // The Studio offers two ways of counting; each has its own folder, and
+  // both fall back to the spoken set the bucket actually holds, so a style
+  // whose recordings are not uploaded yet still counts rather than falling
+  // silent.
+  const COUNT_VOICE_STYLES = {
+    'one-two': ['Counts%20%20vocal', 'Voices'],
+    numeric: ['Counts%20%20numeric', 'Counts%20%20vocal', 'Voices'],
+  };
   const countVoiceCache = new Map();
 
   /** Every R2 address that may hold the recording for a beat number. */
-  function countVoiceUrls(beat) {
+  function countVoiceUrls(beat, style = 'one-two') {
     const number = Math.round(beat);
     if (!(number >= 1)) return [];
-    return COUNT_VOICE_BASES.map((base) => `${base}/${number}.wav`);
+    const folders = COUNT_VOICE_STYLES[style] || COUNT_VOICE_STYLES['one-two'];
+    return folders.map((folder) => `${COUNT_VOICE_ROOT}/${folder}/${number}.wav`);
   }
 
   /** One beat's recording, decoded once. A missing one resolves to null. */
-  async function loadCountVoice(beat) {
-    const urls = countVoiceUrls(beat);
+  async function loadCountVoice(beat, style = 'one-two') {
+    const urls = countVoiceUrls(beat, style);
     if (urls.length === 0) return null;
     const key = urls[0];
     if (countVoiceCache.has(key)) return countVoiceCache.get(key);
@@ -2531,10 +2547,10 @@
   }
 
   /** One recording per beat, in beat order; a beat with none is null. */
-  async function countVoiceSamples(beats) {
+  async function countVoiceSamples(beats, style = 'one-two') {
     const wanted = [];
     for (let beat = 1; beat <= Math.max(0, Math.round(beats)); beat += 1) {
-      wanted.push(loadCountVoice(beat));
+      wanted.push(loadCountVoice(beat, style));
     }
     return await Promise.all(wanted);
   }

@@ -101,7 +101,7 @@
     brand: drumBrand?.value.trim() || 'M Sharing',
     model: drumModel?.value || 'custom',
     notation: notationView?.value || 'page',
-    soundModel: soundModel?.value || 'visual',
+    soundModel: soundModel?.value || 'natural',
     soundVolume: Number(soundVolume?.value) || 0,
     countEnabled: countVoiceEnabled?.value === 'on',
     countVoice: countVoice?.value || 'one-two',
@@ -478,7 +478,8 @@
    * so it is heard even when the drum model is Visual Only.
    */
   async function createDrumAudio({ settings, hits, countIn, duration, meta }) {
-    const model = SOUND_MODELS[settings.soundModel] || SOUND_MODELS.visual;
+    // §၅: a page with no Sound Model chosen still gets its drums heard.
+    const model = SOUND_MODELS[settings.soundModel] || SOUND_MODELS.natural;
     const wantsDrums = model.level > 0;
     // A count-in of zero seconds has nothing to count, so asking for the
     // recordings there would be a download with no sound behind it.
@@ -489,7 +490,7 @@
 
     // The recordings are fetched before the context is built: an offline
     // render cannot wait for a network read once it has started.
-    const voices = wantsCount ? await engine.countVoiceSamples(meta.beats) : [];
+    const voices = wantsCount ? await engine.countVoiceSamples(meta.beats, settings.countVoice) : [];
 
     const sampleRate = 48000;
     const total = countIn + duration;
@@ -592,11 +593,6 @@
   // canvas is what the file will hold. It never touches an encoder.
   // ---------------------------------------------------------------
 
-  // A long score would need a soundtrack buffer measured in hundreds of
-  // megabytes just to preview it; past this the preview stays silent and
-  // says so, and the export still carries the sound.
-  const PREVIEW_AUDIO_LIMIT = 600;
-
   const preview = {
     plan: null,
     size: null,
@@ -605,6 +601,10 @@
     audioBuffer: null,
     audioContext: null,
     source: null,
+    // When the buffer is playing the audio clock is the master: the frame
+    // and the timeline follow it, so the picture cannot drift from the sound.
+    audioStartedAt: 0,
+    audioOffset: 0,
     startedAt: 0,
     offset: 0,
     playing: false,
@@ -691,7 +691,12 @@
     if (timeLabel) timeLabel.textContent = `${formatTime(shown)} / ${formatTime(total)}`;
   }
 
-  const previewClock = () => preview.offset + (performance.now() - preview.startedAt) / 1000;
+  const previewClock = () => {
+    if (preview.playing && preview.source && preview.audioContext) {
+      return preview.audioOffset + (preview.audioContext.currentTime - preview.audioStartedAt);
+    }
+    return preview.offset + (performance.now() - preview.startedAt) / 1000;
+  };
 
   function previewTick() {
     if (!preview.playing) return;
@@ -714,11 +719,11 @@
     preview.playing = true;
     if (playButton) playButton.textContent = '❚❚';
     stage?.classList.add('is-playing');
-    // Starting the sound can wait on the audio context; a pause that lands
-    // in that gap must win, or the clock would come back on its own.
-    await startPreviewAudio(preview.offset);
-    if (!preview.playing) return;
+    // The picture starts at once: a browser that has not opened its audio
+    // context yet must not freeze the frame. The sound joins the running
+    // clock when the context opens, and from then on it is the master.
     preview.rafId = requestAnimationFrame(previewTick);
+    void startPreviewAudio(preview.offset);
   }
 
   function pausePreview() {
@@ -729,18 +734,28 @@
 
   async function startPreviewAudio(offset) {
     if (!preview.audioBuffer) return;
-    try {
-      if (!preview.audioContext) preview.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      if (preview.audioContext.state === 'suspended') await preview.audioContext.resume();
-      if (preview.source) { try { preview.source.stop(); } catch { /* already stopped */ } preview.source.disconnect(); }
-      const source = preview.audioContext.createBufferSource();
-      source.buffer = preview.audioBuffer;
-      source.connect(preview.audioContext.destination);
-      source.start(0, Math.min(offset, Math.max(0, preview.audioBuffer.duration - 0.01)));
-      preview.source = source;
-    } catch (error) {
-      setStatus(`Live preview is visual only: ${error.message || error}`);
+    if (!preview.audioContext) preview.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    if (preview.audioContext.state === 'suspended') await preview.audioContext.resume();
+    // §၅: a preview that looks audible but is not is the failure the Plan
+    // names. A context the browser refuses to open is said out loud.
+    if (preview.audioContext.state !== 'running') {
+      setSource('preview', 'Live preview · sound blocked');
+      setStatus('The browser blocked the preview sound. Press Play again to allow it.');
+      return;
     }
+    if (preview.source) { try { preview.source.stop(); } catch { /* already stopped */ } preview.source.disconnect(); }
+    // The context can take a moment to open; the picture has been running
+    // meanwhile, so the sound joins it where it is rather than where Play
+    // was pressed.
+    const wanted = preview.playing ? previewClock() : offset;
+    const start = Math.min(wanted, Math.max(0, preview.audioBuffer.duration - 0.01));
+    const source = preview.audioContext.createBufferSource();
+    source.buffer = preview.audioBuffer;
+    source.connect(preview.audioContext.destination);
+    source.start(0, start);
+    preview.source = source;
+    preview.audioOffset = start;
+    preview.audioStartedAt = preview.audioContext.currentTime;
   }
 
   /**
@@ -774,10 +789,14 @@
       if (playButton) playButton.disabled = false;
       if (timeline) timeline.disabled = false;
       preview.offset = Math.min(Math.max(0, at), Math.max(0, plan.seconds - 1 / FPS));
-      setSource('preview', plan.seconds > PREVIEW_AUDIO_LIMIT ? 'Live preview · visual only' : 'Live preview');
+      setSource('preview', 'Live preview');
       await drawPreviewFrame(preview.offset);
       if (token !== preview.token) return;
-      if (plan.seconds <= PREVIEW_AUDIO_LIMIT) void loadPreviewAudio(plan, token);
+      // §၅: the sound is built before Play is offered, however long the
+      // score is. A preview that opens silent and finds its voice later
+      // would be the one thing the Plan rules out.
+      await loadPreviewAudio(plan, token);
+      if (token !== preview.token) return;
       if (autoplay) await playPreview();
     } catch (error) {
       if (token !== preview.token) return;
@@ -788,13 +807,20 @@
   async function loadPreviewAudio(plan, token) {
     try {
       const buffer = await engine.timelineAudio(plan);
-      if (token !== preview.token || !buffer) return;
+      if (token !== preview.token) return;
+      // Visual Only has no sound to prepare; saying so is the honest label,
+      // and it is the same words the export uses.
+      if (!buffer) { setSource('preview', 'Live preview · visual only'); return; }
       preview.audioBuffer = buffer;
       setSource('preview', 'Live preview · with sound');
       if (preview.playing) await startPreviewAudio(previewClock());
-    } catch {
-      // A silent preview is still a preview; the export carries the sound.
-      if (token === preview.token) setSource('preview', 'Live preview · visual only');
+    } catch (error) {
+      // §၅: a preview the user believes is audible but is not is worse than
+      // one that says it failed. Say so; the export still carries the sound.
+      if (token === preview.token) {
+        setSource('preview', 'Live preview · sound unavailable');
+        setStatus(`Live preview has no sound: ${error.message || error}`);
+      }
     }
   }
 
@@ -931,6 +957,7 @@
       preview.offset = Math.min(at, Math.max(0, preview.seconds - 1 / FPS));
       if (preview.playing) {
         preview.startedAt = performance.now();
+        if (preview.source) { try { preview.source.stop(); } catch { /* already stopped */ } preview.source.disconnect(); preview.source = null; }
         void startPreviewAudio(preview.offset);
       }
       void drawPreviewFrame(preview.offset);

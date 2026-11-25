@@ -240,6 +240,15 @@ try {
       `The ${stream.width}x${stream.height} picture does not fit the level it declares (level ${level}, ${macroblocks} macroblocks)`);
   };
 
+  // §၅: the Studio opens on a sounding model, so a first export is not
+  // silent. This baseline render is asked for the silent model on purpose:
+  // its job is the picture, and a silent file takes the WebCodecs path,
+  // which is the one that carries the frame's own colour tag.
+  const openedOn = await evaluate("document.querySelector('[data-sound-model]').value");
+  assert.notEqual(openedOn, 'visual',
+    'The Studio opened on Visual Only, so a first export would be silent');
+  await evaluate("(() => { const model = document.querySelector('[data-sound-model]'); model.value = 'visual'; model.dispatchEvent(new Event('change', { bubbles: true })); })()");
+
   await evaluate("document.querySelector('[data-studio-generate]').click()");
 
   const renderStarted = Date.now();
@@ -296,6 +305,10 @@ try {
     }
     return state;
   })())`;
+  // The baseline file above was silent so that it took the WebCodecs path;
+  // the preview now goes back to the sounding default, which is the state
+  // the page opens in.
+  await evaluate("(() => { const model = document.querySelector('[data-sound-model]'); model.value = 'natural'; model.dispatchEvent(new Event('change', { bubbles: true })); })()");
   // Touching a control is how the page is told the settings are worth
   // previewing; the value stays the same, so the frame is the export's.
   await evaluate("(() => { const title = document.querySelector('[data-title-one]'); title.dispatchEvent(new Event('change', { bubbles: true })); })()");
@@ -310,6 +323,16 @@ try {
   assert.ok(previewState.ink > 0, 'The live preview canvas is blank');
   assert.equal(previewState.videoHidden, true, 'The empty <video> was left on show under the preview');
   assert.match(previewState.source, /Live preview/, `The preview does not say it is live: ${previewState.source}`);
+  // §၅: the sound is ready before Play is offered, not fetched after the
+  // first press. The label says so, and it is the only claim made here --
+  // the audio itself is checked through the exported file.
+  const soundAt = Date.now();
+  while (Date.now() - soundAt < 30000 && !/with sound|sound unavailable/.test(previewState.source)) {
+    await sleep(100);
+    previewState = JSON.parse(await evaluate(previewRead));
+  }
+  assert.match(previewState.source, /with sound/,
+    `The live preview did not prepare its sound: ${previewState.source}`);
   assert.equal(previewState.playDisabled, false, 'Play stayed disabled while a live preview was on show');
   assert.equal(previewState.timelineDisabled, false, 'The timeline stayed disabled while a live preview was on show');
   // §၁၅: the preview is the export's frame, at the export's own size --
@@ -346,7 +369,14 @@ try {
   // Frame rate: the Plan asks for 24 fps or better. The engine's own draw
   // call is counted, so this is frames put on the canvas, not rAF ticks.
   await evaluate("(() => { window.__previewDraws = 0; const original = window.VideoEngine.drawFrameAt; window.VideoEngine.drawFrameAt = function (...args) { window.__previewDraws += 1; return original.apply(this, args); }; })()");
-  await evaluate("document.querySelector('[data-video-play]').click()");
+  // §၅: pressing Play must start the sound, not only the picture. The
+  // browser's own source node is observed, so this measures the real
+  // playback path rather than a flag the page sets for itself.
+  await evaluate("(() => { window.__previewAudioStarts = 0; const start = AudioBufferSourceNode.prototype.start; AudioBufferSourceNode.prototype.start = function (...args) { if (this.buffer && this.buffer.duration > 0.2) window.__previewAudioStarts += 1; return start.apply(this, args); }; })()");
+  // A real press carries the user activation a browser requires before it
+  // will open an audio context; a bare .click() does not, so the sound
+  // would be blocked by the browser rather than by the page.
+  await evaluate("document.querySelector('[data-video-play]').click()", { userGesture: true });
   const playedAt = Date.now();
   await sleep(1000);
   const playing = JSON.parse(await evaluate("JSON.stringify({button:document.querySelector('[data-video-play]').textContent, label:document.querySelector('[data-video-time]').textContent})"));
@@ -358,6 +388,9 @@ try {
   }
   const playedSeconds = (Date.now() - playedAt) / 1000;
   const previewFps = (await evaluate('window.__previewDraws')) / playedSeconds;
+  const audioStarts = await evaluate('window.__previewAudioStarts');
+  assert.ok(audioStarts >= 1,
+    `Play started no sound in the live preview (${audioStarts} source nodes started)`);
   assert.ok(previewFps >= 24, `The live preview ran at ${previewFps.toFixed(1)} fps, under the Plan's 24`);
 
   // Seek parity: the frame the canvas shows at t is the file's frame at t,
@@ -379,6 +412,13 @@ try {
 from PIL import Image
 a = Image.open(${JSON.stringify(left)}).convert('RGB')
 b = Image.open(${JSON.stringify(right)}).convert('RGB').resize(a.size, Image.LANCZOS)
+# Both are shrunk to a common small size before comparing: at the export's
+# own 1080p the H.264 artefacts alone are worth a few units per pixel, and
+# they say nothing about whether the two frames are the same picture.
+width = 480
+height = max(1, round(a.size[1] * width / a.size[0]))
+a = a.resize((width, height), Image.LANCZOS)
+b = b.resize((width, height), Image.LANCZOS)
 pa, pb = a.load(), b.load()
 total = 0
 count = 0
@@ -1213,6 +1253,9 @@ print(*image.load()[image.size[0] // 2, image.size[1] // 2])
   // own sound, so leaving it in would give every export an audio track and
   // say nothing about whether the drums themselves are heard.
   thankYouClip = null;
+  // §၅: the page now opens on a sounding model, so Visual Only is asked
+  // for rather than assumed -- the default is checked below.
+  await evaluate("(() => { const model = document.querySelector('[data-sound-model]'); model.value = 'visual'; model.dispatchEvent(new Event('change', { bubbles: true })); })()");
   const visualOnly = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'visual-only.musicxml', thanked.href);
   assert.match(visualOnly.status, /visual only · no drum sound/,
     `Visual Only did not say the drums are absent: ${visualOnly.status}`);

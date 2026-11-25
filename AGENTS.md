@@ -645,3 +645,22 @@ commits stay local and must be reported as unpushed.
     `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` answers `401`. Commits
     `349ae9a` and `7f2236c` therefore sit **local and unpushed**; they need
     a token with Contents: write on this repository.
+
+- **Permission is standing — reaffirmed 2026-11-25, nineteenth pass.** The
+  owner asked again, in this order: check what the Plan still leaves open,
+  record the full code-writing permission first, push what is already
+  written, continue from the Plan, push once at the end. The Plan is
+  refreshed roughly every five hours, so what it leaves open now is
+  expected to arrive in a later pass. **OpenHands has full authority to
+  write, test and push code on `feat/guitar-video-adapter`**;
+  `Website/Plan/README.md` is still not edited by this side.
+  - Plan check this pass: a new revision **has** landed. `origin/main` is
+    now `24e3fd2` ("Plan: Studio page two-box flow with exact-size live
+    Preview, Count Voice from R2, Thank You by ratio/instrument/colour,
+    notes fully visible", 2026-11-25 10:27). It adds Main Plan §၁၅ and
+    work packages **V18–V21**, and marks Video Engine Plan row **14** as
+    `❌/🟡`. All three main-branch Plan commits are already ancestors of
+    this branch's HEAD, so no rebase is needed; only the *work* is new.
+  - The token supplied this pass is a fresh `github_pat_…`; it is passed
+    through `$NEW_PAT` in the scoped helper described under "Pushing" and
+    is not written to the tree.
