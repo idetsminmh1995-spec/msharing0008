@@ -417,6 +417,47 @@ print(total / max(1, count))
   console.log(`TITLE_LATENCY_MS ${titleLatency}`);
   assert.ok(titleLatency <= 900, `The preview took ${titleLatency} ms to follow a Title change`);
 
+  // Main Plan V15: choosing another Brand/Model/ratio has to change the
+  // picture set the preview draws, not just the numbers in a select. The
+  // instrument band is fingerprinted (its colours and a coarse checksum) so
+  // a re-render of the same art cannot pass as new art.
+  const bandSignature = `(() => {
+    const canvas = document.querySelector('[data-video-preview]');
+    const ctx = canvas.getContext('2d');
+    const top = Math.round(canvas.height * 0.6);
+    const { data } = ctx.getImageData(0, top, canvas.width, canvas.height - top);
+    const colours = new Set();
+    let checksum = 0;
+    for (let i = 0; i < data.length; i += 16) {
+      colours.add((data[i] << 16) | (data[i + 1] << 8) | data[i + 2]);
+      checksum = (checksum * 31 + data[i] + data[i + 1] * 3 + data[i + 2] * 7) % 1000000007;
+    }
+    return JSON.stringify({ colours: colours.size, checksum });
+  })()`;
+  const chooseKit = async (ratio) => {
+    await evaluate(`(() => {
+      const brand = document.querySelector('[data-drum-brand]');
+      brand.value = 'MSDrums';
+      brand.dispatchEvent(new Event('change', { bubbles: true }));
+      const model = document.querySelector('[data-drum-model]');
+      model.value = 'MS Drum 1';
+      model.dispatchEvent(new Event('change', { bubbles: true }));
+      const ratioInput = document.querySelector('[data-video-ratio]');
+      ratioInput.value = ${JSON.stringify(ratio)};
+      ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await sleep(2500);
+    return JSON.parse(await evaluate(bandSignature));
+  };
+  const landscapeArt = await chooseKit('16:9');
+  const portraitArt = await chooseKit('9:16');
+  assert.ok(landscapeArt.colours > 200,
+    `The 16:9 preview band holds no photograph: ${JSON.stringify(landscapeArt)}`);
+  assert.ok(portraitArt.colours > 200,
+    `The 9:16 preview band holds no photograph: ${JSON.stringify(portraitArt)}`);
+  assert.notEqual(landscapeArt.checksum, portraitArt.checksum,
+    `The preview kept one picture set across ratios: ${JSON.stringify({ landscapeArt, portraitArt })}`);
+
   // Keyboard play/pause, and no clock left running after repeated plays.
   await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }))");
   await sleep(500);
