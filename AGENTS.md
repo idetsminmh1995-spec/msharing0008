@@ -585,3 +585,29 @@ commits stay local and must be reported as unpushed.
     and beat 4 (the box still counts); `countVoiceLoudness` is 9491 with
     the recordings against 0.74 with the click alone, and 9491 again when
     only the fallback folder answers.
+
+- **Permission is standing — reaffirmed 2026-11-25, seventeenth pass.** The
+  owner repeated the standing order: read the connected repository, check
+  what the Plan still lists as open, record the full code-writing permission
+  first, push whatever is already written, then continue from the Plan and
+  push once at the end. The Plan is refreshed about every five hours, so the
+  remainder is expected to arrive in later passes. **OpenHands has full
+  authority to write, test and push code on `feat/guitar-video-adapter`** —
+  source, tests and Docs alike, with no per-file permission.
+  `Website/Plan/README.md` remains Claude's file and is not edited from this
+  side.
+  - Plan check this pass: **two new revisions arrived on `main`** —
+    `128f749` and `24e3fd2` (2026-11-25). They declare audio in the Live
+    Preview the top priority, cut Notation View to `Page` / `Horizontal`,
+    ask for a one-piece look, a two-box Studio page with an exact-size
+    Preview, a ratio/instrument/colour Thank You clip, and notes that must
+    be fully visible. `origin/main` was merged into the branch before any
+    code was written, so the new Plan text is now local.
+  - Push state at the start of this pass: tree clean, `HEAD` =
+    `origin/feat/guitar-video-adapter` = `c1961a0`, so nothing from earlier
+    passes was waiting.
+  - R2 check made before touching the Thank You code: the Plan's example
+    path `Thank Video/{ratio}/{instrument}/{ratio} {Colour} {Instrument}.mp4`
+    answers 200 for `16x9`/`1x1`/`9x16` × `drum`, and for the guitar and
+    violin sets that exist. The engine's current `thank-you/{shape}.mp4` is
+    a 404 — that is the gap this pass closes.
