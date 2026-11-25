@@ -68,6 +68,10 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 | 8 | **Live Preview** (အသစ်) | ✅ — Main Plan §၁၂ စံနှုန်း ၆ ချက် pass (2026-11-18) |
 | 9 | **Notation View ၄ မျိုး** (V6) | ✅ — `tools/test-notation-view-browser.mjs` က `drawImage` offset ကို တိုက်ရိုက်ဖမ်း၍ Page သုံးမျိုး (42/30/30 staff-space အနံ၊ အောက်မှအပေါ်) နှင့် Horizontal (ညာမှဘယ်၊ marker မရွေ့) ကို စစ်သည်။ Direction ကို ရည်ရွယ်၍ ဖျက်ကြည့်သော mutation ၂ မျိုးလုံး test က ဖမ်းမိသည် |
 | 10 | **Drum ရည်ညွှန်းဒီဇိုင်း** (R2 kit ပုံ + highlight overlay၊ TIME/BPM/COUNT ကွက်၊ Video Color) — V11၊ V12၊ V13 | 🟡 V11 ✅ (R2 kit + overlay)၊ **V12 ✅** (TIME/BPM/COUNT ကွက်၊ COUNT က beat တိုင်း ပြောင်း)၊ **V13 ✅** (Video Color က နောက်ခံ/Notation/ကွက်/စာသား/Title အားလုံး ပြောင်း)။ Band အချိုး 20/33/47 ကို `drums` template တွင် ကြေညာပြီး။ စမ်းသပ်မှု: `tools/test-drum-reference-browser.mjs` |
+| 11 | **အသံပါ Preview** (အရေးအကြီးဆုံး — Preview ကတည်းက အသံပါ၊ ကန့်သတ်ချက်မရှိ၊ audio clock ကို master၊ Export နှင့် တူညီသော event stream) | ❌ — Main Plan §၅၊ §၁၂ |
+| 12 | Notation View ၂ မျိုး (`Page`/`Horizontal`)၊ ratio ↔ R2 ပုံ set တူညီမှု၊ Video ပုံစံ တစ်သားတည်း | ❌ — Main Plan §၁၃.၃ |
+| 13 | Drum Brand/Model ကို manifest မှ၊ Notation ကိုယ့်ဧရိယာထဲ clip | ❌ — Main Plan §၁၃.၁၊ §၁၃.၂ |
+| 14 | **Studio ၂ box** (ဘယ် input / ညာ Preview final အရွယ်အတိအကျ)၊ **Count Voice ကို R2 အသံဖြင့်**၊ **Thank You ကို ratio · တူရိယာ · Black/White အလိုက်**၊ Note အပြည့်အဝ ပေါ်ခြင်း | ❌/🟡 — Main Plan §၁၅၊ §၁၃.၂ |
 
 အသေးစိတ် အဆင့်များ (V1–V10) ကို Main Plan ၏ `Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ်` §၈ တွင် ကြည့်ပါ။
 
