@@ -565,12 +565,23 @@ commits stay local and must be reported as unpushed.
   write, test and push code on `feat/guitar-video-adapter`** — source,
   tests and Docs alike, with no per-file permission. `Website/Plan/README.md`
   remains Claude's file and is not edited from this side.
-  - Push state at the start of this pass: tree clean, `HEAD` = `7fed391`,
-    `origin/feat/guitar-video-adapter` = `05a2275`, so one commit was
-    waiting to go out.
+  - Push state at the start of this pass: the tree was clean and `HEAD`
+    was `7fed391`. The local tracking ref still said `05a2275`, but
+    `git ls-remote` showed `7fed391` already on the remote, so nothing
+    from an earlier pass was waiting — only the tracking ref was stale.
   - A fine-grained `github_pat_…` was supplied with this pass. It is used
     only through the scoped credential helper described under "Pushing"
     and is never written into the tree.
   - The two open items the owner named are the ones this pass works on:
     **Count Voice is sound only** and **Count Display lives in the COUNT
     box, with no second count anywhere on the frame**.
+  - What landed: `studio-video.js` no longer draws the large centre digit
+    on the count-in frame, so the COUNT box is the count's only home; the
+    engine now asks `Counts  vocal` before `Voices`, so a rename on the
+    bucket cannot silence the count. Both folders hold identical files.
+  - New measurements from `test-studio-video-browser.mjs`:
+    `countInCentre.offBackground` = 0 of 518,400 pixels (nothing is drawn
+    in the middle any more); `countInBox` checksums differ between beat 1
+    and beat 4 (the box still counts); `countVoiceLoudness` is 9491 with
+    the recordings against 0.74 with the click alone, and 9491 again when
+    only the fallback folder answers.
