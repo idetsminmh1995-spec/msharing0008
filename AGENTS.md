@@ -741,3 +741,12 @@ commits stay local and must be reported as unpushed.
   - All of it passes: drum studio, notation view, engine, notation clip,
     drum reference, piano, guitar, dispatch, audio contract, bass, violin,
     voice, metronome, muxer (15/15), and `sync-video-engine --check`.
+  - **Push blocked again, this pass.** `git push` → `403 ... denied to
+    idetsminmh1995-spec`; the same URL with `$GITHUB_TOKEN` inline and with
+    `credential.helper=` cleared also 403. The token can read the repo and
+    GitHub reports `permissions.push: true` for the user, but
+    `PATCH /repos/.../git/refs/heads/...` answers
+    `403 Resource not accessible by integration`, so the grant is read-only
+    for writes. `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` answers `401`.
+    Commit `51026b8` is local and unpushed. Do not retry the same three
+    ways; the write grant itself is what is missing.
