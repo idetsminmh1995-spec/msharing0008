@@ -510,3 +510,26 @@ commits stay local and must be reported as unpushed.
     the test (Roland offers only `VAD716`, MSDrums only its two models, and
     a never-seen brand reaches the select with its display name from a
     served manifest alone), and a stray tracked `nohup.out` was removed.
+
+- **Permission is standing — reaffirmed 2026-11-18, thirteenth pass.**
+  The owner asked again, in the same order: check what the Plan still
+  leaves open, write the full code-writing permission down first, push what
+  is already written, continue from the Plan, push once at the end, and
+  leave whatever the Plan still lists open for a later pass (the Plan is
+  refreshed about every five hours). **OpenHands has full authority to
+  write, test and push code on `feat/guitar-video-adapter`**;
+  `Website/Plan/README.md` is still not edited by this side.
+  - Plan check this pass: no new revision. `Website/Plan/README.md` and
+    `Website/Video/Video Engine Plan/PLAN.md` have no diff against
+    `origin/main`; `1299b4a` (2026-11-25) is still the newest commit
+    touching the Main Plan on any remote branch. The open items are the
+    ones the Plan's own tables list.
+  - A fresh `github_pat_…` came with this message and **writes**:
+    `GET /user` answers `200`, and `GET /repos/{owner}/{repo}` reports
+    `{"admin": true, "maintain": true, "push": true, "triage": true,
+    "pull": true}`. Pass it as `password=$NEW_PAT` with username
+    `idetsminmh1995-spec` in the scoped helper above.
+  - Earlier `github_pat_…` tokens (2026-11-18 and 2026-11-23 passes) are
+    dead: they answer `401 Bad credentials` even though the string still
+    has the correct `github_pat_` shape. A well-formed token can be
+    revoked, so check `GET /user` before blaming the helper.
