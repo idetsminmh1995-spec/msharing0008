@@ -53,11 +53,6 @@
     '1:1': { width: 1080, height: 1080 },
     '9:16': { width: 1080, height: 1920 },
   };
-  const LANES = [
-    { id: 'kick', label: 'KICK', y: 0.46, color: '#ff7b55' },
-    { id: 'snare', label: 'SNARE', y: 0.64, color: '#ffcf5a' },
-    { id: 'hihat', label: 'HI-HAT', y: 0.82, color: '#78a8ff' },
-  ];
 
   const selectedTool = (new URLSearchParams(window.location.search).get('tool') || 'drums').toLowerCase();
 
@@ -328,77 +323,19 @@
   }
 
 
-  /** The instrument part: the drum lanes the performance is read from. */
-  function drawInstrumentPart(ctx, rect, at, hits, duration, settings, palette) {
-    const scale = Math.max(0.6, Math.min(1.2, Math.min(rect.width / 640, rect.height / 360)));
-    const labelWidth = Math.round(78 * scale);
-    const left = rect.x + labelWidth;
-    const right = rect.x + rect.width - Math.round(16 * scale);
-    const trackWidth = Math.max(1, right - left);
-    const lanePositions = LANES.map((lane, index) => ({
-      ...lane,
-      y: Math.round(rect.y + rect.height * (0.2 + index * 0.3)),
-    }));
-
-    const gridStep = Math.max(1, Math.ceil(duration / 8));
-    ctx.font = `${Math.max(9, Math.round(10 * scale))}px monospace`;
-    for (let second = 0; second <= duration; second += gridStep) {
-      const x = left + (second / duration) * trackWidth;
-      ctx.strokeStyle = palette.grid;
-      ctx.beginPath();
-      ctx.moveTo(x, rect.y + Math.round(6 * scale));
-      ctx.lineTo(x, rect.y + rect.height - Math.round(6 * scale));
-      ctx.stroke();
-      ctx.fillStyle = palette.muted;
-      ctx.fillText(`${second}s`, x + 3, rect.y + Math.round(18 * scale));
-    }
-    for (const lane of lanePositions) {
-      ctx.fillStyle = palette.muted;
-      ctx.font = `600 ${Math.max(9, Math.round(10 * scale))}px Inter, system-ui, sans-serif`;
-      ctx.fillText(lane.label, rect.x + Math.round(10 * scale), lane.y + Math.round(4 * scale));
-      ctx.strokeStyle = palette.line;
-      ctx.beginPath();
-      ctx.moveTo(left, lane.y);
-      ctx.lineTo(right, lane.y);
-      ctx.stroke();
-    }
-    for (const hit of hits) {
-      const lane = lanePositions.find((candidate) => candidate.id === hit.type);
-      if (!lane) continue;
-      const x = left + (Math.min(hit.at, duration) / duration) * trackWidth;
-      const active = Math.abs(at - hit.at) < 0.12;
-      ctx.beginPath();
-      ctx.fillStyle = lane.color;
-      ctx.globalAlpha = active ? 1 : 0.78;
-      ctx.arc(x, lane.y, active ? Math.round(8 * scale) : Math.round(5 * scale), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    const playheadX = left + Math.min(1, at / duration) * trackWidth;
-    ctx.strokeStyle = '#f20d3d';
-    ctx.lineWidth = Math.max(1, Math.round(2 * scale));
-    ctx.beginPath();
-    ctx.moveTo(playheadX, rect.y + Math.round(6 * scale));
-    ctx.lineTo(playheadX, rect.y + rect.height - Math.round(6 * scale));
-    ctx.stroke();
-    ctx.lineWidth = 1;
-    ctx.fillStyle = palette.muted;
-    ctx.font = `${Math.max(10, Math.round(11 * scale))}px monospace`;
-    ctx.fillText(`${at.toFixed(1)} / ${duration.toFixed(1)} sec`, rect.x + Math.round(10 * scale), rect.y + rect.height - Math.round(10 * scale));
-  }
-
   /**
-   * The kit pictures this render will draw, or `null` when the bucket
-   * cannot be reached.
+   * The kit's pictures for the frame being rendered, or an error that stops
+   * the render.
    *
-   * A kit is decoration, not evidence: if R2 is down the video still
-   * renders, with the lane chart it drew before. What must NOT happen is a
-   * half-loaded kit -- a background with no sticks on it looks like a kit
-   * nobody played -- so a failed load falls back whole.
+   * Main Plan §၁၃.၁ gives every ratio its own picture set and makes the
+   * base picture a required asset, so a kit with no art for the chosen
+   * ratio stops the export and says which ratios it does carry. A video
+   * drawn from another ratio's photographs, or from a lane chart standing
+   * in for the kit, is not the video the Plan describes.
    */
   async function loadKit(settings, hits) {
     const drumKit = window.DrumKit;
-    if (!drumKit) return null;
+    if (!drumKit) throw new Error('The drum kit module is not loaded, so no kit pictures are available.');
     // The bucket's manifest is the authority on which kits exist (§၁၀), so
     // it is read before the kit is looked up: a kit uploaded to R2 must
     // reach the video without a code change.
@@ -407,28 +344,24 @@
       console.warn(`The drum kit manifest could not be read (${manifest.error}); using the built-in kit list.`);
     }
     const name = `${settings.brand}/${settings.model}`;
-    if (!drumKit.KITS[name]) return null;
-    try {
-      setStatus('Loading the drum kit from R2…');
-      const art = await drumKit.loadArt(name, settings.ratio);
-      const strokes = hits
-        .filter((hit) => Number.isFinite(hit.midi))
-        .map((hit) => ({ note: hit.midi, at: hit.at }));
-      const limbs = drumKit.solveLimbs(strokes.map((stroke) => ({ time: stroke.at, note: stroke.note })));
-      strokes.forEach((stroke, index) => { stroke.limb = limbs[index]; });
-      const resolved = await drumKit.loadHitImages(art, strokes);
-      return {
-        draw: (ctx, rect, at) => drumKit.draw(ctx, rect, art, at, strokes, resolved),
-        missing: drumKit.missingSummary(strokes),
-      };
-    } catch (error) {
-      console.warn('Drum kit pictures unavailable; drawing the lane chart instead.', error);
-      setStatus(`Drum kit unavailable (${error.message || error}). Drawing the lane chart instead.`);
-      return null;
+    if (!drumKit.KITS[name]) {
+      throw new Error(`No drum kit is known by the name "${name}".`);
     }
+    setStatus('Loading the drum kit from R2…');
+    const art = await drumKit.loadArt(name, settings.ratio);
+    const strokes = hits
+      .filter((hit) => Number.isFinite(hit.midi))
+      .map((hit) => ({ note: hit.midi, at: hit.at }));
+    const limbs = drumKit.solveLimbs(strokes.map((stroke) => ({ time: stroke.at, note: stroke.note })));
+    strokes.forEach((stroke, index) => { stroke.limb = limbs[index]; });
+    const resolved = await drumKit.loadHitImages(art, strokes);
+    return {
+      draw: (ctx, rect, at) => drumKit.draw(ctx, rect, art, at, strokes, resolved),
+      missing: drumKit.missingSummary(strokes),
+    };
   }
 
-  async function drawPerformance(ctx, at, hits, duration, settings, meta, kit, notationState) {
+  async function drawPerformance(ctx, at, settings, meta, kit, notationState) {
     const { width, height } = settings.size;
     const palette = getPalette(settings.color);
 
@@ -447,9 +380,7 @@
       parts: {
         title: (target, rect) => engine.drawTitlePart(target, rect, at, meta, palette, settings),
         notation: (target, rect) => engine.drawNotationPart(target, rect, at, notationState, palette),
-        instrument: (target, rect) => (kit
-          ? kit.draw(target, rect, at)
-          : drawInstrumentPart(target, rect, at, hits, duration, settings, palette)),
+        instrument: (target, rect) => kit.draw(target, rect, at),
       },
     });
     // Outside composeFrame's bands: the reference picture puts this mark on
@@ -646,7 +577,7 @@
     if (countIn > 0) {
       segments.push({ seconds: countIn, draw: (ctx, at) => drawCountIn(ctx, at, settings, meta) });
     }
-    segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta, kit, notationState) });
+    segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, settings, meta, kit, notationState) });
 
     // The sound spans the count-in and the performance together, so it
     // rides on the first of those two segments and starts at zero.

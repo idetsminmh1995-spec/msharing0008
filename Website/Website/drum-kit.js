@@ -33,11 +33,8 @@
   const MANIFEST_FILE = 'manifest.json';
 
   const RATIO_PATHS = { '16:9': '16x9', '1:1': '1x1', '9:16': '9x16' };
-  // Only some kits carry the square and portrait art, so 16x9 is the one
-  // every kit is guaranteed to have and the one a missing ratio falls back
-  // to. The kit's ink sits at the foot of the frame in all three, so the
-  // landscape art reads correctly in a portrait band.
-  const FALLBACK_RATIO = '16x9';
+  // Every ratio is its own picture set: Main Plan §၁၃.၁ forbids stretching
+  // one ratio's art into another, so there is no fallback between folders.
   const BACKGROUND_FILE = 'Drum Bg.png';
 
   /** The live kit list: the built-in table until the bucket's manifest answers. */
@@ -95,6 +92,11 @@
       Object.assign(KITS, next);
       manifestState = { source: 'manifest', error: null, kits: Object.keys(KITS) };
     } catch (error) {
+      // A manifest that will not answer leaves the built-in table behind,
+      // including after an earlier manifest had replaced it: the list a
+      // page shows must never be the one from a manifest that is gone.
+      for (const key of Object.keys(KITS)) delete KITS[key];
+      Object.assign(KITS, BUILT_IN_KITS);
       manifestState = {
         source: 'built-in',
         error: String(error?.message || error),
@@ -169,28 +171,32 @@
   };
 
   /**
-   * A kit's pictures for one frame ratio: the background, and the ratio
-   * folder that actually answered. A kit without the requested ratio uses
-   * its 16x9 art rather than going dark, and `ratioPath` reports which one
-   * was used so the hits come from the same folder as the background.
+   * A kit's pictures for one frame ratio: the background from that ratio's
+   * own folder.
+   *
+   * Main Plan §၁၃.၁ gives every ratio its own picture set and forbids
+   * stretching one ratio's art into another, so a kit that carries only
+   * landscape art cannot serve a square or portrait video: the failure is
+   * reported with the ratios the kit does carry, and the export stops
+   * rather than shipping a picture that was never drawn for the frame.
    */
   const loadArt = async (kit, ratio) => {
     const entry = KITS[kit];
     if (!entry) throw new RangeError(`No drum kit is known by the name "${kit}".`);
-    const wanted = RATIO_PATHS[ratio] || FALLBACK_RATIO;
+    const wanted = RATIO_PATHS[ratio];
+    if (!wanted) throw new RangeError(`No drum pictures are stored for the ratio "${ratio}".`);
     // A manifest may say which ratio folders a kit actually carries; that
     // list is a fact about the bucket, so it is believed over the guess
     // that every kit has all three.
     const declared = entry.ratios?.length ? entry.ratios : null;
-    const order = (declared ? [wanted, ...declared] : [wanted, FALLBACK_RATIO])
-      .filter((path, index, all) => all.indexOf(path) === index);
-    for (const ratioPath of order) {
-      const background = await loadImage(kitUrl(kit, ratioPath, entry.background || BACKGROUND_FILE));
-      if (background) {
-        return { kit, ratioPath, background, ink: measureInk(background) };
-      }
+    if (declared && !declared.includes(wanted)) {
+      throw new Error(`The kit "${entry.label}" has no ${wanted} pictures; it carries ${declared.join(', ')}.`);
     }
-    throw new Error(`The kit "${entry.label}" has no background picture in R2.`);
+    const background = await loadImage(kitUrl(kit, wanted, entry.background || BACKGROUND_FILE));
+    if (background) {
+      return { kit, ratioPath: wanted, background, ink: measureInk(background) };
+    }
+    throw new Error(`The kit "${entry.label}" has no background picture in R2 for ${wanted}.`);
   };
 
   /**

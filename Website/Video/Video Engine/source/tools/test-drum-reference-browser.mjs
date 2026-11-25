@@ -514,8 +514,79 @@ try {
   assert.ok(new Set(cursorOnNotes.map((frame) => frame.left)).size > 1,
     `The cursor never moved across the notes: ${JSON.stringify(cursorOnNotes)}`);
 
+  // V14 (§၁၃.၂): the Notation is drawn inside its own band and nowhere
+  // else. The check composes a whole frame twice -- once with the Notation
+  // part and once without -- and compares the two pictures outside the
+  // Notation rect. A sheet that scrolls past its band, or a cursor drawn
+  // over the kit, shows up as changed pixels there. Both notation views and
+  // all three ratios are measured, at a time the sheet has moved.
+  const clipping = JSON.parse(await evaluate(`(async () => {
+    const score = ${JSON.stringify(CURSOR_SCORE)};
+    const file = new File([score], 'notation-clip.musicxml', { type: 'application/xml' });
+    const out = {};
+    for (const ratio of ${JSON.stringify(RATIOS)}) {
+      const size = VideoEngine.sizeFor(ratio);
+      const palette = VideoEngine.paletteFor('white');
+      out[ratio] = {};
+      for (const view of ['landscape', 'horizontal']) {
+        const state = await VideoEngine.prepareNotationFor(file, {
+          instrument: 'drums', notation: view, size, cursorShape: 'box', palette,
+        });
+        if (!state || state.error) throw new Error(ratio + ' ' + view + ': ' + (state ? state.error : 'no state'));
+        const rect = VideoEngine.layoutFor('drums', { width: size.width, height: size.height }).rects.notation;
+        const shoot = async (withNotation) => {
+          const canvas = document.createElement('canvas');
+          canvas.width = size.width;
+          canvas.height = size.height;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true });
+          const parts = {
+            title: (target, band) => VideoEngine.drawTitlePart(target, band, 1, { beats: 4, beatType: 4, bpm: 120 },
+              palette, { infoBoxes: true, titleOne: 'DRUM PERFORMANCE', titleTwo: 'Exercise - 10' }),
+            instrument: (target, band) => {
+              target.fillStyle = palette.accent;
+              target.fillRect(band.x, band.y, band.width, band.height);
+            },
+          };
+          if (withNotation) {
+            parts.notation = (target, band) => VideoEngine.drawNotationPart(target, band, 1, state, palette);
+          }
+          await VideoEngine.composeFrame(ctx, { instrument: 'drums', width: size.width, height: size.height, parts });
+          return ctx.getImageData(0, 0, size.width, size.height).data;
+        };
+        const withInk = await shoot(true);
+        const withoutInk = await shoot(false);
+        // A pixel that differs between the two pictures is the Notation's
+        // own ink, so every one of them must lie inside the band.
+        let outside = 0;
+        let inside = 0;
+        for (let y = 0; y < size.height; y += 1) {
+          for (let x = 0; x < size.width; x += 1) {
+            const offset = (y * size.width + x) * 4;
+            if (withInk[offset] === withoutInk[offset] && withInk[offset + 1] === withoutInk[offset + 1]
+              && withInk[offset + 2] === withoutInk[offset + 2]) continue;
+            const withinRect = x >= rect.x && x < rect.x + rect.width
+              && y >= rect.y && y < rect.y + rect.height;
+            if (withinRect) inside += 1;
+            else outside += 1;
+          }
+        }
+        out[ratio][view] = { inside, outside, rect };
+      }
+    }
+    return JSON.stringify(out);
+  })()`));
+  for (const ratio of RATIOS) {
+    for (const view of ['landscape', 'horizontal']) {
+      const band = clipping[ratio][view];
+      assert.ok(band.inside > 1000,
+        `The ${ratio} ${view} Notation drew nothing inside its own band: ${JSON.stringify(band)}`);
+      assert.equal(band.outside, 0,
+        `The ${ratio} ${view} Notation painted ${band.outside} pixels outside its band`);
+    }
+  }
+
   console.log(JSON.stringify({
-    shares, marks, cursorShapes, cursorOnNotes, boxes: {
+    shares, marks, cursorShapes, cursorOnNotes, clipping, boxes: {
       labels: boxes.beats.texts.map((entry) => entry.text),
       countBeats: countAt(boxes.beats), countSecondBeat: countAt(boxes.second),
       countEighths: countAt(boxes.eighths),

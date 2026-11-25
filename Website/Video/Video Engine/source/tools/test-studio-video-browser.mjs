@@ -475,7 +475,11 @@ print(total / max(1, count))
   // normal MP4 of the same length.
   await evaluate("(() => { const title = document.querySelector('[data-title-one]'); title.value = 'DRUM PERFORMANCE'; title.dispatchEvent(new Event('input', { bubbles: true })); })()");
 
-  await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); const color = document.querySelector('[data-video-color]'); const count = document.querySelector('[data-count-voice-enabled]'); ratio.value = '9:16'; ratio.dispatchEvent(new Event('change', { bubbles: true })); color.value = 'white'; color.dispatchEvent(new Event('change', { bubbles: true })); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
+  // Main Plan §၁၃.၁ keeps one picture set per ratio and forbids drawing
+  // one ratio's art into another, so the three-ratio export runs on the kit
+  // the bucket holds all three of. Roland's kit is landscape-only, which is
+  // checked on its own further down.
+  await evaluate("(() => { const brand = document.querySelector('[data-drum-brand]'); brand.value = 'MSDrums'; brand.dispatchEvent(new Event('change', { bubbles: true })); const model = document.querySelector('[data-drum-model]'); model.value = 'MS Drum 1'; model.dispatchEvent(new Event('change', { bubbles: true })); const ratio = document.querySelector('[data-video-ratio]'); const color = document.querySelector('[data-video-color]'); const count = document.querySelector('[data-count-voice-enabled]'); ratio.value = '9:16'; ratio.dispatchEvent(new Event('change', { bubbles: true })); color.value = 'white'; color.dispatchEvent(new Event('change', { bubbles: true })); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
   const portraitStartedAt = Date.now();
   let portraitState;
   while (Date.now() - portraitStartedAt < 60000) {
@@ -724,8 +728,44 @@ print(len(colours))
   })()`);
   assert.match(noArt, /no background picture/,
     `A kit with no art was not reported: ${noArt}`);
+
+  // Main Plan §၁၃.၁ gives every ratio its own picture set and forbids
+  // drawing one ratio's art into another. A kit whose manifest names only
+  // landscape folders must therefore refuse the other two rather than
+  // stretch its landscape photograph to fit.
+  const wrongRatio = JSON.parse(await evaluate(`(async () => {
+    const out = {};
+    for (const ratio of ['1:1', '9:16']) {
+      try { await window.DrumKit.loadArt('RolandDrums/VAD716', ratio); out[ratio] = 'loaded'; }
+      catch (error) { out[ratio] = String(error.message); }
+    }
+    return JSON.stringify(out);
+  })()`));
+  for (const ratio of ['1:1', '9:16']) {
+    assert.match(wrongRatio[ratio], /no 1x1 pictures|no 9x16 pictures/,
+      `The ${ratio} render used the landscape art: ${wrongRatio[ratio]}`);
+  }
   drumManifest = null;
   await evaluate("window.DrumKit.loadManifest({ reload: true })");
+
+  // The picture that is drawn is the one in the requested ratio's folder:
+  // the decoded image's own address is the evidence, so a fallback to
+  // another folder cannot pass as its own.
+  const folderPerRatio = JSON.parse(await evaluate(`(async () => {
+    const out = {};
+    for (const ratio of ['16:9', '1:1', '9:16']) {
+      const art = await window.DrumKit.loadArt('MSDrums/MS Drum 1', ratio);
+      out[ratio] = { ratioPath: art.ratioPath, src: art.background.src };
+    }
+    return JSON.stringify(out);
+  })()`));
+  for (const [ratio, folder] of Object.entries({ '16:9': '16x9', '1:1': '1x1', '9:16': '9x16' })) {
+    const art = folderPerRatio[ratio];
+    assert.equal(art.ratioPath, folder,
+      `The ${ratio} kit art came from the ${art.ratioPath} folder: ${JSON.stringify(art)}`);
+    assert.ok(decodeURIComponent(art.src).includes(`/MS Drum 1/${folder}/Drum Bg.png`),
+      `The ${ratio} kit art was not read from its own folder: ${JSON.stringify(art)}`);
+  }
 
   // A score that names its drums with <midi-unpitched> must light the kit,
   // and the stroke must change the instrument band: the background alone

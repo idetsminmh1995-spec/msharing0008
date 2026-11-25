@@ -466,3 +466,43 @@ commits stay local and must be reported as unpushed.
     (`github_pat_11BWCKOXY…`, used only through the scoped credential
     helper, never written to the tree): `e7fed8b..ba8187b`. That PAT
     writes; the helper's exchanged installation token still does not.
+
+- **V15/B17 finished — 2026-11-18 (fourteenth pass).** Same standing order
+  (check the Plan, record the code-writing permission, push, continue with
+  the Drum video). The Plan revision `1299b4a` was already merged in
+  `102caf0`, so this pass implemented what it left open:
+  - **V15/B17 — one ratio's pictures never serve another.** `drum-kit.js`
+    lost `FALLBACK_RATIO`: `loadArt` reads only the requested ratio's
+    folder and throws with the ratios the kit does carry when the manifest
+    says the kit has none. `test-studio-video-browser.mjs` proves it three
+    ways — Roland's landscape-only kit refuses `1:1` and `9:16`, MS Drum 1
+    resolves each of the three folders, and the decoded image's own `src`
+    is checked to sit in that ratio's folder (a fallback cannot pass).
+  - **Manifest fallback repaired.** A manifest read that fails *after* one
+    had succeeded used to leave the manifest's kit list in `KITS` while
+    reporting `source: 'built-in'`; the catch now restores `BUILT_IN_KITS`.
+    The test's manifest-teardown path exposed this.
+  - **§၁၃.၁ — no base picture, no export.** `loadKit` no longer returns
+    `null`; it throws, so `buildTimeline` fails and the preview/export
+    reports the reason instead of drawing a lane chart. `drawInstrumentPart`
+    and the `LANES` table are gone, and `drawPerformance` dropped its
+    unused `hits, duration` parameters.
+  - **Three-ratio export test** now selects `MSDrums/MS Drum 1` (the kit
+    with all three folders) before the 9:16/1:1 renders; Roland's kit
+    correctly fails those ratios.
+  - Cache keys re-derived for the two edited app assets (`drum-kit.js`,
+    `studio-video.js`) in `studio.html`. The bundle test still reports
+    pre-existing mismatches for `studio-metronome.js` and other assets this
+    pass did not touch.
+  - Green: `test-studio-video-browser`, `test-drum-reference-browser`,
+    `test-video-engine-browser`, `test-video-engine`, `test-audio-contract`,
+    `test-title-info`, `test-notation-view`, `test-studio-dispatch`,
+    metronome/guitar/piano/bass/violin/voice, `test-mxl-score`.
+  - **Push still blocked.** `git push` answers `403 ... denied to
+    idetsminmh1995-spec`, and `POST /git/blobs` /
+    `PATCH /git/refs/heads/feat%2Fguitar-video-adapter` both answer
+    `403 Resource not accessible by integration`, although
+    `GET /repos/{owner}/{repo}` reports `push: true`. The owner's
+    fine-grained PAT from the previous pass is not in this session's
+    environment, so the work sits one commit ahead of
+    `origin/feat/guitar-video-adapter` until one is supplied.
