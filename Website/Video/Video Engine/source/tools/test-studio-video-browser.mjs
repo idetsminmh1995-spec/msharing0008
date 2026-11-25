@@ -1074,6 +1074,68 @@ print(json.dumps({'peak': max(peaks) if peaks else 0, 'at': peaks}))
   assert.ok(onBeat > offBeat * 2,
     `The drums do not land on the beat: ${onBeat} on the beat against ${offBeat} between beats`);
 
+  // Main Plan V15: the Brand select decides which Models are offered, so a
+  // model from another brand -- a folder the bucket does not hold -- cannot
+  // be chosen.
+  const modelLists = JSON.parse(await evaluate(`(() => {
+    const brand = document.querySelector('[data-drum-brand]');
+    const model = document.querySelector('[data-drum-model]');
+    const read = (value) => {
+      brand.value = value;
+      brand.dispatchEvent(new Event('change', { bubbles: true }));
+      return [...model.options].map((option) => option.value);
+    };
+    const out = { RolandDrums: read('RolandDrums'), MSDrums: read('MSDrums') };
+    brand.value = 'MSDrums';
+    brand.dispatchEvent(new Event('change', { bubbles: true }));
+    model.value = 'MS Drum 1';
+    model.dispatchEvent(new Event('change', { bubbles: true }));
+    return JSON.stringify(out);
+  })()`));
+  assert.deepEqual(modelLists.RolandDrums, ['VAD716'],
+    `A brand offered another brand's models: ${JSON.stringify(modelLists)}`);
+  assert.deepEqual(modelLists.MSDrums, ['MS Drum 1', 'MS Drum 2'],
+    `A brand did not offer its own models: ${JSON.stringify(modelLists)}`);
+
+  // And a brand the page has never heard of reaches the selects from the
+  // bucket's manifest alone: the lists are rebuilt when it answers.
+  drumManifest = {
+    schemaVersion: 1,
+    kits: [
+      { brand: 'MSDrums', brandLabel: 'M Sharing', model: 'MS Drum 1', label: 'M Sharing Drum 1' },
+      { brand: 'TestDrums', brandLabel: 'Test Drums Co', model: 'Manifest Only', label: 'Manifest Only Kit' },
+    ],
+  };
+  await evaluate('location.reload()');
+  const reloadStartedAt = Date.now();
+  let manifestSelects = { brands: [], models: [] };
+  while (Date.now() - reloadStartedAt < 20000) {
+    manifestSelects = JSON.parse(await evaluate(`(() => {
+      const brand = document.querySelector('[data-drum-brand]');
+      const model = document.querySelector('[data-drum-model]');
+      if (!brand || !model) return JSON.stringify({ brands: [], models: [] });
+      if (![...brand.options].some((option) => option.value === 'TestDrums')) {
+        return JSON.stringify({ brands: [...brand.options].map((o) => o.value), models: [] });
+      }
+      brand.value = 'TestDrums';
+      brand.dispatchEvent(new Event('change', { bubbles: true }));
+      return JSON.stringify({
+        brands: [...brand.options].map((o) => o.value),
+        labels: [...brand.options].map((o) => o.textContent),
+        models: [...model.options].map((o) => o.value),
+      });
+    })()`));
+    if (manifestSelects.models.length) break;
+    await sleep(200);
+  }
+  assert.ok(manifestSelects.brands.includes('TestDrums'),
+    `A manifest brand never reached the Brand select: ${JSON.stringify(manifestSelects)}`);
+  assert.ok(manifestSelects.labels?.includes('Test Drums Co'),
+    `A manifest brand's display name was not used: ${JSON.stringify(manifestSelects)}`);
+  assert.deepEqual(manifestSelects.models, ['Manifest Only'],
+    `A manifest brand did not offer exactly its own models: ${JSON.stringify(manifestSelects)}`);
+  drumManifest = null;
+
   console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds, thankYouSeconds: thanked.seconds, visualOnlyStatus: visualOnly.status, audibleStatus: audible.status, drumPeak: loudness.peak, kitBandColours: bandColours.map(({ stdout }) => Number(stdout.trim())), kitProbe, kitStrokeChangedPixels: changedPixels, kitStrokePeakDelta: peakDelta, kitOverlayProbe: drawProbe }, null, 2));
 } finally {
   cdp?.close();
