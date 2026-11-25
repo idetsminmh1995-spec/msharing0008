@@ -65,7 +65,7 @@
       ...size,
       instrument: 'violin',
       size,
-      notation: 'landscape',
+      notation: 'page',
       color: 'black',
     };
   }

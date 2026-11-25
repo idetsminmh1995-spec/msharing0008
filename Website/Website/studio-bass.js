@@ -98,7 +98,7 @@
       ...size,
       instrument: 'bass',
       size,
-      notation: 'landscape',
+      notation: 'page',
       color: 'black',
     };
   }

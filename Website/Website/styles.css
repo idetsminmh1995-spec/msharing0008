@@ -286,10 +286,14 @@
 }
 
 /* Keep the preview frame stable regardless of the loaded video's intrinsic size. */
-.studio-panel--video .video-stage { width:100%; height:clamp(240px,26vw,460px); min-height:240px; flex:0 0 auto; aspect-ratio:16 / 9; }
+.studio-panel--video .video-stage { width:100%; height:auto; min-height:0; flex:0 0 auto; aspect-ratio:16 / 9; }
+/* The preview is the export's own frame: a portrait video gets a portrait box. */
+.studio-panel--video .video-stage[data-video-ratio='1:1'] { width:min(100%,460px); height:auto; margin-inline:auto; aspect-ratio:1 / 1; }
+.studio-panel--video .video-stage[data-video-ratio='9:16'] { width:auto; height:min(70vh,620px); margin-inline:auto; aspect-ratio:9 / 16; }
 .studio-field--empty { min-height:1px; }
 @media (max-width:860px) {
   .studio-panel--video .video-stage { height:auto; min-height:0; aspect-ratio:16 / 9; }
+  .studio-panel--video .video-stage[data-video-ratio='9:16'] { width:auto; height:min(60vh,520px); }
 }
 @media (max-width:560px) {
   .studio-panel--video .video-stage { min-height:180px; }

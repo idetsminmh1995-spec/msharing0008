@@ -312,12 +312,12 @@ try {
   assert.match(previewState.source, /Live preview/, `The preview does not say it is live: ${previewState.source}`);
   assert.equal(previewState.playDisabled, false, 'Play stayed disabled while a live preview was on show');
   assert.equal(previewState.timelineDisabled, false, 'The timeline stayed disabled while a live preview was on show');
-  // The preview is the export's shape at a smaller pixel count, not a
-  // re-layout: 16:9 stays 16:9.
-  assert.equal(previewState.width * 9, previewState.height * 16,
-    `The preview is not the export's 16:9 shape: ${previewState.width}x${previewState.height}`);
-  assert.ok(Math.max(previewState.width, previewState.height) <= 960,
-    `The preview was not drawn small: ${previewState.width}x${previewState.height}`);
+  // §၁၅: the preview is the export's frame, at the export's own size --
+  // not a smaller re-layout that could hide a difference.
+  assert.equal(previewState.width, 1920,
+    `The preview canvas is not the export's width: ${previewState.width}x${previewState.height}`);
+  assert.equal(previewState.height, 1080,
+    `The preview canvas is not the export's height: ${previewState.width}x${previewState.height}`);
 
   // The reference picture's corner mark (§၁၃) reaches the Studio's own
   // frame, not only the engine's helper. Its containment is checked where
@@ -599,7 +599,7 @@ print(total / max(1, count))
     input.files = transfer.files;
     input.dispatchEvent(new Event('change', { bubbles: true }));
     const view = document.querySelector('[data-notation-view]');
-    view.value = 'landscape';
+    view.value = 'page';
     view.dispatchEvent(new Event('change', { bubbles: true }));
     const ratio = document.querySelector('[data-video-ratio]');
     ratio.value = '16:9';

@@ -422,7 +422,7 @@ try {
     const out = {};
     for (const shape of ['bar', 'box']) {
       const state = await VideoEngine.prepareNotationFor(file, {
-        instrument: 'drums', notation: 'landscape', size, cursorShape: shape,
+        instrument: 'drums', notation: 'page', size, cursorShape: shape,
         palette: VideoEngine.paletteFor('white'),
       });
       if (!state || state.error) throw new Error(shape + ': ' + (state ? state.error : 'no state'));
@@ -465,7 +465,7 @@ try {
     const size = VideoEngine.sizeFor('16:9');
     const rect = VideoEngine.layoutFor('drums', size).rects.notation;
     const state = await VideoEngine.prepareNotationFor(file, {
-      instrument: 'drums', notation: 'landscape', size, cursorShape: 'box',
+      instrument: 'drums', notation: 'page', size, cursorShape: 'box',
       palette: VideoEngine.paletteFor('white'),
     });
     if (!state || state.error) throw new Error(state ? state.error : 'no state');
@@ -528,7 +528,7 @@ try {
       const size = VideoEngine.sizeFor(ratio);
       const palette = VideoEngine.paletteFor('white');
       out[ratio] = {};
-      for (const view of ['landscape', 'horizontal']) {
+      for (const view of ['page', 'horizontal']) {
         const state = await VideoEngine.prepareNotationFor(file, {
           instrument: 'drums', notation: view, size, cursorShape: 'box', palette,
         });
@@ -576,7 +576,7 @@ try {
     return JSON.stringify(out);
   })()`));
   for (const ratio of RATIOS) {
-    for (const view of ['landscape', 'horizontal']) {
+    for (const view of ['page', 'horizontal']) {
       const band = clipping[ratio][view];
       assert.ok(band.inside > 1000,
         `The ${ratio} ${view} Notation drew nothing inside its own band: ${JSON.stringify(band)}`);

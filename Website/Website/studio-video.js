@@ -100,7 +100,7 @@
     titleTwoSize: Number(titleTwoSize?.value) || 11,
     brand: drumBrand?.value.trim() || 'M Sharing',
     model: drumModel?.value || 'custom',
-    notation: notationView?.value || 'landscape',
+    notation: notationView?.value || 'page',
     soundModel: soundModel?.value || 'visual',
     soundVolume: Number(soundVolume?.value) || 0,
     countEnabled: countVoiceEnabled?.value === 'on',
@@ -135,6 +135,9 @@
   const syncControlState = () => {
     const settings = getSettings();
     if (formatLabel) formatLabel.textContent = `${settings.ratio} · ${settings.size.width}×${settings.size.height}`;
+    // The stage takes the video's own shape, so a portrait preview is not
+    // letterboxed inside a landscape box (§၁၅).
+    if (stage) stage.dataset.videoRatio = settings.ratio;
     if (soundVolumeValue) soundVolumeValue.value = `${settings.soundVolume}%`;
     if (countVolumeValue) countVolumeValue.value = `${settings.countVolume}%`;
     const countOn = settings.countEnabled;
@@ -589,9 +592,6 @@
   // canvas is what the file will hold. It never touches an encoder.
   // ---------------------------------------------------------------
 
-  const PREVIEW_LONG_SIDE = 960;
-  const PREVIEW_MIN_LONG_SIDE = 480;
-  const PREVIEW_TARGET_FPS = 24;
   // A long score would need a soundtrack buffer measured in hundreds of
   // megabytes just to preview it; past this the preview stays silent and
   // says so, and the export still carries the sound.
@@ -612,16 +612,14 @@
     token: 0,
     drawing: false,
     pendingAt: null,
-    frames: 0,
-    measuredAt: 0,
-    slowStrikes: 0,
   };
 
-  /** The preview's own frame size: same ratio, smaller pixels. */
-  const previewSizeFor = (size) => {
-    const scale = Math.min(1, PREVIEW_LONG_SIDE / Math.max(size.width, size.height));
-    return { width: Math.round(size.width * scale), height: Math.round(size.height * scale) };
-  };
+  /**
+   * The preview draws at the export's own pixel size (§၁၅): the canvas is
+   * 1920x1080 (or 1080x1080 / 1080x1920) and CSS scales it down into the
+   * stage. A smaller canvas would be a different picture, not the same one.
+   */
+  const previewSizeFor = (size) => ({ width: size.width, height: size.height });
 
   const previewVisible = () => Boolean(preview.plan) && !previewCanvas?.hidden;
 
@@ -705,26 +703,6 @@
       updatePreviewControls(preview.seconds);
       return;
     }
-    // The auto-shrink watches the frames actually drawn: a machine that
-    // cannot hold 24 fps at 960 px is asked to hold it at half that.
-    const now = performance.now();
-    preview.frames += 1;
-    if (!preview.measuredAt) preview.measuredAt = now;
-    else if (now - preview.measuredAt >= 1000) {
-      const fps = (preview.frames * 1000) / (now - preview.measuredAt);
-      preview.frames = 0;
-      preview.measuredAt = now;
-      if (fps < PREVIEW_TARGET_FPS && preview.size && Math.max(preview.size.width, preview.size.height) > PREVIEW_MIN_LONG_SIDE) {
-        preview.slowStrikes += 1;
-        if (preview.slowStrikes >= 2) {
-          preview.slowStrikes = 0;
-          void shrinkPreview();
-          return;
-        }
-      } else {
-        preview.slowStrikes = 0;
-      }
-    }
     void drawPreviewFrame(at);
     preview.rafId = requestAnimationFrame(previewTick);
   }
@@ -734,8 +712,6 @@
     if (preview.offset >= preview.seconds) preview.offset = 0;
     preview.startedAt = performance.now();
     preview.playing = true;
-    preview.frames = 0;
-    preview.measuredAt = 0;
     if (playButton) playButton.textContent = '❚❚';
     stage?.classList.add('is-playing');
     // Starting the sound can wait on the audio context; a pause that lands
@@ -765,19 +741,6 @@
     } catch (error) {
       setStatus(`Live preview is visual only: ${error.message || error}`);
     }
-  }
-
-  /** The preview rebuilt at a smaller size, because it could not keep up. */
-  async function shrinkPreview() {
-    if (!preview.settings || !preview.size) return;
-    const next = {
-      width: Math.max(2, Math.round(preview.size.width / 2)),
-      height: Math.max(2, Math.round(preview.size.height / 2)),
-    };
-    const at = previewClock();
-    const wasPlaying = preview.playing;
-    stopPreviewClock();
-    await startPreview(preview.settings, { size: next, at, autoplay: wasPlaying });
   }
 
   /**

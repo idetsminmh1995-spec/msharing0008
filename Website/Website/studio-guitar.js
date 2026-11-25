@@ -102,7 +102,7 @@
       size,
       // The page has no Notation View control, so the sheet is the
       // landscape page the other video pages default to.
-      notation: 'landscape',
+      notation: 'page',
       color: 'black',
     };
   }

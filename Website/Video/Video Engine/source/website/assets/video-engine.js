@@ -1678,6 +1678,10 @@
     portrait: [30, 42],
     square: [30, 30],
   };
+  // The Plan gives Notation View two choices only, `Page` and `Horizontal`,
+  // and the page's own shape follows the frame's ratio rather than being a
+  // third setting (§၁၃.၃ ခ).
+  const PAGE_SHAPE_BY_RATIO = { '16:9': 'landscape', '1:1': 'square', '9:16': 'portrait' };
 
   let notationEnginePromise = null;
   let bravuraBase64 = null;
@@ -1746,6 +1750,10 @@
     if (!file) return null;
     const api = await loadNotationEngine();
     const mode = settings.notation === 'horizontal' ? 'scroll' : 'page';
+    // Page's shape is the frame's own: a landscape video gets a landscape
+    // sheet. The old landscape/portrait/square values are read as `Page`
+    // so a saved setting keeps working.
+    const pageShape = PAGE_SHAPE_BY_RATIO[ratioOf(settings.size.width, settings.size.height)] || 'landscape';
     // Only a page that offers Video Color passes a palette; the rest keep
     // the paper-and-ink sheet they have always had.
     const palette = settings.palette ?? null;
@@ -1756,9 +1764,9 @@
         : { ink: '#101828', background: '#ffffff' },
     };
     if (mode === 'page') {
-      // The chosen page shape, in staff spaces -- the same A4 proportions
-      // the engine defaults to, turned or squared as the user asked.
-      const [pageWidth, pageHeight] = PAGE_SHAPES[settings.notation] || PAGE_SHAPES.landscape;
+      // The sheet, in staff spaces -- the same A4 proportions the engine
+      // defaults to, turned or squared to match the frame.
+      const [pageWidth, pageHeight] = PAGE_SHAPES[pageShape];
       config.page = {
         pageWidth,
         pageHeight,
@@ -1767,6 +1775,13 @@
         marginLeft: 1.4,
         marginRight: 1.4,
       };
+    }
+    // The sheet the engine was asked for, reported so a caller can check
+    // that a frame's ratio reached the page layout.
+    let sheet = null;
+    if (mode === 'page') {
+      const [width, height] = PAGE_SHAPES[pageShape];
+      sheet = { shape: pageShape, width, height };
     }
     const parsed = api.parseMusicXml(await readScoreText(file));
     const rendered = api.renderParsedMusicXml(parsed, { config });
@@ -1785,6 +1800,7 @@
     return {
       api,
       mode,
+      sheet,
       playback: rendered.playback,
       image,
       width: image.naturalWidth,

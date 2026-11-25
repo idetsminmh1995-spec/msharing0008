@@ -111,7 +111,15 @@ const SCORE = await readFile(new URL(
   import.meta.url,
 ), 'utf8');
 
-const VIEWS = ['landscape', 'portrait', 'square', 'horizontal'];
+// The Plan offers two views only: `Page`, whose sheet shape follows the
+// frame's ratio, and `Horizontal`. Every ratio is measured so a Page that
+// kept one shape for all three would be caught.
+const CASES = [
+  { key: 'page-16:9', notation: 'page', size: { width: 1920, height: 1080 }, sheetWidth: 42 },
+  { key: 'page-1:1', notation: 'page', size: { width: 1080, height: 1080 }, sheetWidth: 30, sheetHeight: 30 },
+  { key: 'page-9:16', notation: 'page', size: { width: 1080, height: 1920 }, sheetWidth: 30, sheetHeight: 42 },
+  { key: 'horizontal', notation: 'horizontal', size: { width: 1920, height: 1080 } },
+];
 
 try {
   const httpPort = await findFreePort();
@@ -144,16 +152,17 @@ try {
 
   const measured = await evaluate(`(async () => {
     const file = new File([${JSON.stringify(SCORE)}], 'long-score.musicxml', { type: 'application/xml' });
-    const views = ${JSON.stringify(VIEWS)};
+    const cases = ${JSON.stringify(CASES)};
     // Spread across the score, so every view crosses system boundaries and
     // the sheet has to travel for the reading line to stay on the notes.
     const times = [2, 40, 80, 120];
     const out = {};
-    for (const view of views) {
-      const settings = { instrument: 'drums', notation: view, size: { width: 1920, height: 1080 } };
+    for (const testCase of cases) {
+      const view = testCase.key;
+      const settings = { instrument: 'drums', notation: testCase.notation, size: testCase.size };
       const state = await VideoEngine.prepareNotationFor(file, settings);
       if (!state || state.error) throw new Error(view + ': ' + (state ? state.error : 'no notation state'));
-      const rect = VideoEngine.layoutFor('drums', { width: 1920, height: 1080 }).rects.notation;
+      const rect = VideoEngine.layoutFor('drums', testCase.size).rects.notation;
       const canvas = document.createElement('canvas');
       canvas.width = rect.width;
       canvas.height = rect.height;
@@ -194,6 +203,7 @@ try {
         : (state.image.naturalHeight * (((rect.width * 0.98) / state.viewBox.width) / imageSpace)) / rect.height;
       out[view] = {
         mode: state.mode,
+        sheet: state.sheet,
         seconds: state.seconds,
         viewBox: state.viewBox,
         rect: { width: rect.width, height: rect.height },
@@ -204,11 +214,11 @@ try {
     return out;
   })()`);
 
-  const pageWidths = { landscape: 42, portrait: 30, square: 30 };
   const falling = (values) => values.every((value, index) => index === 0 || value < values[index - 1]);
   const report = {};
 
-  for (const view of VIEWS) {
+  for (const testCase of CASES) {
+    const view = testCase.key;
     const result = measured[view];
     assert.ok(result, `The ${view} view produced no measurement`);
     const [first] = result.frames;
@@ -234,10 +244,14 @@ try {
       continue;
     }
 
-    // Page: the requested sheet shape, and the sheet climbing bottom to top.
+    // Page: a sheet shaped like the frame, climbing bottom to top.
     assert.equal(result.mode, 'page', `The ${view} view did not use the page layout: ${result.mode}`);
-    assert.equal(result.viewBox.width, pageWidths[view],
-      `The ${view} sheet is ${result.viewBox.width} staff spaces wide, not ${pageWidths[view]}`);
+    assert.equal(result.sheet?.width, testCase.sheetWidth,
+      `The ${view} sheet is ${result.sheet?.width} staff spaces wide, not ${testCase.sheetWidth}`);
+    if (testCase.sheetHeight) {
+      assert.equal(result.sheet?.height, testCase.sheetHeight,
+        `The ${view} sheet is ${result.sheet?.height} staff spaces tall, not ${testCase.sheetHeight}`);
+    }
     const offsets = result.frames.map((frame) => frame.sheet.dy);
     assert.ok(falling(offsets), `The ${view} sheet did not climb bottom to top: ${offsets}`);
     // The reading line is where the cursor is drawn; it has to stay put
@@ -248,6 +262,7 @@ try {
       `The ${view} view drew the same sheet offset at 2 s and 120 s`);
     report[view] = {
       mode: result.mode,
+      sheet: result.sheet,
       viewBox: result.viewBox,
       offsets,
       readingLines: lines,
@@ -256,7 +271,7 @@ try {
   }
 
   console.log(JSON.stringify({ views: report }, null, 2));
-  console.log('Notation view check passed for landscape, portrait, square and horizontal.');
+  console.log('Notation view check passed: Page at 16:9, 1:1 and 9:16, and Horizontal.');
 } finally {
   cdp?.close();
   browser?.kill();
