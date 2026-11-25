@@ -285,7 +285,7 @@
           });
         },
       }];
-      const ending = await engine.thankYouSegment(settings.width, settings.height);
+      const ending = await engine.thankYouSegment(settings.width, settings.height, { instrument: 'voice', color: settings.color });
       if (ending) segments.push(ending);
 
       const result = await engine.render({

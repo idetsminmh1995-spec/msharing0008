@@ -173,6 +173,8 @@ async function waitForRender(label, timeoutMs = 120000, previousHref = null) {
  * for it: `clip` is its bytes, or null for the 404 the Plan allows.
  */
 let thankYouClip = null;
+/** Every Thank You address the page asked for, in order. */
+let thankYouRequests = [];
 /**
  * A picture the page is told not to find. Plan §5 says a required asset that
  * will not load stops the export; a neck drawn without its strings would be
@@ -190,10 +192,11 @@ async function serveThankYou() {
       });
       return;
     }
-    if (!event.request.url.includes('/thank-you/')) {
+    if (!event.request.url.includes('/Thank%20Video/')) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
     }
+    thankYouRequests.push(event.request.url);
     if (!thankYouClip) {
       await cdp.call('Fetch.fulfillRequest', {
         requestId: event.requestId,
@@ -393,10 +396,15 @@ print(background, other)
     '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', clipPath]);
   thankYouClip = await readFile(clipPath);
+  thankYouRequests = [];
   await evaluate("document.querySelector('[data-studio-generate]').click()");
   const thanked = await waitForRender('Guitar render with a Thank You clip', 120000, state.href);
   assert.ok(thanked.status.startsWith('Rendered '), `Guitar render did not complete: ${thanked.status}`);
   assert.match(thanked.status, /Thank You ending/, 'Guitar export does not report its Thank You ending');
+  // A guitar page asks for the guitar clip, not the drum set that every
+  // page used to share.
+  assert.ok(thankYouRequests[0]?.includes('/guitar/'),
+    `The guitar page did not ask for a guitar clip: ${thankYouRequests[0]}`);
   const thankedBytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(thanked.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
   const thankedPath = `${output}-thanked.mp4`;
   await writeFile(thankedPath, thankedBytes);

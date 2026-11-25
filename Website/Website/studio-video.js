@@ -578,7 +578,7 @@
     if (audio) segments[0].audio = audio;
     // The Plan's last part of the length: the Thank You clip. The engine
     // owns its address and shape, so the page only asks for it.
-    const ending = await engine.thankYouSegment(settings.size.width, settings.size.height);
+    const ending = await engine.thankYouSegment(settings.size.width, settings.size.height, { instrument: 'drum', color: settings.color });
     if (ending) segments.push(ending);
     return { segments, audio, meta, source, notationState, countIn, duration, kit };
   }

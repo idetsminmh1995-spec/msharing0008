@@ -122,6 +122,10 @@ let countVoice = null;
 let countVoicePrimaryMissing = false;
 /** The bucket's kit manifest, or null for a 404 -- the two states §၁၀ names. */
 let drumManifest = null;
+/** Every Thank You address the page asked for, in order. */
+let thankYouRequests = [];
+/** Addresses the stand-in should answer 404, so a fallback can be exercised. */
+let thankYouMissing = [];
 async function serveThankYou() {
   cdp.on('Fetch.requestPaused', async (event) => {
     const { url } = event.request;
@@ -131,13 +135,18 @@ async function serveThankYou() {
     const isPrimary = url.includes('/Counts%20%20vocal/');
     const isCountVoice = isPrimary || url.includes('/Voices/');
     const isManifest = url.endsWith('/drums/manifest.json');
-    if (!url.includes('/thank-you/') && !isCountVoice && !isManifest) {
+    const isThankYou = url.includes('/Thank%20Video/');
+    if (isThankYou) thankYouRequests.push(url);
+    if (!isThankYou && !isCountVoice && !isManifest) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
     }
+    const withheld = isThankYou && thankYouMissing.some((part) => url.includes(part));
     const body = isManifest
       ? drumManifest
-      : (isCountVoice ? (isPrimary && countVoicePrimaryMissing ? null : countVoice) : thankYouClip);
+      : (isCountVoice
+        ? (isPrimary && countVoicePrimaryMissing ? null : countVoice)
+        : (withheld ? null : thankYouClip));
     if (!body) {
       await cdp.call('Fetch.fulfillRequest', {
         requestId: event.requestId,
@@ -1105,9 +1114,20 @@ print(json.dumps(math.sqrt(sum(v * v for v in window) / max(1, len(window)))))
     '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', clipPath]);
   thankYouClip = await readFile(clipPath);
-  await evaluate("(() => { const count = document.querySelector('[data-count-voice-enabled]'); count.value = 'off'; count.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  // The earlier renders left the page on a portrait frame; this one starts
+  // from a known landscape, white frame so the address it asks for is known
+  // in advance. White keeps the score's own background far from the clip's
+  // dark colour, which is what the picture check below compares.
+  await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); ratio.value = '16:9'; ratio.dispatchEvent(new Event('change', { bubbles: true })); const colour = document.querySelector('[data-video-color]'); colour.value = 'white'; colour.dispatchEvent(new Event('change', { bubbles: true })); const count = document.querySelector('[data-count-voice-enabled]'); count.value = 'off'; count.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  thankYouRequests = [];
   const thanked = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'thank-you-score.musicxml', counted.href);
   assert.ok(Math.abs(thanked.seconds - 6) < 0.5, `The Thank You clip was not counted in the length: ${thanked.seconds}s instead of 6s`);
+  // The Plan gives the clip one address per ratio, instrument and colour.
+  // The page must ask for the drum set in the chosen colour at the frame's
+  // own ratio -- not a letterboxed clip from another shape.
+  assert.ok(thankYouRequests.length > 0, 'The page never asked for a Thank You clip');
+  assert.ok(thankYouRequests[0].includes('/16x9/drum/16x9%20White%20Drum.mp4'),
+    `The Thank You clip was not asked for by ratio, instrument and colour: ${thankYouRequests[0]}`);
   const clipFrames = [];
   for (const second of ['3.5', '5.0']) {
     const framePath = `${output}.thank-${second}.png`;
@@ -1137,6 +1157,52 @@ print(*image.load()[image.size[0] // 2, image.size[1] // 2])
     '-show_entries', 'stream=codec_type', '-of', 'json', thanked.path])).stdout).streams;
   assert.ok(thankedStreams.some((stream) => stream.codec_type === 'audio'),
     `The Thank You clip's sound is missing: ${JSON.stringify(thankedStreams)}`);
+
+  // Black is a different clip, and a ratio change is a different folder.
+  // Both are asked for by name, so the page cannot quietly keep one clip
+  // for every setting.
+  await evaluate("(() => { const colour = document.querySelector('[data-video-color]'); colour.value = 'black'; colour.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  thankYouRequests = [];
+  const white = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'thank-you-black.musicxml', thanked.href);
+  assert.ok(white.seconds > 0, 'The black-colour render produced no video');
+  assert.ok(thankYouRequests[0]?.includes('/16x9/drum/16x9%20Black%20Drum.mp4'),
+    `Black did not ask for the black clip: ${thankYouRequests[0]}`);
+
+  await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); ratio.value = '1:1'; ratio.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  thankYouRequests = [];
+  const square = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'thank-you-square.musicxml', white.href);
+  assert.ok(square.seconds > 0, 'The square render produced no video');
+  assert.ok(thankYouRequests[0]?.includes('/1x1/drum/1x1%20Black%20Drum.mp4'),
+    `The square ratio did not ask for the 1x1 clip: ${thankYouRequests[0]}`);
+  await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); ratio.value = '16:9'; ratio.dispatchEvent(new Event('change', { bubbles: true })); })()");
+
+  // A second render must not keep a stale clip: the white and square
+  // requests above prove the address follows the settings.
+  thankYouRequests = [];
+
+  // The bucket is not complete: 1:1 Black Guitar and 9:16 White Guitar
+  // have no file. The candidate list is what keeps such a combination from
+  // losing its ending, so its order is checked directly.
+  const candidates = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const engine = window.VideoEngine;
+    return {
+      guitarBlackSquare: engine.thankYouCandidates(1080, 1080, { instrument: 'guitar', color: 'black' }),
+      pianoPortrait: engine.thankYouCandidates(1080, 1920, { instrument: 'piano', color: 'white' }),
+      nearSquare: engine.thankYouCandidates(1000, 900, {}),
+    };
+  })())`));
+  assert.ok(candidates.guitarBlackSquare[0].includes('/1x1/guitar/1x1%20Black%20Guitar.mp4'),
+    `The exact guitar clip was not tried first: ${candidates.guitarBlackSquare[0]}`);
+  assert.ok(candidates.guitarBlackSquare.some((url) => url.includes('/1x1/guitar/1x1%20White%20Guitar.mp4')),
+    `The same instrument in the other colour was not tried: ${JSON.stringify(candidates.guitarBlackSquare)}`);
+  assert.ok(candidates.guitarBlackSquare.at(-1).includes('/1x1/drum/'),
+    `The drum set was not the last resort: ${candidates.guitarBlackSquare.at(-1)}`);
+  assert.ok(candidates.pianoPortrait.every((url) => url.includes('/9x16/')),
+    `A candidate left the frame's own ratio: ${JSON.stringify(candidates.pianoPortrait)}`);
+  // `ratioOf` snaps an odd frame to its nearest shape, so even a 1000x900
+  // canvas is served a 1x1 clip rather than losing its ending.
+  assert.ok(candidates.nearSquare.every((url) => url.includes('/1x1/')),
+    `A near-square frame was not served a 1x1 clip: ${JSON.stringify(candidates.nearSquare)}`);
 
   // The drum sound. A Sound Model other than Visual Only means the file
   // carries the drums the picture shows, and Visual Only means it does not:

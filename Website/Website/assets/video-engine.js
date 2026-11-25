@@ -2528,68 +2528,111 @@
   //
   // The Plan gives this whole matter to the engine: the file names, the
   // R2 path and what happens when a clip is missing are decided here and
-  // nowhere else. One clip per frame shape, named by the shape's own
-  // ratio. A missing clip leaves the video without an ending rather than
-  // failing the export.
+  // nowhere else. The bucket holds one clip per ratio, instrument and
+  // Video Color, at
+  // `Thank Video/{ratio}/{instrument}/{ratio} {Colour} {Instrument}.mp4`.
+  //
+  // Not every combination is uploaded yet (1:1 Black Guitar, 9:16 White
+  // Guitar and others are absent), so the lookup walks a short list of
+  // candidates before giving up: the exact clip, then the same instrument
+  // in the other colour, then the drum set in either colour, which is
+  // complete for all three ratios. A missing clip leaves the video without
+  // an ending rather than failing the export.
   // ---------------------------------------------------------------
-  const THANK_YOU_BASE = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/thank-you';
-  const THANK_YOU_RATIOS = { '16:9': 'landscape', '1:1': 'square', '9:16': 'portrait' };
+  const THANK_YOU_BASE = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/Thank%20Video';
+  const THANK_YOU_RATIOS = { '16:9': '16x9', '1:1': '1x1', '9:16': '9x16' };
+  const THANK_YOU_COLOURS = ['Black', 'White'];
+  // Drum first in the fallback order because it is the one set uploaded
+  // for every ratio in both colours.
+  const THANK_YOU_INSTRUMENTS = ['drum', 'guitar', 'violin', 'piano', 'bass', 'strings', 'voice', 'metronome'];
 
   const thankYouCache = new Map();
 
-  /** The R2 address of the clip for a frame this shape, or null. */
-  function thankYouUrl(width, height) {
-    const shape = THANK_YOU_RATIOS[ratioOf(width, height)];
-    return shape ? `${THANK_YOU_BASE}/${shape}.mp4` : null;
+  const capitalise = (word) => word.charAt(0).toUpperCase() + word.slice(1);
+
+  /** The R2 address of one exact clip. `ratioOf` snaps to the nearest of the
+   *  three shapes, so every frame has an address. */
+  function thankYouUrl(width, height, { instrument = 'drum', color = 'black' } = {}) {
+    const ratio = THANK_YOU_RATIOS[ratioOf(width, height)];
+    const name = THANK_YOU_INSTRUMENTS.includes(instrument) ? instrument : 'drum';
+    const colour = THANK_YOU_COLOURS.includes(capitalise(color)) ? capitalise(color) : 'Black';
+    return `${THANK_YOU_BASE}/${ratio}/${name}/${ratio}%20${colour}%20${capitalise(name)}.mp4`;
   }
 
   /**
-   * The clip as a playable source plus its sound. Fetched once per shape
-   * and kept: a clip is read for every frame of its segment, and asking
-   * R2 each time would put a download behind every frame.
+   * The clips to try, best first: the exact one, the same instrument in
+   * the other colour, then the complete drum set. Every entry is a real
+   * address, so the caller can stop at the first that answers.
    */
-  async function loadThankYou(width, height) {
-    const url = thankYouUrl(width, height);
-    if (!url) return null;
-    if (thankYouCache.has(url)) return thankYouCache.get(url);
+  function thankYouCandidates(width, height, { instrument = 'drum', color = 'black' } = {}) {
+    const exact = thankYouUrl(width, height, { instrument, color });
+    const ratio = THANK_YOU_RATIOS[ratioOf(width, height)];
+    const name = THANK_YOU_INSTRUMENTS.includes(instrument) ? instrument : 'drum';
+    const colour = THANK_YOU_COLOURS.includes(capitalise(color)) ? capitalise(color) : 'Black';
+    const other = colour === 'Black' ? 'White' : 'Black';
+    const clip = (which, shade) => `${THANK_YOU_BASE}/${ratio}/${which}/${ratio}%20${shade}%20${capitalise(which)}.mp4`;
+    const candidates = [exact];
+    const sameOtherColour = clip(name, other);
+    if (!candidates.includes(sameOtherColour)) candidates.push(sameOtherColour);
+    for (const shade of [colour, other]) {
+      const fallback = clip('drum', shade);
+      if (!candidates.includes(fallback)) candidates.push(fallback);
+    }
+    return candidates;
+  }
+
+  /**
+   * The clip as a playable source plus its sound. Fetched once per
+   * candidate list and kept: a clip is read for every frame of its
+   * segment, and asking R2 each time would put a download behind every
+   * frame. `clip.url` names the address that answered, which may be a
+   * fallback rather than the one asked for.
+   */
+  async function loadThankYou(width, height, options = {}) {
+    const candidates = thankYouCandidates(width, height, options);
+    const key = candidates.join('|');
+    if (thankYouCache.has(key)) return thankYouCache.get(key);
     const pending = (async () => {
-      try {
-        const response = await fetch(url, { mode: 'cors' });
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        // A blob URL is what makes seeking honest: an element reading
-        // from a plain URL reports a zero-length seekable range and stays
-        // on its first frame however far it is asked to go.
-        const objectUrl = URL.createObjectURL(blob);
-        const video = document.createElement('video');
-        video.crossOrigin = 'anonymous';
-        video.preload = 'auto';
-        video.playsInline = true;
-        video.muted = true;
-        video.src = objectUrl;
-        await new Promise((resolve, reject) => {
-          video.onloadeddata = resolve;
-          video.onerror = () => reject(new Error(`Thank You clip could not be played: ${video.error?.code ?? 'unknown'}`));
-          video.load();
-        });
-        let audio = null;
+      for (const url of candidates) {
         try {
-          const context = new OfflineAudioContext(1, 1, AUDIO_SAMPLE_RATE);
-          audio = await context.decodeAudioData(await blob.arrayBuffer());
+          const response = await fetch(url, { mode: 'cors' });
+          if (!response.ok) continue;
+          const blob = await response.blob();
+          // A blob URL is what makes seeking honest: an element reading
+          // from a plain URL reports a zero-length seekable range and stays
+          // on its first frame however far it is asked to go.
+          const objectUrl = URL.createObjectURL(blob);
+          const video = document.createElement('video');
+          video.crossOrigin = 'anonymous';
+          video.preload = 'auto';
+          video.playsInline = true;
+          video.muted = true;
+          video.src = objectUrl;
+          await new Promise((resolve, reject) => {
+            video.onloadeddata = resolve;
+            video.onerror = () => reject(new Error(`Thank You clip could not be played: ${video.error?.code ?? 'unknown'}`));
+            video.load();
+          });
+          let audio = null;
+          try {
+            const context = new OfflineAudioContext(1, 1, AUDIO_SAMPLE_RATE);
+            audio = await context.decodeAudioData(await blob.arrayBuffer());
+          } catch (error) {
+            audio = null;
+          }
+          return { video, audio, objectUrl, seconds: video.duration, url, cacheKey: key };
         } catch (error) {
-          audio = null;
+          // Try the next candidate rather than ending the video here.
         }
-        return { video, audio, objectUrl, seconds: video.duration, url };
-      } catch (error) {
-        return null;
       }
+      return null;
     })();
-    thankYouCache.set(url, pending);
+    thankYouCache.set(key, pending);
     const clip = await pending;
     // A missing clip must not be remembered: the next export may find it
     // uploaded, and a cached "no" would end every video after that one
     // short.
-    if (!clip) thankYouCache.delete(url);
+    if (!clip) thankYouCache.delete(key);
     return clip;
   }
 
@@ -2616,8 +2659,8 @@
    * frame, letterboxed rather than cropped so nothing of it is lost.
    * `null` when the clip is unavailable, so a page can skip it.
    */
-  async function thankYouSegment(width, height) {
-    const clip = await loadThankYou(width, height);
+  async function thankYouSegment(width, height, options = {}) {
+    const clip = await loadThankYou(width, height, options);
     if (!clip || !Number.isFinite(clip.seconds) || clip.seconds <= 0) return null;
     return {
       seconds: clip.seconds,
@@ -2633,7 +2676,7 @@
       },
       onEnd: () => {
         URL.revokeObjectURL(clip.objectUrl);
-        thankYouCache.delete(clip.url);
+        thankYouCache.delete(clip.cacheKey);
       },
     };
   }
@@ -2763,6 +2806,7 @@
     // The Plan gives the Thank You clip to this engine: a page asks for a
     // segment and appends it, and never learns the clip's address.
     thankYouUrl,
+    thankYouCandidates,
     thankYouSegment,
     // The spoken count, for the same reason: the recordings' address and
     // names stay in here, and a page asks for the beats it is counting in.

@@ -207,7 +207,7 @@ async function waitForRender(label, timeoutMs = 120000, previousHref = null) {
 let thankYouClip = null;
 async function serveThankYou() {
   cdp.on('Fetch.requestPaused', async (event) => {
-    if (!event.request.url.includes('/thank-you/')) {
+    if (!event.request.url.includes('/Thank%20Video/')) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
     }

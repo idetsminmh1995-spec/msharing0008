@@ -400,7 +400,7 @@
       // performance segment and starts with it.
       setStatus('Synthesizing the piano sound…');
       segments[0].audio = await createPianoAudio({ keys, seconds });
-      const ending = await engine.thankYouSegment(settings.width, settings.height);
+      const ending = await engine.thankYouSegment(settings.width, settings.height, { instrument: 'piano', color: settings.color });
       if (ending) segments.push(ending);
 
       const result = await engine.render({
