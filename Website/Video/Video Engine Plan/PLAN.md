@@ -71,6 +71,7 @@ Instrument တစ်ခုချင်းစီသည် Video Engine encoder �
 | 11 | **အသံပါ Preview** (အရေးအကြီးဆုံး — Preview ကတည်းက အသံပါ၊ ကန့်သတ်ချက်မရှိ၊ audio clock ကို master၊ Export နှင့် တူညီသော event stream) | ❌ — Main Plan §၅၊ §၁၂ |
 | 12 | Notation View ၂ မျိုး (`Page`/`Horizontal`)၊ ratio ↔ R2 ပုံ set တူညီမှု၊ Video ပုံစံ တစ်သားတည်း | ❌ — Main Plan §၁၃.၃ |
 | 13 | Drum Brand/Model ကို manifest မှ၊ Notation ကိုယ့်ဧရိယာထဲ clip | ❌ — Main Plan §၁၃.၁၊ §၁၃.၂ |
+| 14 | **Studio ၂ box** (ဘယ် input / ညာ Preview final အရွယ်အတိအကျ)၊ **Count Voice ကို R2 အသံဖြင့်**၊ **Thank You ကို ratio · တူရိယာ · Black/White အလိုက်**၊ Note အပြည့်အဝ ပေါ်ခြင်း | ❌/🟡 — Main Plan §၁၅၊ §၁၃.၂ |
 
 အသေးစိတ် အဆင့်များ (V1–V10) ကို Main Plan ၏ `Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ်` §၈ တွင် ကြည့်ပါ။
 
