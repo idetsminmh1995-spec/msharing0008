@@ -180,18 +180,32 @@ try {
         VideoEngine.drawNotationPart(ctx, { x: 0, y: 0, width: rect.width, height: rect.height }, at, state);
         const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
         let dark = 0, red = 0, redX = 0, redY = 0, white = 0;
+        let redTop = Infinity, redBottom = -Infinity;
+        const rowInk = new Array(canvas.height).fill(0);
+        const colInk = new Array(canvas.width).fill(0);
         for (let y = 0; y < canvas.height; y += 1) {
           for (let x = 0; x < canvas.width; x += 1) {
             const offset = (y * canvas.width + x) * 4;
             const r = data[offset], g = data[offset + 1], b = data[offset + 2];
-            if (r > 140 && g < 90 && b < 90) { red += 1; redX += x; redY += y; }
-            else if (r < 130 && g < 130 && b < 130) dark += 1;
+            if (r > 140 && g < 90 && b < 90) {
+              red += 1; redX += x; redY += y;
+              if (y < redTop) redTop = y;
+              if (y > redBottom) redBottom = y;
+            } else if (r < 130 && g < 130 && b < 130) {
+              dark += 1; rowInk[y] += 1; colInk[x] += 1;
+            }
             else if (r > 240 && g > 240 && b > 240) white += 1;
           }
         }
         return {
           at, sheet, dark, white, red,
           redX: red ? redX / red : 0, redY: red ? redY / red : 0,
+          redTop: red ? redTop : 0, redBottom: red ? redBottom : 0,
+          // §၁၃.၂ / V21: ink on a band edge is an element sliced by the band.
+          cut: {
+            top: rowInk[0], bottom: rowInk[canvas.height - 1],
+            left: colInk[0], right: colInk[canvas.width - 1],
+          },
         };
       });
       const imageSpace = state.image.naturalWidth / state.viewBox.width;
@@ -232,6 +246,17 @@ try {
     assert.ok(result.overflow > 2,
       `The ${view} sheet fits its part (${result.overflow.toFixed(2)}x), so no direction was tested`);
 
+    // V21 / §၁៣.២: a staff, stem, beam, ledger or accidental running into an
+    // edge is a note the viewer cannot read. Top and bottom are checked for
+    // both views, because neither view scrolls that way -- the band's height
+    // is the sheet's height, so ink there means the sheet was scaled wrong.
+    for (const frame of result.frames) {
+      assert.equal(frame.cut.top, 0,
+        `The ${view} view cut notation at the band's top edge at ${frame.at}s: ${frame.cut.top} px`);
+      assert.equal(frame.cut.bottom, 0,
+        `The ${view} view cut notation at the band's bottom edge at ${frame.at}s: ${frame.cut.bottom} px`);
+    }
+
     if (view === 'horizontal') {
       // Right to left under a marker that stays put: the sheet travels, the
       // cursor holds its reading line.
@@ -255,9 +280,22 @@ try {
     const offsets = result.frames.map((frame) => frame.sheet.dy);
     assert.ok(falling(offsets), `The ${view} sheet did not climb bottom to top: ${offsets}`);
     // The reading line is where the cursor is drawn; it has to stay put
-    // while the sheet moves under it.
-    const lines = result.frames.map((frame) => Math.round(frame.redY));
+    // while the sheet moves under it. Its top and bottom edges are what say
+    // so: a centroid slides a pixel whenever a notehead covers part of the
+    // thin bar, which is the note's ink moving, not the marker's.
+    const lines = result.frames.map((frame) => `${frame.redTop}-${frame.redBottom}`);
     assert.equal(new Set(lines).size, 1, `The ${view} view moved its reading line: ${lines}`);
+    // §၁៣.២ also rules out sideways slicing for Page: a sheet that only
+    // travels up and down is the sheet's own width inside the band, so its
+    // side margins must stay clear. Horizontal is left out on purpose -- the
+    // Plan keeps its left/right cut open (§၁៣.២'s open question), and a sheet
+    // that travels sideways is meant to leave the band's sides.
+    for (const frame of result.frames) {
+      assert.equal(frame.cut.left, 0,
+        `The ${view} view cut notation at the band's left edge at ${frame.at}s: ${frame.cut.left} px`);
+      assert.equal(frame.cut.right, 0,
+        `The ${view} view cut notation at the band's right edge at ${frame.at}s: ${frame.cut.right} px`);
+    }
     assert.notEqual(first.sheet.dy, last.sheet.dy,
       `The ${view} view drew the same sheet offset at 2 s and 120 s`);
     report[view] = {

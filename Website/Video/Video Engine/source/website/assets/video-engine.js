@@ -1512,7 +1512,9 @@
         highlight: '#f8c9c9',
         highlightText: '#7f1220',
         notationInk: '#101828',
-        notationBackground: '#ffffff',
+        // §၁၃.၃(က): the sheet is the frame's own background, so the notation
+        // band has no panel edge against the bands beside it.
+        notationBackground: '#f7f9fc',
         logoVariant: 'light',
         titleOne: '#ffaa00',
         titleTwo: '#111827',
@@ -1528,7 +1530,7 @@
         highlight: '#7f1220',
         highlightText: '#ffd9dd',
         notationInk: '#f8fafc',
-        notationBackground: '#0b1220',
+        notationBackground: '#080d16',
         logoVariant: 'dark',
         titleOne: '#ffaa00',
         titleTwo: '#e2e8f0',
@@ -1807,6 +1809,54 @@
     const systemYs = [...new Set(rendered.playback.measureNumbersInOrder
       .map((number) => rendered.playback.placementByMeasureNumber.get(number).systemY))]
       .sort((left, right) => left - right);
+    // §၁၃.၂ wants the staff, stems, beams and marks whole inside the band, so
+    // the band has to know where each system's ink begins and ends. The row
+    // profile the ink measure already walked gives that, per system: systems
+    // differ in height (a tempo mark or a repeat makes one taller), which is
+    // why one shared height is not enough. The staff line `systemY` is what
+    // the cursor is drawn on, so the ink is measured as the worst reach above
+    // and below that line -- fitting a total height would let the lower side
+    // spill past the band's bottom edge.
+    const imagePerSpace = image.naturalWidth / viewBox.width;
+    // A score with one system has no neighbour to halve the gap to, so its
+    // band is the whole sheet. Reading the second system there would be
+    // `undefined` and every band would come out NaN.
+    const gapAbove = systemYs.length > 1 ? (systemYs[1] - systemYs[0]) / 2 : systemYs[0];
+    const systemBands = systemYs.map((start, index) => {
+      // Each system owns half the gap to its neighbours, so a tall tempo mark
+      // above one staff is not mistaken for part of the system above it.
+      const previous = index > 0 ? (systemYs[index - 1] + start) / 2 : start - gapAbove;
+      const following = index + 1 < systemYs.length
+        ? (start + systemYs[index + 1]) / 2
+        : start + (start - systemYs[index - 1]);
+      let top = Infinity;
+      let bottom = -Infinity;
+      const first = Math.max(0, Math.floor(previous * imagePerSpace));
+      const last = Math.min(ink.rows.length - 1, Math.ceil(following * imagePerSpace));
+      for (let y = first; y <= last; y += 1) {
+        if (!ink.rows[y]) continue;
+        const spaces = y / imagePerSpace;
+        if (spaces < top) top = spaces;
+        if (spaces > bottom) bottom = spaces;
+      }
+      return top === Infinity ? null : { top, bottom };
+    });
+    let inkAbove = 0;
+    let inkBelow = 0;
+    systemBands.forEach((band, index) => {
+      if (!band) return;
+      inkAbove = Math.max(inkAbove, systemYs[index] - band.top);
+      inkBelow = Math.max(inkBelow, band.bottom - systemYs[index]);
+    });
+    if (inkAbove + inkBelow === 0 && systemYs.length > 0) {
+      // No system band could be measured. The sheet's own ink still says how
+      // far the notation reaches, so a band is drawn rather than collapsed to
+      // nothing while the score's picture is fine.
+      const inkTop = ink.y / imagePerSpace;
+      const inkBottom = (ink.y + ink.height) / imagePerSpace;
+      inkAbove = Math.max(0, systemYs[0] - inkTop);
+      inkBelow = Math.max(0, inkBottom - systemYs[0]);
+    }
     return {
       api,
       mode,
@@ -1816,6 +1866,9 @@
       width: image.naturalWidth,
       height: image.naturalHeight,
       systemYs,
+      systemBands,
+      inkAbove,
+      inkBelow,
       viewBox,
       ink,
       cursor: api.resolveConfig().cursor,
@@ -1847,12 +1900,14 @@
     let top = canvas.height;
     let right = -1;
     let bottom = -1;
+    const rows = new Array(canvas.height).fill(0);
     for (let y = 0; y < canvas.height; y += 1) {
       for (let x = 0; x < canvas.width; x += 1) {
         const offset = (y * canvas.width + x) * 4;
         const luminance = 0.299 * data[offset] + 0.587 * data[offset + 1] + 0.114 * data[offset + 2];
         const ink = darkInk ? luminance < 160 : luminance > 96;
         if (!ink || data[offset + 3] < 32) continue;
+        rows[y] += 1;
         if (x < left) left = x;
         if (x > right) right = x;
         if (y < top) top = y;
@@ -1861,8 +1916,8 @@
     }
     canvas.width = 0;
     canvas.height = 0;
-    if (right < 0) return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
-    return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
+    if (right < 0) return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight, rows };
+    return { x: left, y: top, width: right - left + 1, height: bottom - top + 1, rows };
   };
 
   /**
@@ -1886,11 +1941,43 @@
     }
   };
 
+  /**
+   * The slice of the sheet one system owns: its ink plus a small margin, in
+   * staff spaces, measured from the system's staff line. A system with no
+   * measured ink (an empty score) falls back to the whole sheet so the view
+   * still draws something rather than a blank band.
+   */
+  const SYSTEM_WINDOW_MARGIN = 0.6;
+  function systemWindow(state, systemY) {
+    const bands = state.systemBands;
+    if (Array.isArray(bands) && bands.length) {
+      const index = state.systemYs.indexOf(systemY);
+      const band = index >= 0 ? bands[index] : null;
+      if (band) {
+        const above = Math.max(0, systemY - band.top) + SYSTEM_WINDOW_MARGIN;
+        const below = Math.max(0, band.bottom - systemY) + SYSTEM_WINDOW_MARGIN;
+        return { above, below, height: above + below };
+      }
+    }
+    // Four staff spaces is the height a staff and its marks need; a window
+    // smaller than that would clip the very system it is meant to show.
+    const above = Math.max(state.inkAbove ?? 0, 4);
+    const below = Math.max(state.inkBelow ?? 0, 4);
+    return { above, below, height: above + below };
+  }
+
   function drawNotationPart(ctx, rect, at, state, palette = null) {
     ctx.save();
     ctx.translate(rect.x, rect.y);
     ctx.fillStyle = palette ? palette.notationBackground : '#ffffff';
     ctx.fillRect(0, 0, rect.width, rect.height);
+    // §၁၃.၂: the part draws only inside its own rect. `composeFrame` already
+    // clips each part, but a page may call a part drawer directly (the
+    // preview does), so the drawer holds the same rule itself rather than
+    // relying on the caller.
+    ctx.beginPath();
+    ctx.rect(0, 0, rect.width, rect.height);
+    ctx.clip();
     if (!state) {
       ctx.fillStyle = palette ? palette.muted : '#8b95a7';
       ctx.font = `600 ${Math.max(10, Math.round(rect.height * 0.07))}px Inter, system-ui, sans-serif`;
@@ -1934,20 +2021,54 @@
       return;
     }
 
-    // Page: the sheet is as wide as the part and slides bottom to top, one
-    // system at a time -- the Plan's own wording for this view.
-    const pxPerSpace = (rect.width * 0.98) / viewBox.width;
+    // Page: the sheet slides bottom to top, one system at a time -- the
+    // Plan's own wording for this view.
+    //
+    // §၁၃.၂ asks for the staff whole inside the band, so the sheet is scaled
+    // to fit one system's ink rather than to the band's width alone: a
+    // width-scaled sheet drew one system 1313 px tall in a 342 px band at
+    // 16:9 and sliced every staff at both edges. The ink is fitted above and
+    // below the staff line the cursor sits on, so the reading line keeps its
+    // place on the frame while the sheet travels. Whichever of the two fits
+    // -- width or height -- wins, so a narrow frame still shows the width.
+    // The window is this system's own ink plus a hair of margin, so the
+    // system is whole inside it and no neighbour can reach the band's edges.
     const placement = api.computeCursorPlacement(state.playback, tick, { mode: 'cursorMoves' });
+    const window = systemWindow(state, placement.systemY);
+    const byWidth = (rect.width * 0.98) / viewBox.width;
+    // The reading line sits a little above the middle, where the reference
+    // picture puts it, and it holds still while the sheet travels under it.
+    const lineY = rect.height * 0.4;
+    // Both sides of that fixed line are budgets of their own: the ink reaches
+    // further below the staff than above it, so a single total-height fit
+    // would push the lower notes past the band's bottom edge. The budgets are
+    // the score's worst system, not this frame's, so the notation keeps one
+    // size from the first system to the last instead of zooming between them.
+    const pad = rect.height * 0.02;
+    // The window's margin is part of the budget, not spare room on top of it:
+    // a margin the scale did not pay for would push the ink past the band.
+    const worstAbove = Math.max(state.inkAbove ?? 0, 0) + SYSTEM_WINDOW_MARGIN;
+    const worstBelow = Math.max(state.inkBelow ?? 0, 0) + SYSTEM_WINDOW_MARGIN;
+    const byInk = worstAbove + worstBelow > 0
+      ? Math.min(
+        worstAbove > 0 ? (lineY - pad) / worstAbove : Infinity,
+        worstBelow > 0 ? (rect.height - lineY - pad) / worstBelow : Infinity,
+      )
+      : Infinity;
+    const pxPerSpace = Math.min(byWidth, byInk);
+    const placementY = placement.systemY * pxPerSpace;
     const sheetHeight = state.image.naturalHeight * (pxPerSpace / imageSpace);
     const originX = (rect.width - viewBox.width * pxPerSpace) / 2;
-    const systemTop = placement.systemY * pxPerSpace;
-    const originY = sheetHeight <= rect.height
-      ? (rect.height - sheetHeight) / 2
-      : Math.min(0, Math.max(rect.height - sheetHeight, rect.height * 0.4 - systemTop));
+    const originY = lineY - placementY;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, lineY - window.above * pxPerSpace, rect.width, window.height * pxPerSpace);
+    ctx.clip();
     ctx.drawImage(state.image, originX, originY,
       state.image.naturalWidth * (pxPerSpace / imageSpace), sheetHeight);
+    ctx.restore();
     drawCursor(ctx, state, originX + placement.markerX * pxPerSpace,
-      originY + systemTop, CURSOR_SPACES * pxPerSpace, pxPerSpace);
+      lineY, CURSOR_SPACES * pxPerSpace, pxPerSpace);
     ctx.restore();
   }
 
@@ -2668,22 +2789,51 @@
     return clip;
   }
 
-  /** Seeks a clip to `at` and resolves once that frame is the one on show. */
+  /**
+   * Seeks a clip to `at` and resolves once that frame can be drawn.
+   *
+   * `seeked` says the element has moved, not that the decoder has produced
+   * the frame: drawing straight away paints the old picture, which for a
+   * fresh element is black. Waiting for the next painted frame is what
+   * makes the clip's first frames the clip rather than a black rectangle.
+   * The wait is bounded -- a clip that never presents a frame must not stop
+   * an export, and the seek itself already put the right time in place.
+   */
   const seekThankYou = (video, at) => new Promise((resolve, reject) => {
-    if (Math.abs(video.currentTime - at) < 1e-3 && video.readyState >= 2) {
-      resolve();
-      return;
-    }
-    const done = () => {
-      video.removeEventListener('seeked', done);
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
       resolve();
     };
-    video.addEventListener('seeked', done);
-    video.currentTime = at;
-    setTimeout(() => {
-      video.removeEventListener('seeked', done);
+    const painted = () => {
+      if (typeof video.requestVideoFrameCallback === 'function') {
+        video.requestVideoFrameCallback(() => finish());
+      } else {
+        requestAnimationFrame(() => finish());
+      }
+      // Bounded: a paused element does not always present a frame after a
+      // seek, and an export that waits forever is worse than one frame of
+      // the clip drawn a moment early.
+      setTimeout(finish, 250);
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       reject(new Error('Thank You clip did not reach the requested frame'));
     }, 8000);
+    const done = () => {
+      video.removeEventListener('seeked', done);
+      clearTimeout(timer);
+      painted();
+    };
+    if (Math.abs(video.currentTime - at) < 1e-3 && video.readyState >= 2) {
+      clearTimeout(timer);
+      painted();
+      return;
+    }
+    video.addEventListener('seeked', done);
+    video.currentTime = at;
   });
 
   /**

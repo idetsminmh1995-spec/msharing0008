@@ -688,3 +688,56 @@ commits stay local and must be reported as unpushed.
     requires to be fixed. `systemInk`/`systemBands`/`systemPitch` are not in
     the tree; the Plan leaves the Horizontal-view edge question open
     (§၁၃.၂), so this needs a decision before it is coded again.
+
+- **Permission is standing — reaffirmed 2026-11-18 (this session, after the
+  read-only pass).** The owner opened with a read-only request, then asked
+  in the next message for every unwritten Plan item to be written and
+  pushed once at the end. Recorded here as the standing default, as asked:
+  write the whole implementation (code, tests, docs), then a single push.
+  V21 is no longer blocked on a decision -- the two constraints the earlier
+  pass thought were in conflict are not: the reading line is the staff line
+  the cursor is drawn on, so fitting one system's ink *above and below that
+  line* and centring the ink keeps the line fixed while the sheet travels.
+  Measured this pass: `inkAbove`/`inkBelow` per system from the ink row
+  profile, scale = min(width fit, band fit over `inkAbove + inkBelow`),
+  band clipped to that one system. 16:9, 1:1 and 9:16 all come out with
+  zero ink on any band edge at t = 2, 40, 80 and 120 s, and the cursor's
+  top/bottom edges are identical in every frame.
+  - The existing test's reading-line check measured the cursor's *centroid*,
+    which slides a pixel whenever a notehead covers part of the thin bar.
+    It now measures the cursor's top and bottom edges, which is what "the
+    marker did not move" actually means.
+
+- **Twentieth pass — §၁၃.၃ (က)(ဂ) closed, and four test defects found
+  along the way.** Work record:
+  `Website/Doc/Video-Single-Look-Notation-Band-2026-11-18.md`.
+  - V21's root cause was not the band arithmetic but a *single-system*
+    score: `systemYs[1]` is `undefined` there, so `previous`/`following`
+    were `NaN`, every band was dropped, `inkAbove`/`inkBelow` stayed 0 and
+    the clip window had zero height. Nothing of the notation was drawn; the
+    cursor survived because it is drawn on the staff line itself. A
+    `gapAbove` fallback, an ink-bbox fallback and a four-staff-space floor
+    on the window are what fixed it. Any score the tests use has one
+    system, so this path is the normal one, not an edge case.
+  - `seekThankYou` resolved on `seeked`, which says the element moved, not
+    that the decoder produced the frame. The clip's first frames were
+    therefore pure black. It now waits for `requestVideoFrameCallback`
+    (falling back to `requestAnimationFrame`) with a 250 ms bound, so a
+    clip that never presents a frame cannot hang an export.
+  - Two measurement defects in `test-studio-video-browser.mjs` were also
+    the test's own fault, not the code's:
+    - the sync check assumed strokes in the first 2 s, but a drum video
+      opens on the count-in; it now reads the whole file and cross-
+      correlates the picture's changed-pixel count against the sound's
+      per-frame peak (best lag 0).
+    - the join check compared each frame's mean brightness with a fixed
+      "black" threshold. The Thank You clip is genuinely near-black
+      (mean 2–3), so a correct file failed. It now compares frames pixel
+      by pixel against a frame from inside each of the two parts.
+  - `sync/` was never created before ffmpeg wrote into it; `mkdir` first.
+  - §၁၃.၃(ဂ) is now measured the way the Plan asks: the CDP network log,
+    not the code's own report, is what `assertKitRequestsInRatio` reads,
+    with the image cache disabled so a warm preview cannot hide a request.
+  - All of it passes: drum studio, notation view, engine, notation clip,
+    drum reference, piano, guitar, dispatch, audio contract, bass, violin,
+    voice, metronome, muxer (15/15), and `sync-video-engine --check`.

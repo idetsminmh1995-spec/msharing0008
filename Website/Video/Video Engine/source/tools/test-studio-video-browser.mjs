@@ -7,7 +7,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -124,6 +124,14 @@ let countVoicePrimaryMissing = false;
 let drumManifest = null;
 /** Every Thank You address the page asked for, in order. */
 let thankYouRequests = [];
+/**
+ * Every drum-kit address the page asked for, in order. §၁၃.၃(ဂ) makes the
+ * ratio folder a rule rather than a convention, so the check reads the
+ * addresses the browser actually requested instead of the ratio the code
+ * reports. The cache is off while it runs, or a warm preview would answer
+ * from memory and the log would stay empty.
+ */
+let kitRequests = [];
 /** Addresses the stand-in should answer 404, so a fallback can be exercised. */
 let thankYouMissing = [];
 async function serveThankYou() {
@@ -136,7 +144,10 @@ async function serveThankYou() {
     const isCountVoice = isPrimary || url.includes('/Voices/');
     const isManifest = url.endsWith('/drums/manifest.json');
     const isThankYou = url.includes('/Thank%20Video/');
+    // A kit picture is any image under `drums/`; the manifest is not one.
+    const isKitPicture = !isManifest && url.includes('/drums/') && /\.(png|webp|jpe?g)(\?|$)/i.test(url);
     if (isThankYou) thankYouRequests.push(url);
+    if (isKitPicture) kitRequests.push(url);
     if (!isThankYou && !isCountVoice && !isManifest) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
@@ -189,6 +200,7 @@ try {
   cdp = new Cdp(page.webSocketDebuggerUrl);
   await cdp.call('Page.enable');
   await cdp.call('Runtime.enable');
+  await cdp.call('Network.enable');
   await serveThankYou();
 
   const startedAt = Date.now();
@@ -240,6 +252,26 @@ try {
       `The ${stream.width}x${stream.height} picture does not fit the level it declares (level ${level}, ${macroblocks} macroblocks)`);
   };
 
+  /**
+   * §၁၃.၃(ဂ): a ratio's export may only ask for that ratio's kit pictures,
+   * never another ratio's stretched to fit. The check reads the addresses
+   * the browser actually requested, so a fallback would be caught even if
+   * the code reported the right ratio.
+   *
+   * The page decodes each picture once and keeps it, so a request can land
+   * when the preview redraws rather than when Generate is pressed. The mark
+   * is where the log stood before the export was asked for; a preview that
+   * already fetched this ratio's picture still counts as evidence, because
+   * what the rule forbids is a picture from any *other* folder.
+   */
+  const assertKitRequestsInRatio = (mark, ratioPath, label) => {
+    const during = kitRequests.slice(mark);
+    assert.deepEqual(during.filter((url) => !url.includes(`/${ratioPath}/`)), [],
+      `The ${label} export asked for another ratio's kit picture: ${JSON.stringify(during)}`);
+    assert.ok(kitRequests.some((url) => url.includes(`/${ratioPath}/`)),
+      `The ${label} export never asked for a ${ratioPath} kit picture: ${JSON.stringify(kitRequests)}`);
+  };
+
   // §၅: the Studio opens on a sounding model, so a first export is not
   // silent. This baseline render is asked for the silent model on purpose:
   // its job is the picture, and a silent file takes the WebCodecs path,
@@ -249,6 +281,7 @@ try {
     'The Studio opened on Visual Only, so a first export would be silent');
   await evaluate("(() => { const model = document.querySelector('[data-sound-model]'); model.value = 'visual'; model.dispatchEvent(new Event('change', { bubbles: true })); })()");
 
+  const landscapeMark = kitRequests.length;
   await evaluate("document.querySelector('[data-studio-generate]').click()");
 
   const renderStarted = Date.now();
@@ -280,6 +313,7 @@ try {
   assert.equal(probe.streams[0].height, 1080);
 
   assertAvcLevel(probe.streams[0]);
+  assertKitRequestsInRatio(landscapeMark, '16x9', 'landscape');
 
   // ---------------------------------------------------------------
   // Live Preview (§၁၂). The page opens it from the same settings the file
@@ -577,6 +611,7 @@ print(total / max(1, count))
   // one ratio's art into another, so the three-ratio export runs on the kit
   // the bucket holds all three of. Roland's kit is landscape-only, which is
   // checked on its own further down.
+  const portraitMark = kitRequests.length;
   await evaluate("(() => { const brand = document.querySelector('[data-drum-brand]'); brand.value = 'MSDrums'; brand.dispatchEvent(new Event('change', { bubbles: true })); const model = document.querySelector('[data-drum-model]'); model.value = 'MS Drum 1'; model.dispatchEvent(new Event('change', { bubbles: true })); const ratio = document.querySelector('[data-video-ratio]'); const color = document.querySelector('[data-video-color]'); const count = document.querySelector('[data-count-voice-enabled]'); ratio.value = '9:16'; ratio.dispatchEvent(new Event('change', { bubbles: true })); color.value = 'white'; color.dispatchEvent(new Event('change', { bubbles: true })); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
   const portraitStartedAt = Date.now();
   let portraitState;
@@ -599,11 +634,13 @@ print(total / max(1, count))
   assert.equal(portraitProbe.streams[0].width, 1080);
   assert.equal(portraitProbe.streams[0].height, 1920);
   assertAvcLevel(portraitProbe.streams[0]);
+  assertKitRequestsInRatio(portraitMark, '9x16', 'portrait');
 
   // The Plan's B0 asks for an export in each of the three ratios, not just
   // the one the page happens to open with. 16:9 is measured at the top of
   // this file and 9:16 above; 1:1 is measured here. A page that kept a size
   // of its own for the square case would fail rather than go unnoticed.
+  const squareMark = kitRequests.length;
   await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); ratio.value = '1:1'; ratio.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
   const squareStartedAt = Date.now();
   let squareState;
@@ -624,6 +661,7 @@ print(total / max(1, count))
   assert.equal(squareProbe.streams[0].height, 1080, `Square video height is wrong: ${JSON.stringify(squareProbe)}`);
   assertAvcLevel(squareProbe.streams[0]);
   assert.match(squareState.download, /1x1/, `The square export is not named for its ratio: ${squareState.download}`);
+  assertKitRequestsInRatio(squareMark, '1x1', 'square');
 
   // A real score must reach the Notation part, and its own cursor must be
   // drawn: the Plan puts both inside the frame the Video Engine composes.
@@ -1293,6 +1331,161 @@ print(json.dumps({'peak': max(peaks) if peaks else 0, 'at': peaks}))
   const offBeat = Math.max(peakAt(0.26), peakAt(0.76), peakAt(1.26));
   assert.ok(onBeat > offBeat * 2,
     `The drums do not land on the beat: ${onBeat} on the beat against ${offBeat} between beats`);
+
+  // §၅ / V9: the sound and the picture are one performance, so a hit has to
+  // be heard where it is seen. Both streams are read from the file that was
+  // written -- when a stroke lights from the encoded frames, when a hit is
+  // heard from the samples -- and the two curves are slid against each other.
+  // The lag with the best overlap is the offset; a claim about sync is worth
+  // nothing that a measurement cannot contradict.
+  //
+  // The whole file is read, not the first seconds: a drum video opens on the
+  // count-in, which has no stroke in it, so a short window would measure the
+  // count against silence.
+  const syncFrames = join(profile, 'sync');
+  await mkdir(syncFrames, { recursive: true });
+  await exec('ffmpeg', ['-v', 'error', '-y', '-i', audible.path,
+    '-vf', 'fps=30', join(syncFrames, 'f%04d.png')]);
+  const picture = JSON.parse((await exec('python3', ['-c', `
+import json, glob, os
+from PIL import Image
+paths = sorted(glob.glob(os.path.join(${JSON.stringify(syncFrames)}, '*.png')))
+# The instrument band is the bottom of a drum frame. The kit photo does not
+# move, so the median value of a pixel over the run is its unlit state; a
+# frame where it differs from that has a stroke over it. Every fourth pixel
+# is read -- a stroke covers hundreds of them.
+step = 4
+bands = []
+for path in paths:
+    image = Image.open(path).convert('L')
+    width, height = image.size
+    band = image.crop((0, int(height * 0.60), width, height))
+    pixels = band.load()
+    bands.append([pixels[x, y] for y in range(0, band.size[1], step) for x in range(0, width, step)])
+reference = [sorted(column)[len(column) // 2] for column in zip(*bands)]
+lit = []
+for band in bands:
+    count = 0
+    for index, value in enumerate(band):
+        if abs(value - reference[index]) > 20:
+            count += 1
+    lit.append(count)
+print(json.dumps({'frames': len(lit), 'lit': lit}))
+`])).stdout);
+  assert.ok(picture.frames > 30, `The drum export is too short to measure sync: ${picture.frames} frames`);
+
+  const audio = JSON.parse((await exec('python3', ['-c', `
+import json, struct, wave
+handle = wave.open(${JSON.stringify(wavPath)})
+rate = handle.getframerate()
+samples = struct.unpack('<%dh' % handle.getnframes(), handle.readframes(handle.getnframes()))
+window = rate // 30
+level = []
+for index in range(0, len(samples) // window):
+    piece = samples[index * window:(index + 1) * window]
+    level.append(max(abs(value) for value in piece))
+print(json.dumps({'level': level}))
+`])).stdout);
+
+  // The picture is a count of changed pixels and the sound a peak per frame;
+  // both are scaled to their own range so the overlap compares shape, not
+  // loudness. The lag is searched one frame either side, which is more than
+  // the Plan's ~40 ms budget allows.
+  const normalise = (values) => {
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    return max === min ? values.map(() => 0) : values.map((value) => (value - min) / (max - min));
+  };
+  const pictureCurve = normalise(picture.lit);
+  const audioCurve = normalise(audio.level.slice(0, pictureCurve.length));
+  let bestLag = 0;
+  let bestScore = -Infinity;
+  for (let lag = -2; lag <= 2; lag += 1) {
+    let score = 0;
+    for (let index = 0; index < pictureCurve.length; index += 1) {
+      const other = index + lag;
+      if (other < 0 || other >= audioCurve.length) continue;
+      score += pictureCurve[index] * audioCurve[other];
+    }
+    if (score > bestScore) { bestScore = score; bestLag = lag; }
+  }
+  const syncError = Math.abs(bestLag) / 30;
+  // A frame is 33 ms, so one frame is the finest the picture can say; the
+  // Plan's budget is ~40 ms.
+  assert.ok(syncError <= 0.04,
+    `The sound is ${Math.round(syncError * 1000)} ms from the picture (best lag ${bestLag} frames)`);
+
+  // §၁៣.៣(က): Count-in, the score and the Thank You clip are one file that
+  // runs on, with no black frame where one part meets the next. Each frame at
+  // a join is compared, pixel by pixel, with a frame taken from inside each
+  // of the two parts. A blank frame differs from both of them everywhere; a
+  // frame of either part differs only where its own content moved. Brightness
+  // alone would not do: the clip's picture is nearly black and the score's is
+  // nearly white, so no single threshold can call both of them pictures.
+  const joinDiff = async (path, seconds) => {
+    const out = [];
+    for (const second of seconds) {
+      const framePath = `${output}.join-${second}.png`;
+      await exec('ffmpeg', ['-v', 'error', '-y', '-ss', String(second), '-i', path, '-frames:v', '1', framePath]);
+      out.push(framePath);
+    }
+    const { stdout } = await exec('python3', ['-c', `
+import json
+from PIL import Image
+# A third of the pixels, on a grid, is enough to tell a picture from a blank.
+step = 3
+frames = []
+for path in ${JSON.stringify(out)}:
+    image = Image.open(path).convert('L')
+    width, height = image.size
+    pixels = image.load()
+    frames.append([pixels[x, y] for y in range(0, height, step) for x in range(0, width, step)])
+def differs(a, b):
+    return sum(1 for left, right in zip(a, b) if abs(left - right) > 40) / len(a)
+first, *middle = frames
+last = frames[-1]
+print(json.dumps({
+  'middle': [round(min(differs(frame, first), differs(frame, last)), 3) for frame in middle],
+  'parts': [round(differs(first, last), 3), round(sum(first) / len(first), 1), round(sum(last) / len(last), 1)],
+}))
+`]);
+    return JSON.parse(stdout.trim());
+  };
+  // `counted` is the count-in followed by the score, so the join is at 2.0 s.
+  const countJoin = await joinDiff(counted.path, [1.5, 1.9, 1.97, 2.03, 2.1, 2.5]);
+  assert.ok(countJoin.middle.every((share) => share < 0.5),
+    `A frame at the count-in join is neither part's picture: ${JSON.stringify(countJoin)}`);
+  // `thanked` is the score followed by the Thank You clip, so the join is at
+  // 4.0 s. The two parts must also be different pictures, or the check above
+  // would pass on a file that never changed over.
+  const thankJoin = await joinDiff(thanked.path, [3.5, 3.9, 3.97, 4.03, 4.1, 4.5]);
+  assert.ok(thankJoin.middle.every((share) => share < 0.5),
+    `A frame at the Thank You join is neither part's picture: ${JSON.stringify(thankJoin)}`);
+  assert.ok(thankJoin.parts[0] > 0.5,
+    `The Thank You clip did not replace the score at the join: ${JSON.stringify(thankJoin.parts)}`);
+
+  // ...and the sound runs on across the same joins: a silent stretch in the
+  // middle of the file is the audio cut the Plan rules out.
+  const silence = JSON.parse((await exec('python3', ['-c', `
+import json, struct, wave
+handle = wave.open(${JSON.stringify(wavPath)})
+rate = handle.getframerate()
+samples = struct.unpack('<%dh' % handle.getnframes(), handle.readframes(handle.getnframes()))
+peak = max(abs(value) for value in samples) or 1
+window = rate // 100
+quiet = 0
+longest = 0
+for index in range(0, len(samples) // window):
+    piece = samples[index * window:(index + 1) * window]
+    if max(abs(value) for value in piece) < peak * 0.01:
+        quiet += 1
+        longest = max(longest, quiet)
+    else:
+        quiet = 0
+print(json.dumps({'longestSilence': round(longest / 100, 2)}))
+`])).stdout);
+  assert.ok(silence.longestSilence < 0.4,
+    `The drum sound has a ${silence.longestSilence}s silent gap in it`);
 
   // Main Plan V15: the Brand select decides which Models are offered, so a
   // model from another brand -- a folder the bucket does not hold -- cannot
