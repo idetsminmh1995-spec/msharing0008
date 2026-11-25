@@ -124,9 +124,15 @@ Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Eng
 - **Notation cursor** — `video-engine.js` သည် ယခင် `secondsToTick` ဖြင့်သာ တွက်သဖြင့် repeat ဒုတိယချီတွင် cursor က ရှေ့ဆက် ရွေ့နေခဲ့သည်။ ယခု repeat ရှိလျှင် `api.performanceSecondsToWritten` ဖြင့် ဖတ်သဖြင့် pass အသစ်စတိုင်း cursor က repeat အစသို့ ပြန်ခုန်သည်။ repeat မရှိလျှင် ယခင် လမ်းကြောင်းအတိုင်း ဖြစ်သည်။
 - **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် case ၆ ခု ထည့်ထားသည်: 60 BPM ၄ bar (၁၆ စက္ကန့်)၊ voice ၂ ခု ၂ bar (၄ စက္ကန့်)၊ repeat ၂ bar (written ၄ → played ၈ စက္ကန့်)၊ drum + bass part ၂ ခု (၄ စက္ကန့်)၊ Count Voice ဖွင့်ထားသော ၂ bar (၂ + ၄ = ၆ စက္ကန့်)၊ Thank You clip ၂ စက္ကန့် ပါသော ၂ bar (၄ + ၂ = ၆ စက္ကန့်)။ ခြောက်ခုလုံးကို Chromium မှ render ပြီး `ffprobe` ဖြင့် အရှည်တိုင်းသည်။ နောက်ဆုံးတွင် clip ၏ ပုံနှင့် အသံ ပါကြောင်းပါ စစ်သည်။
 - **Part များ** — score ထဲတွင် drum အပြင် bass ကဲ့သို့ အခြား part ပါလာလျှင် parser သည် part အားလုံး၏ measure များကို ဖတ်သဖြင့် video က score တစ်ခုလုံး စုပုံသလောက် ရှည်ခဲ့သည်။ ယခု percussion clef ရှိသော part (မရှိလျှင် unpitched note ရှိသော part) ကိုသာ drum performance အဖြစ် ဖတ်သည်။
-- **Count Voice count-in** — Plan §7 ၏ အရှည်စည်းမျဉ်းအရ video အရှည်တွင် count-in ပါသည်။ Count Voice ကို On ထားလျှင် score မစမီ bar တစ်ခု (score ၏ metre နှင့် tempo အတိုင်း) ကို segment အဖြစ် ထပ်ထည့်ပြီး ဗဟိုတွင် ရေတွက်သည့် ဂဏန်းကို ပြသည်။ 4/4၊ 120 BPM တွင် ၂ စက္ကန့် ဖြစ်သည်။
+- **Count Voice count-in** — Plan §7 ၏ အရှည်စည်းမျဉ်းအရ video အရှည်တွင် count-in ပါသည်။ Count Voice ကို On ထားလျှင် score မစမီ bar တစ်ခု (score ၏ metre နှင့် tempo အတိုင်း) ကို segment အဖြစ် ထပ်ထည့်သည်။ 4/4၊ 120 BPM တွင် ၂ စက္ကန့် ဖြစ်သည်။ **ရေတွက်သည့် ဂဏန်းကို count-in frame ၏ ဗဟိုတွင် သီးခြား မဆွဲတော့ပါ** — ရေတွက်မှု၏ တစ်ခုတည်းသော နေရာမှာ Title band ၏ COUNT ကွက်ဖြစ်သည်။ frame ဗဟိုသည် နောက်ခံအရောင်သာ ဖြစ်သည်။
 - **Thank You segment** — Plan §7 အရ video အရှည်တွင် Thank You clip ပါသည်။ ဖိုင်အမည်၊ R2 path နှင့် မရလျှင် လုပ်ပုံကို Engine ထဲတွင်သာ ထားသည် — `thankYouUrl()` က frame ၏ ပုံစံအလိုက် `thank-you/landscape.mp4`၊ `square.mp4`၊ `portrait.mp4` ကို ပြန်ပေးပြီး `thankYouSegment()` က segment တစ်ခု ထုတ်ပေးသည်။ Page က clip ၏ လိပ်စာကို မသိရပါ။ Clip ကို တစ်ကြိမ်သာ ယူပြီး cache လုပ်သည်; မရလျှင် export ကို မတားဘဲ အဆုံးပိုင်း မပါဘဲ ထွက်သည်၊ သို့သော် "မရ" ကို မမှတ်ထားပါ (နောက် export တွင် ပြန်ရှာသည်)။
 - **ကျန်ရှိ** — `MAX_SECONDS` ကဲ့သို့ ကိုယ်ပိုင် ကန့်သတ်ချက် မရှိတော့ပါ; Video Engine ၏ memory guard သာ safety အဖြစ် ကျန်သည်။ R2 ထဲ Thank You ဖိုင် အမှန်တကယ် တင်ရန် ကျန်သည်။
+
+## Drum Studio — count-in ဗဟိုဂဏန်း ဖြုတ်ခြင်း (2026-11-25)
+
+- **ပြဿနာ** — Count Voice ဖွင့်ထားသော video ၏ အစ count-in segment တွင် `drawCountIn()` က frame ဗဟို၌ ရေတွက်သည့် ဂဏန်းကို frame ၏ ၂၂% အရွယ်ဖြင့် သီးခြား ဆွဲခဲ့သည်။ ထို့ကြောင့် ရေတွက်မှုသည် နေရာ ၂ ခုတွင် ပေါ်ခဲ့သည် — Title band ၏ COUNT ကွက်နှင့် frame ဗဟို။
+- **ပြင်ဆင်မှု** — `studio-video.js` ၏ `drawCountIn()` မှ ဗဟိုဂဏန်း ဆွဲသည့် အပိုင်းကို ဖယ်သည်။ ယခု count-in frame တွင် Title band (TIME / BPM / COUNT ကွက်) နှင့် ထောင့် logo သာ ရှိသည်။ ရေတွက်မှု၏ တစ်ခုတည်းသော နေရာမှာ COUNT ကွက် ဖြစ်သည်။ Count Voice အသံသည် မပြောင်းလဲပါ — R2 မှ အသံသည် ယခင်အတိုင်း ကြိမ်သံအပေါ် ထပ်တီးသည်။
+- **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် case ၂ ခု ထည့်သည်: (၁) count-in frame ၏ အလယ် ၅၀% ဧရိယာတွင် နောက်ခံနှင့် မတူသော pixel ၀.၂% အောက်သာ ရှိကြောင်း (ဗဟိုဂဏန်း မရှိတော့ကြောင်း)၊ (၂) COUNT ကွက် ဧရိယာသည် beat ၁ နှင့် beat ၄ တွင် မတူညီကြောင်း (ရေတွက်မှု ဆက်အလုပ်လုပ်ကြောင်း)။
 
 ## Drum Studio — Count ကို COUNT ကွက်တစ်နေရာတည်း ပြခြင်း (2026-11-18)
 
@@ -136,8 +142,9 @@ Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Eng
 
 ## Drum Studio — Count Voice ကို R2 မှ အသံဖြင့် ချိတ်ခြင်း (2026-11-18)
 
-- **ဖိုင်နေရာ** — R2 public bucket တွင် `Voices/1.wav` … `Voices/7.wav` (နှင့် `M1`–`M4`) ရှိသည်။ `1.wav` နှင့် `M1.wav` သည် 1.5 s၊ ကျန်သည် 0.375 s၊ 44.1 kHz stereo။ `Counts vocal/`, `count-voice/` စသည်တို့မှာ 404 ဖြစ်သည်။
-- **Engine ဘက်** — `countVoiceUrl(beat)` နှင့် `countVoiceSamples(beats)` ကို `video-engine.js` တွင် ထည့်သည်။ Thank You clip နှင့် ပုံစံတူ — လိပ်စာနှင့် ဖိုင်အမည်ကို engine ထဲတွင်သာ ထားပြီး page က beat အရေအတွက်သာ တောင်းသည်။ decode လုပ်ပြီးသော buffer ကို cache လုပ်သည်; မရသော beat ကို မမှတ်ထားပါ။
+- **ဖိုင်နေရာ** — R2 public bucket တွင် `Voices/1.wav` … `Voices/7.wav` (နှင့် `M1`–`M4`) ရှိသည်။ `1.wav` နှင့် `M1.wav` သည် 1.5 s၊ ကျန်သည် 0.375 s၊ 44.1 kHz stereo။ `Counts  vocal/` (space နှစ်ခု) တွင်လည်း ထို ဖိုင်များ အတိအကျ ရှိသည် — MD5 တူသည်၊ ထို့ကြောင့် `Voices/` ၏ ပုံတူသာ ဖြစ်သည်။ `Counts vocal/` (space တစ်ခု)၊ `count-voice/` စသည်တို့မှာ 404 ဖြစ်သည်။
+- **နှစ်နာမည် ရှာခြင်း** — Engine က `Counts  vocal/{n}.wav` ကို အရင်တောင်းပြီး မရမှ `Voices/{n}.wav` သို့ ကျသည် (`COUNT_VOICE_BASES`)။ ထို့ကြောင့် folder တစ်ခုကို အမည်ပြောင်းခြင်း/ဖျက်ခြင်းက count အသံကို တိတ်မသွားစေပါ။ Cache key က ပထမလိပ်စာဖြစ်သဖြင့် beat တစ်ခုလျှင် တစ်ကြိမ်သာ ရှာသည်။
+- **Engine ဘက်** — `countVoiceUrls(beat)` နှင့် `countVoiceSamples(beats)` ကို `video-engine.js` တွင် ထည့်သည်။ Thank You clip နှင့် ပုံစံတူ — လိပ်စာနှင့် ဖိုင်အမည်ကို engine ထဲတွင်သာ ထားပြီး page က beat အရေအတွက်သာ တောင်းသည်။ decode လုပ်ပြီးသော buffer ကို cache လုပ်သည်; မရသော beat ကို မမှတ်ထားပါ။
 - **Adapter ဘက်** — `createDrumAudio()` သည် `countVoiceSamples(meta.beats)` ကို context မတည်မီ ယူပြီး beat တစ်ခုစီတွင် ကြိမ်သံအပေါ် `countVolume` ဖြင့် ထပ်တွဲသည်။ Count Voice သည် Sound Model ၏ အစိတ်အပိုင်း မဟုတ်သဖြင့် Visual Only တွင်လည်း အသံထွက်သည်။
 - **Status** — Visual Only + Count Voice ဖြစ်လျှင် "count voice only" ဟု ပြသည်; ယခင် "no drum sound" ဟု ပြခဲ့သည်မှာ မှားသည်။
 - **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် R2 ကို အစားထိုးပြီး (၁) အသံဖိုင် ရှိလျှင် beat ကြားကာလတွင် အသံ ပိုကျယ်ကြောင်း၊ (၂) count-in ပြီးနောက် score ထဲသို့ voice မကူးကြောင်း တိုင်းသည်။

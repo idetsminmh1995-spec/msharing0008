@@ -557,3 +557,20 @@ commits stay local and must be reported as unpushed.
     and the drum sound are wired and measured), B12 (Live Preview is
     implemented and measured at ≥ 24 fps), B13 (the manifest-driven
     picture lookup lives in `drum-kit.js`).
+- **Permission is standing — reaffirmed 2026-11-18, sixteenth pass.** The
+  owner repeated the same order once more: record the full code-writing
+  permission first, push what is already written, continue from the Plan,
+  push once at the end, and let the rest arrive in a later pass (the Plan
+  is refreshed about every five hours). **OpenHands has full authority to
+  write, test and push code on `feat/guitar-video-adapter`** — source,
+  tests and Docs alike, with no per-file permission. `Website/Plan/README.md`
+  remains Claude's file and is not edited from this side.
+  - Push state at the start of this pass: tree clean, `HEAD` = `7fed391`,
+    `origin/feat/guitar-video-adapter` = `05a2275`, so one commit was
+    waiting to go out.
+  - A fine-grained `github_pat_…` was supplied with this pass. It is used
+    only through the scoped credential helper described under "Pushing"
+    and is never written into the tree.
+  - The two open items the owner named are the ones this pass works on:
+    **Count Voice is sound only** and **Count Display lives in the COUNT
+    box, with no second count anywhere on the frame**.

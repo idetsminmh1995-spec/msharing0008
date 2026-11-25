@@ -114,22 +114,30 @@ async function evaluate(expression, options = {}) {
  * so the test stands in for R2: every request to either is answered here.
  * `thankYouClip` is the clip's bytes, or null for a 404 -- the two states
  * the Plan cares about. `countVoice` is the WAV handed back for every
- * `Voices/{n}.wav`, or null for a 404.
+ * count recording, or null for a 404.
  */
 let thankYouClip = null;
 let countVoice = null;
+/** When true the newer folder answers 404 and only `Voices` has the file. */
+let countVoicePrimaryMissing = false;
 /** The bucket's kit manifest, or null for a 404 -- the two states §၁၀ names. */
 let drumManifest = null;
 async function serveThankYou() {
   cdp.on('Fetch.requestPaused', async (event) => {
     const { url } = event.request;
-    const isCountVoice = url.includes('/Voices/');
+    // The engine asks `Counts  vocal` first and `Voices` second, so the
+    // stand-in answers both names -- otherwise the first request would go
+    // to the real bucket and the test would be measuring the network.
+    const isPrimary = url.includes('/Counts%20%20vocal/');
+    const isCountVoice = isPrimary || url.includes('/Voices/');
     const isManifest = url.endsWith('/drums/manifest.json');
     if (!url.includes('/thank-you/') && !isCountVoice && !isManifest) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
     }
-    const body = isManifest ? drumManifest : (isCountVoice ? countVoice : thankYouClip);
+    const body = isManifest
+      ? drumManifest
+      : (isCountVoice ? (isPrimary && countVoicePrimaryMissing ? null : countVoice) : thankYouClip);
     if (!body) {
       await cdp.call('Fetch.fulfillRequest', {
         requestId: event.requestId,
@@ -987,6 +995,58 @@ print(sum(1 for value in pixels if value > 10), max(pixels))
   const counted = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-in.musicxml', twoPart.href);
   assert.ok(Math.abs(counted.seconds - 6) < 0.4, `The count-in was not added to the length: ${counted.seconds}s instead of 6s`);
 
+  // The count-in frame carries the count once, in the Title band's COUNT
+  // box. A second, large count in the middle of the frame is what the owner
+  // asked to have removed, so the centre of a count-in frame has to be the
+  // plain background.
+  const countInFrame = `${output}.count-in-frame.png`;
+  await exec('ffmpeg', ['-v', 'error', '-y', '-ss', '0.5', '-i', counted.path, '-frames:v', '1', countInFrame]);
+  const centre = JSON.parse((await exec('python3', ['-c', `
+import json
+from PIL import Image
+image = Image.open(${JSON.stringify(countInFrame)}).convert('RGB')
+width, height = image.size
+box = (int(width * 0.25), int(height * 0.25), int(width * 0.75), int(height * 0.75))
+pixels = list(image.crop(box).getdata())
+background = pixels[0]
+off = sum(1 for pixel in pixels if max(abs(a - b) for a, b in zip(pixel, background)) > 24)
+print(json.dumps({'pixels': len(pixels), 'offBackground': off, 'background': background}))
+`])).stdout);
+  assert.ok(centre.offBackground / centre.pixels < 0.002,
+    `The count-in frame still draws something large in the middle: ${JSON.stringify(centre)}`);
+
+  // ...and it still counts: the COUNT box moves between two beats of the
+  // count-in, which is the one place the count is allowed to show.
+  const boxFrame = async (seconds) => {
+    const path = `${output}.count-in-${seconds}.png`;
+    await exec('ffmpeg', ['-v', 'error', '-y', '-ss', String(seconds), '-i', counted.path, '-frames:v', '1', path]);
+    return path;
+  };
+  const boxInk = async (path) => JSON.parse((await exec('python3', ['-c', `
+import json
+from collections import Counter
+from PIL import Image
+image = Image.open(${JSON.stringify(path)}).convert('RGB')
+width, height = image.size
+# The COUNT box is the rightmost of the three. Its digit sits on the value
+# line, under the label, so the crop covers the digit and nothing else.
+box = (int(width * 0.925), int(height * 0.043), int(width * 0.972), int(height * 0.076))
+pixels = list(image.crop(box).getdata())
+fill = Counter(pixels).most_common(1)[0][0]
+ink = sum(1 for pixel in pixels if max(abs(a - b) for a, b in zip(pixel, fill)) > 40)
+checksum = 0
+for pixel in pixels:
+    for channel in pixel:
+        checksum = (checksum * 31 + channel) % 1000000007
+print(json.dumps({ 'ink': ink, 'pixels': len(pixels), 'checksum': checksum }))
+`])).stdout);
+  const firstBeatBox = await boxInk(await boxFrame(0.1));
+  const fourthBeatBox = await boxInk(await boxFrame(1.5));
+  assert.ok(firstBeatBox.ink > 0 && fourthBeatBox.ink > 0,
+    `The COUNT box is empty during the count-in: ${JSON.stringify({ firstBeatBox, fourthBeatBox })}`);
+  assert.notEqual(firstBeatBox.checksum, fourthBeatBox.checksum,
+    `The COUNT box did not change between two count-in beats: ${JSON.stringify({ firstBeatBox, fourthBeatBox })}`);
+
   // The spoken count is its own sound: R2's `Voices/{n}.wav` is played over
   // the click, and it is heard even when the drum model is Visual Only.
   // The two renders below differ in nothing but whether the recordings
@@ -1024,6 +1084,16 @@ print(json.dumps(math.sqrt(sum(v * v for v in window) / max(1, len(window)))))
   const afterCount = await loudnessOf(spoken.path, 2.5, 3.5);
   assert.ok(afterCount < withVoice * 0.5,
     `The spoken count runs into the score: ${afterCount} against ${withVoice}`);
+
+  // The older `Voices` folder is the fallback: with the newer name gone,
+  // the count still speaks. That keeps a rename on the bucket from
+  // silencing the count.
+  countVoicePrimaryMissing = true;
+  const fallback = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-voice-fallback.musicxml', spoken.href);
+  const fallbackVoice = await loudnessOf(fallback.path, 0.15, 0.4);
+  assert.ok(fallbackVoice > Math.max(clickOnly * 4, 300),
+    `The count fell silent when only the Voices folder answered: ${fallbackVoice} against ${clickOnly}`);
+  countVoicePrimaryMissing = false;
   countVoice = null;
 
   // The Plan's last part: the Thank You clip closes the video and is
@@ -1177,7 +1247,7 @@ print(json.dumps({'peak': max(peaks) if peaks else 0, 'at': peaks}))
     `A manifest brand did not offer exactly its own models: ${JSON.stringify(manifestSelects)}`);
   drumManifest = null;
 
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds, thankYouSeconds: thanked.seconds, visualOnlyStatus: visualOnly.status, audibleStatus: audible.status, drumPeak: loudness.peak, kitBandColours: bandColours.map(({ stdout }) => Number(stdout.trim())), kitProbe, kitStrokeChangedPixels: changedPixels, kitStrokePeakDelta: peakDelta, kitOverlayProbe: drawProbe }, null, 2));
+  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds, countInCentre: centre, countInBox: { first: firstBeatBox, fourth: fourthBeatBox }, countVoiceLoudness: { clickOnly, withVoice, afterCount, fallbackVoice }, thankYouSeconds: thanked.seconds, visualOnlyStatus: visualOnly.status, audibleStatus: audible.status, drumPeak: loudness.peak, kitBandColours: bandColours.map(({ stdout }) => Number(stdout.trim())), kitProbe, kitStrokeChangedPixels: changedPixels, kitStrokePeakDelta: peakDelta, kitOverlayProbe: drawProbe }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {

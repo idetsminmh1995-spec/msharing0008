@@ -400,7 +400,10 @@
     return meta.beats * beatSeconds;
   };
 
-  /** The count-in frame: the Title band, and the count called out large. */
+  /**
+   * The count-in frame: the Title band, whose COUNT box is the count. The
+   * count has one home on the frame, so nothing here draws it a second time.
+   */
   async function drawCountIn(ctx, at, settings, meta) {
     const { width, height } = settings.size;
     const palette = getPalette(settings.color);
@@ -415,16 +418,6 @@
       },
     });
     engine.drawCornerLogo(ctx, { width, height, palette, image: settings.cornerLogoImage });
-    const tokens = engine.countTokens(settings.countDisplay, meta.beats);
-    const active = engine.currentCountToken(tokens, settings.countDisplay, meta, at);
-    if (active < 0 || active >= tokens.length) return;
-    ctx.save();
-    ctx.fillStyle = palette.accent;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `700 ${Math.round(Math.min(width, height) * 0.22)}px Inter, system-ui, sans-serif`;
-    ctx.fillText(tokens[active], width / 2, height / 2);
-    ctx.restore();
   }
 
   /**

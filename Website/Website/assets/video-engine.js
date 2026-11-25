@@ -2466,38 +2466,51 @@
   // The Plan hands the file names and the R2 path to the engine, the same
   // way it hands over the Thank You clip: a page asks for the recordings
   // it needs and never learns their address. R2 holds one recording per
-  // beat number, `Voices/{n}.wav`; a beat with no recording leaves the
-  // click alone rather than failing the export.
+  // beat number; a beat with no recording leaves the click alone rather
+  // than failing the export.
+  //
+  // The recordings live under two names. `Counts  vocal` is the folder the
+  // owner keeps them in (the name carries two spaces); `Voices` is the
+  // older copy, byte for byte the same files. Both are tried, in that
+  // order, so renaming either one does not silence the count.
   // ---------------------------------------------------------------
-  const COUNT_VOICE_BASE = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/Voices';
+  const COUNT_VOICE_BASES = [
+    'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/Counts%20%20vocal',
+    'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/Voices',
+  ];
   const countVoiceCache = new Map();
 
-  /** The R2 address of the recording for a beat number, or null. */
-  function countVoiceUrl(beat) {
+  /** Every R2 address that may hold the recording for a beat number. */
+  function countVoiceUrls(beat) {
     const number = Math.round(beat);
-    return number >= 1 ? `${COUNT_VOICE_BASE}/${number}.wav` : null;
+    if (!(number >= 1)) return [];
+    return COUNT_VOICE_BASES.map((base) => `${base}/${number}.wav`);
   }
 
   /** One beat's recording, decoded once. A missing one resolves to null. */
   async function loadCountVoice(beat) {
-    const url = countVoiceUrl(beat);
-    if (!url) return null;
-    if (countVoiceCache.has(url)) return countVoiceCache.get(url);
+    const urls = countVoiceUrls(beat);
+    if (urls.length === 0) return null;
+    const key = urls[0];
+    if (countVoiceCache.has(key)) return countVoiceCache.get(key);
     const pending = (async () => {
-      try {
-        const response = await fetch(url, { mode: 'cors' });
-        if (!response.ok) return null;
-        const bytes = await response.arrayBuffer();
-        const context = new OfflineAudioContext(1, 1, AUDIO_SAMPLE_RATE);
-        return await context.decodeAudioData(bytes);
-      } catch (error) {
-        return null;
+      for (const url of urls) {
+        try {
+          const response = await fetch(url, { mode: 'cors' });
+          if (!response.ok) continue;
+          const bytes = await response.arrayBuffer();
+          const context = new OfflineAudioContext(1, 1, AUDIO_SAMPLE_RATE);
+          return await context.decodeAudioData(bytes);
+        } catch (error) {
+          // Try the next name rather than giving up on the beat.
+        }
       }
+      return null;
     })();
-    countVoiceCache.set(url, pending);
+    countVoiceCache.set(key, pending);
     const sample = await pending;
     // A miss is not remembered: the next export may find the file uploaded.
-    if (!sample) countVoiceCache.delete(url);
+    if (!sample) countVoiceCache.delete(key);
     return sample;
   }
 
@@ -2753,7 +2766,7 @@
     thankYouSegment,
     // The spoken count, for the same reason: the recordings' address and
     // names stay in here, and a page asks for the beats it is counting in.
-    countVoiceUrl,
+    countVoiceUrls,
     countVoiceSamples,
     // One clock for the encoder and the preview: the plan says where each
     // segment starts in frames, so a preview cannot drift from the file.
