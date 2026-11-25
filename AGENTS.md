@@ -533,3 +533,27 @@ commits stay local and must be reported as unpushed.
     dead: they answer `401 Bad credentials` even though the string still
     has the correct `github_pat_` shape. A well-formed token can be
     revoked, so check `GET /user` before blaming the helper.
+
+- **Permission is standing — reaffirmed 2026-11-18, fifteenth pass.** The
+  owner repeated the same order again: check what the Plan still leaves
+  open, record the code-writing permission first, push what is already
+  written, continue from the Plan, push once at the end, and leave the
+  rest for a later pass (the Plan is refreshed about every five hours).
+  **OpenHands has full authority to write, test and push code on
+  `feat/guitar-video-adapter`**, including tests and Docs; no per-file
+  permission is needed. `Website/Plan/README.md` is still Claude's file
+  and is not edited from this side.
+  - Plan check this pass: **no new revision.** `Website/Plan/README.md`
+    and `Website/Video/Video Engine Plan/PLAN.md` are byte-identical to
+    `origin/main` (`5a85ee7`), and `1299b4a` (2026-11-25) is still the
+    newest commit touching the Main Plan on any remote branch.
+  - Push state at the start of this pass: tree clean, `HEAD` =
+    `origin/feat/guitar-video-adapter` = `05a2275`, so there was nothing
+    left to push from earlier passes.
+  - Plan tables that are now stale against the code, checked this pass
+    (left alone, since the Plan is Claude's): B1 (Metronome already ships
+    1080p through `DELIVERY_SIZES`), B3/B5 (both have browser tests),
+    B4 (`MAX_SECONDS` is gone from `studio-video.js`), B7/B9 (Thank You
+    and the drum sound are wired and measured), B12 (Live Preview is
+    implemented and measured at ≥ 24 fps), B13 (the manifest-driven
+    picture lookup lives in `drum-kit.js`).
