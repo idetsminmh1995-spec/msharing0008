@@ -449,3 +449,20 @@ commits stay local and must be reported as unpushed.
   nohup'd into `/tmp/*.log` and poll; a foreground call with a long
   `timeout` is refused by the runtime cap. `static_ffmpeg`'s `bin/linux`
   directory must be on `PATH` or `ffprobe` assertions fail.
+- **Permission reaffirmed again — 2026-11-18 (thirteenth pass).** The owner
+  repeated the standing order in the same sequence: check what the Plan
+  still leaves open, record the full code-writing permission, push what is
+  written, then continue from the Plan and push once at the end. **OpenHands
+  has full authority to write, test and push code on
+  `feat/guitar-video-adapter`**; `Website/Plan/README.md` stays Claude's
+  file and is not edited from this side.
+  - Plan check this pass: **a new revision arrived** — `origin/main` moved
+    `d4c93c0..1299b4a` ("Plan: Drum R2 structure … V14-V15/B16-B17"). The
+    new work is §၁၃.၁ (R2 path `drums/{Brand}/{Model}/{ratio}/`,
+    `Drum Bg.png`, MIDI-named highlights, manifest as the authority),
+    §၁၃.၂ (Notation clipped to its own rect), **V14/B16** and **V15/B17**.
+    MVP is now V1–V7 plus V10–V15.
+  - Pushed this pass with the owner-supplied fine-grained PAT
+    (`github_pat_11BWCKOXY…`, used only through the scoped credential
+    helper, never written to the tree): `e7fed8b..ba8187b`. That PAT
+    writes; the helper's exchanged installation token still does not.
