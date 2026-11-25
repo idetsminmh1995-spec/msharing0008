@@ -664,3 +664,27 @@ commits stay local and must be reported as unpushed.
   - The token supplied this pass is a fresh `github_pat_…`; it is passed
     through `$NEW_PAT` in the scoped helper described under "Pushing" and
     is not written to the tree.
+  - **Push blocked again, with a new failure mode.** The token supplied
+    this pass answers `401 Bad credentials` from `GET /user` and from
+    `GET /repos/idetsminmh1995-spec/msharing0008`, and `git push` says
+    `Invalid username or token`. It is 93 characters, so the value reached
+    the helper intact -- GitHub itself rejects it. `$GITHUB_TOKEN` still
+    reads the repo and still reports `admin/push: true`, yet
+    `git-receive-pack` answers `403 ... denied to idetsminmh1995-spec`.
+    `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` answers `401`. Commit
+    `1b70a24` is therefore **local and unpushed**.
+  - Work written this pass: **§၅ items 1, 2, 3 and 6** (default Sound
+    Model, no preview length cap, a spoken error when sound cannot be
+    prepared, Count Voice from R2), plus two defects the tests found -- the
+    missing `colr` box (export darker than the preview) and Play starting
+    no audio source node. All of it is in `1b70a24`.
+  - **V21 (notes never cut by the band) was attempted and reverted.** The
+    measurement is worth keeping: in Page view the sheet was scaled to the
+    band's *width*, so one system came out 1313 px tall inside a 342 px
+    band at 16:9 (1015 px at 1:1, 552 px at 9:16) and ink touched the band
+    edge at every ratio. Scaling to a whole system, then clipping to one
+    system, removed the edge ink but moved the cursor's reading line
+    between systems (118, 74, 74, 118), which `test-notation-view-browser`
+    requires to be fixed. `systemInk`/`systemBands`/`systemPitch` are not in
+    the tree; the Plan leaves the Horizontal-view edge question open
+    (§၁၃.၂), so this needs a decision before it is coded again.
