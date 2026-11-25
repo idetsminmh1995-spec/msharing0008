@@ -611,3 +611,37 @@ commits stay local and must be reported as unpushed.
     answers 200 for `16x9`/`1x1`/`9x16` × `drum`, and for the guitar and
     violin sets that exist. The engine's current `thank-you/{shape}.mp4` is
     a 404 — that is the gap this pass closes.
+
+- **2026-11-25 — this pass: B22, B18 and B20 written, push refused.**
+  - **B22 (Thank You by ratio · instrument · colour) — done.** The engine
+    replaced its one-clip-per-ratio table with `thankYouCandidates()`, an
+    ordered list under `Thank Video/{ratio}/{instrument}/{ratio} {Colour}
+    {Instrument}.mp4`: the exact clip, then the same instrument in the
+    other colour, then the drum set, so an upload gap costs the colour
+    rather than the whole ending. `loadThankYou` caches per candidate list;
+    the six `studio-*.js` adapters pass `{ instrument, color }`.
+  - **B18 (Notation View two choices) — done.** `studio.html` offers
+    `Page` / `Horizontal` only. `prepareNotation` derives the page shape
+    from the frame's ratio (`PAGE_SHAPE_BY_RATIO`) and reports it as
+    `state.sheet`, so an old `landscape`/`portrait`/`square` value still
+    reads as `Page`. `test-notation-view-browser.mjs` now measures Page at
+    16:9, 1:1 and 9:16 plus Horizontal, and asserts each sheet shape.
+  - **B20 (exact-size Preview) — done.** `previewSizeFor` returns the
+    export's own size (1920×1080 and so on); the canvas is that size and
+    CSS scales it into the stage. The half-size auto-shrink, its counters
+    and `PREVIEW_LONG_SIDE`/`PREVIEW_MIN_LONG_SIDE` are gone, because a
+    smaller canvas is a different picture, not the same one. The stage
+    takes the video's shape through `data-video-ratio`.
+  - Tests run this pass, all green: `test-studio-video-browser`,
+    `test-guitar-studio-browser`, `test-piano-studio-browser`,
+    `test-bass-studio-browser`, `test-violin-studio-browser`,
+    `test-voice-studio-browser`, `test-notation-view-browser`,
+    `test-drum-reference-browser`, `test-mxl-score-browser`.
+  - **Push refused again.** `$GITHUB_TOKEN` reads the repo and reports
+    `push: true`, but `POST /git/blobs` answers `403 Resource not
+    accessible by integration` and `git-receive-pack` answers `403 …
+    denied`. The helper-exchanged secret is a 40-character token that also
+    answers `403` on the same write, and
+    `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` answers `401`. Commits
+    `349ae9a` and `7f2236c` therefore sit **local and unpushed**; they need
+    a token with Contents: write on this repository.
