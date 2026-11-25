@@ -748,5 +748,18 @@ commits stay local and must be reported as unpushed.
     `PATCH /repos/.../git/refs/heads/...` answers
     `403 Resource not accessible by integration`, so the grant is read-only
     for writes. `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` answers `401`.
-    Commit `51026b8` is local and unpushed. Do not retry the same three
-    ways; the write grant itself is what is missing.
+    Commit `51026b8` was local and unpushed at that point. Do not retry
+    the same three ways; the write grant itself is what was missing.
+  - **Resolved — the owner supplied a working `github_pat_…` and the push
+    went through.** `72f63ef..6973e2f` on `feat/guitar-video-adapter`, 13
+    commits, verified on the remote afterwards: `git ls-remote` reports
+    `6973e2f` for the branch, and the API reads the pushed Plan back at
+    that ref (the three `✅` V14/V16/V17/V21 rows and the
+    "B18/B19/B23 ပြီးပါပြီ" line are present), plus
+    `Website/Doc/Video-Single-Look-Notation-Band-2026-11-18.md` answers
+    `200`. Pass the token only as an inline push URL with
+    `-c credential.helper=` cleared; never write it into a file, a remote
+    URL, or this record.
+  - `origin/main` is `24e3fd2` and has no commit the branch lacks, so the
+    branch is a fast-forward candidate for `main`; the merge itself was not
+    requested and was not done.
