@@ -832,3 +832,16 @@ commits stay local and must be reported as unpushed.
     an absolute, is the honest bound.
   - Record: `Website/Doc/Video-Overlay-Removal-2026-11-18.md`, linked from
     `Website/Doc/README.md`.
+- **Push blocked again — 2026-11-18, overlay-removal pass.** The commit
+  `d1d57f3` is local only. The environment token is the same read-only
+  GitHub App token the Count Display pass hit: `GET /repos/…` reports
+  `admin/maintain/push: true`, but every write path answers
+  `403 Resource not accessible by integration` — `POST /git/blobs`,
+  `POST /git/refs` and `PATCH /git/refs/heads/…` were each tried once.
+  `git push` with the owner name, `x-access-token` and
+  `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` all fail as before ("denied to
+  idetsminmh1995-spec", "Invalid username or token"), so those shapes are
+  not worth retrying. `origin` still points at plain
+  `https://github.com/…` with no token in it, and no credentials file or
+  `.netrc` was created. An owner-supplied `github_pat_…` is what unblocked
+  the previous pass; the same is needed here.
