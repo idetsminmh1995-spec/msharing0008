@@ -291,3 +291,17 @@ Metronome Engine Plan ၏ "နောက်ထပ်လုပ်ရန်" ပထ
 4. **စမ်းသပ်မှု** — `test-studio-video-browser.mjs` တွင် Roland VAD716 သည် 35–59 သာ ရှိပြီး 81 မရှိသည်ကို အသုံးပြု၍ (က) ပုံရှိသော stroke က ဆက်လက် resolve ဖြစ်ခြင်း၊ (ခ) မရှိသော stroke က `missing` ဖြင့် ပြန်ခြင်း၊ (ဂ) summary က note နံပါတ်ကို အမည်တပ်ခြင်း ကို စစ်သည်။
 
 **မပြောင်းလဲသည့် အပိုင်း:** kit လုံးဝ မရလျှင် (R2 ပြတ်/background 404) ယခင် အတိုင်း lane chart သို့ ပြန်ကျပြီး export ကို မရပ်ပါ — ထို အပြုအမူကို မထိပါ။
+
+## Writer Engine မှ ဆင်းသက်လာသော video-side လိုအပ်ချက်များ — 2026-11-26
+
+ရေးခြင်း (notation editor) နှင့် video ထုတ်ခြင်းကို ရောမထားရ။ Writer Engine ၏ Plan သည် `Website/Writer/Writer Engine Plan/PLAN.md` တွင် ရှိပြီး **ရေးခြင်း logic ကိုသာ** ပိုင်သည်။ ဤ section သည် ထို Plan ထဲက အလုပ်များက video export ကို ထိသည့်အခါ ဤ Engine ဘက်မှ ဘာလုပ်ရမည်ကို သီးခြား မှတ်ထားခြင်း ဖြစ်သည်။ Video ၏ ကိုယ်ပိုင်အလုပ် (layout၊ band အချိုး၊ Thank You၊ encode) သည် ဤနေရာတွင်သာ ဆက်ရှိမည်။
+
+| လိုအပ်ချက် | မည်သည့် Writer WP မှ | Video Engine ဘက်မှ လုပ်ရမည့်အရာ | အခြေအနေ |
+|---|---|---|---|
+| **Tuplet ကို exported frame တွင် ဆွဲခြင်း** | W3 | Tuplet ပါ score ကို `drawNotationPart` ဖြင့် render လုပ်နိုင်ကြောင်း စစ်။ Geometry က Notation Engine ၏ အလုပ် — Video Engine က ပြန်မဆွဲရ၊ အတိုင်း ပေါင်းရုံ။ | ❌ မစစ်ရသေး |
+| **Guitar staff ↔ Tab တစ်ပြိုင်တည်း** | W10 (နှင့် Main Plan A4) | Guitar page ၏ notation band တွင် staff နှင့် tab နှစ်ခုလုံး ပေါ်ကြောင်း၊ ကျယ်သော frame (16:9) တွင်လည်း မပြတ်ကြောင်း စစ် | 🟡 band အမြင့် ပြင်ပြီး (`Guitar-Notation-Band-2026-11-18.md`); tab ပါဝင်မှု မစစ်ရသေး |
+| **ရေးစဉ် အသံကြား (preview)** | W6 | Video နှင့် မသက်ဆိုင် — Sound Engine ၏ အလုပ်။ Video export သည် ရှိပြီးသား `joinAudio` လမ်းကြောင်းအတိုင်း ဆက်။ | — (ဤ Engine တွင် အလုပ်မရှိ) |
+| **Ottava (8va/8vb) bracket** | W7 / Main Plan A2 | Bracket ပါ score ကို frame ထဲ ဆွဲကြောင်း စစ် (Notation Engine က ဆွဲပြီးသား) | 🟡 မစစ်ရသေး |
+| **MusicXML round trip** | W5 / §၅ | Export သည် MusicXML ဖိုင်မှ တိုက်ရိုက်ဖတ်သဖြင့် Writer ပြောင်းလဲမှုက ဖိုင်အဆင့်တွင် မှန်ရမည် | — |
+
+**နယ်နိမိတ် (ထပ်မံ အတည်ပြု):** Writer Engine သည် canvas မဆွဲ၊ frame မပေါင်း၊ encode မလုပ်။ Video Engine သည် score ကို မ edit လုပ်၊ command မခေါ်၊ note မထည့်။ နှစ်ခုကြား ချိတ်ဆက်မှုသည် Notation Engine ၏ structured document နှင့် `drawNotationPart` သာ ဖြစ်သည်။

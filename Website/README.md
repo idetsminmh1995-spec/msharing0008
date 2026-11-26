@@ -17,6 +17,6 @@ M Sharing music platform ၏ responsive web interface ဖြစ်သည်။ �
 | `SQL/` | **SQL ဖိုင်များသာ** (Supabase migrations) |
 | `Worker/` | **Worker ဖိုင် တစ်ခုတည်း** (Cloudflare Worker) |
 | `Website/` | Deploy လုပ်ရသော static site၊ Wrangler config |
-| `Notation/`, `Video/`, `Drum/`, `Guitar/`, `Piano/`, `Metronome/` | Engine code နှင့် ၎င်းတို့၏ Engine Plan / Doc folder |
+| `Notation/`, `Video/`, `Drum/`, `Guitar/`, `Piano/`, `Metronome/`, `Writer/` | Engine code နှင့် ၎င်းတို့၏ Engine Plan / Doc folder |
 
 အသေးစိတ်စည်းမျဉ်းကို Main Plan ၏ `Repository structure — folder rules` section တွင် ကြည့်ပါ။
