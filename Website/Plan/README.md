@@ -549,7 +549,7 @@ Export ၏ segment အစီအစဉ် (ပန်းတိုင်): **Count-
 | Notation View | ✅ `Page — Landscape` / `Page — Portrait` / `Page — Square` / `Horizontal` | Plan ၏ Page / Horizontal နှင့် ကိုက်ညီ |
 | Video Color | ✅ Black / White | |
 | Drum Brand / Drum Model | ✅ | Drum အပိုင်း၏ အရောင်/ပုံစံ |
-| Sound Model + volume | UI ✅ (default `Visual Only`) | အသံ render မချိတ်ရသေး |
+| Sound Model + volume | UI ✅ (default `Visual Only`) | **ယခုအဆင့်: Sound Engine ၏ အသံထွက်ရုံနှင့် လုံလောက်** — default ကို အသံပါသောအဖြစ် ပြောင်း။ Model (`Natural` / `Studio` / `Room`) ရွေးချယ်မှု၏ အဓိပ္ပာယ်ကို **နောက်မှ အသေးစိတ်ခွဲမည်** (user)။ `Visual Only` ကို silent လိုသူအတွက် ရွေးစရာအဖြစ်သာ ထား |
 | Count Voice (on/off၊ type) | UI ✅ (`One, Two…` / `1, 2…`) | အသံ မချိတ်ရသေး |
 | **ရေတွက်ပုံ ရွေးချယ်မှု** (`1,2,3,4` / `1&,2&,…` / `1e&a,…`) | ✅ ရှိပြီး (`data-count-display`: beats / eighths / sixteenths) | Video ပေါ်စာသားသာ (`drawCountRow`)။ Count Voice အသံနှင့် မဆက်စပ် |
 | `4/4`၊ BPM၊ Key | ✅ MusicXML မှ ဖတ်၍ Title / Info တွင်ပြ | Key ကို `keyName` ဖြင့် |
@@ -765,6 +765,7 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 12. **Count Voice** = meter အတိုင်း (`4/4` → `1, 2, 3, 4`၊ `6/8` → `1…6`)၊ R2 အသံဖိုင်ဖြင့် — R2 တွင် `M1`–`M7` ဖိုင်တစ်ခုစီ ရှိ။
 13. **Horizontal ၏ အစွန်းတွင် note မပြတ်** — အပြည့်အဝ ပြ (§၁၃.၂)။
 14. **Thank You ဖိုင်အမည်ပုံစံ** (`Thank Video/{ratio}/{instrument}/{ratio} {Black|White} {Instrument}.mp4`) ကို user အတည်ပြုပြီး (§၁၅)။
+15. **Sound Model** — ယခုအဆင့်တွင် အသံထွက်ရုံနှင့် လုံလောက်၊ Model ရွေးချယ်မှုကို နောက်မှ အသေးစိတ်ခွဲ။
 
 ### ၁၂။ Preview Play (video ကို play ကြည့်နိုင်ရန်)
 
@@ -963,7 +964,7 @@ Drum video ၏ Notation ကို **Notation အပိုင်း၏ ဧရိ�
 5. ဆုံးဖြတ်ထားသော default များ (Overlay ~၁၂၀ ms၊ Count-in အရှည်၊ အပိုင်းအချိုး) ကို အသုံးပြုသူသည် **ထုတ်လုပ်ပြီးသော video အစစ်ကို စမ်းကြည့်ပြီးမှ** ပြင်ဆင်မည်။
 6. (ဖြေပြီး) **Drum အသံ ရင်းမြစ်** = Sound Engine ၏ အသံ (MuseScore General ၏ GM percussion)။ Sound Model (`Natural` / `Studio` / `Room`) ကို Sound Engine ၏ ဘယ် setting နှင့် ချိတ်မလဲသာ ကျန် (အောက်ပါ ၈)။
 7. (ဖြေပြီး) Count Voice သည် R2 ထဲ အသံဖိုင်ရှိ — **R2 path / ဖိုင်အမည်** ကို အတည်ပြုရန်။
-8. **Sound Model** (`Natural` / `Studio` / `Room`) တစ်ခုချင်းစီ၏ အဓိပ္ပာယ်၊ Default ကို ဘယ်ဟာထားမလဲ။
+8. (ဖြေပြီး၊ နောက်ဆိုင်း) **Sound Model** — ယခုအဆင့်တွင် Sound Engine ၏ အသံထွက်ရုံ။ `Natural` / `Studio` / `Room` ရွေးချယ်မှုကို **နောက်မှ အသေးစိတ်ခွဲမည်** (user)။
 9. Audio/video sync ရည်မှန်းချက် (~၄၀ ms) နှင့် phone တွင် latency လက်ခံနိုင်ပမာဏ။
 10. (ဖြေပြီး) **Horizontal ၏ အစွန်း** — note တစ်ဝက်မပြတ်၊ အပြည့်အဝ ပြ။ ကျန်သည်မှာ အကောင်အထည်ဖော်ပုံကို OpenHands က ရွေးရန်။
 11. **Count Voice ၏ R2 လမ်းကြောင်း/ဖိုင် extension** — ဖိုင်အမည် `M1`–`M7` ဟုသိရပြီး၊ folder နှင့် extension ကျန်။ **၇ ထက်များသော meter** (`9/8`၊ `12/8` …) ရေတွက်ပုံ — `M8` ထက်ကျော်ဖိုင် ထပ်ထည့်မလား၊ အုပ်စုခွဲ၍ ရေတွက်မလား (ဥပမာ `12/8` → `1, 2, 3, 4`)။
