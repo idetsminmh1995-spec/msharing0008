@@ -762,7 +762,7 @@ R2 မှ ဖိုင်ကို တစ်ကြိမ်သာ ဖတ်ပ�
 9. **Drum video MVP** = Title / Info နှင့် Notation ပါသော MP4 export + Preview Play (§၈)။
 10. Count-in အရှည် = အစ bar တစ်ခု (default)။ Thank You ကို Live Preview ထဲလည်း ထည့်။
 11. **Drum အသံ = Sound Engine ၏ အသံ** (MuseScore General ၏ GM percussion) — synthesize မလုပ်တော့။
-12. **Count Voice** = meter အတိုင်း (`4/4` → `1, 2, 3, 4`)၊ R2 အသံဖိုင်ဖြင့်။
+12. **Count Voice** = meter အတိုင်း (`4/4` → `1, 2, 3, 4`၊ `6/8` → `1…6`)၊ R2 အသံဖိုင်ဖြင့် — R2 တွင် `M1`–`M7` ဖိုင်တစ်ခုစီ ရှိ။
 13. **Horizontal ၏ အစွန်းတွင် note မပြတ်** — အပြည့်အဝ ပြ (§၁၃.၂)။
 14. **Thank You ဖိုင်အမည်ပုံစံ** (`Thank Video/{ratio}/{instrument}/{ratio} {Black|White} {Instrument}.mp4`) ကို user အတည်ပြုပြီး (§၁၅)။
 
@@ -938,7 +938,7 @@ Drum video ၏ Notation ကို **Notation အပိုင်း၏ ဧရိ�
 **Notation View:** `Page` နှင့် `Horizontal` နှစ်ခုသာ (§၁၃.၃ (ခ))။ **Note များ အပြည့်အဝ ပေါ်ရမည်၊ မှန်ကန်စွာ မြင်ရမည်** — Notation ကို ပြရမည့် **ဘောင်အတွင်း** staff၊ note head၊ stem၊ beam၊ ledger line၊ accidental၊ tempo mark စသည်တို့ ဘောင်ကြောင့် မဖြတ်မပြတ် ပြည့်ပြည့်စုံစုံ ပေါ်ရမည် (§၁၃.၂)။
 
 **Count Voice နှင့် Count Display:**
-- **Count Voice** သည် **R2 ထဲတွင် အသံဖိုင်ရှိ**သည်။ **MusicXML မစတင်ခင်** (count-in) တွင် **MusicXML ၏ tempo နှင့် meter အတိုင်း** ရေတွက်သံထွက်ရမည် — **MusicXML က `4/4` ဆိုလျှင် `1, 2, 3, 4`** (အစ bar တစ်ခု၊ meter ၏ beat အရေအတွက်အတိုင်း)။ Count Voice အတွက် **ဘာမှ ထပ်ပြစရာ မလို**။ (`6/8` ကဲ့သို့ compound meter ကို ဘယ်လိုရေတွက်မလဲ — default အနေဖြင့် ပေါ်ပါ ဂဏန်းအတိုင်း `1…6` ဟု ယူထားသည်၊ အတည်ပြုရန်။)
+- **Count Voice** သည် **R2 ထဲတွင် အသံဖိုင်ရှိ**သည်။ **MusicXML မစတင်ခင်** (count-in) တွင် **MusicXML ၏ tempo နှင့် meter အတိုင်း** ရေတွက်သံထွက်ရမည် — **MusicXML က `4/4` ဆိုလျှင် `1, 2, 3, 4`** (အစ bar တစ်ခု၊ meter ၏ beat အရေအတွက်အတိုင်း)။ Count Voice အတွက် **ဘာမှ ထပ်ပြစရာ မလို**။ (`6/8` ကဲ့သို့ compound meter သည် ပေါ်ပါ ဂဏန်းအတိုင်း `1…6` ဟု ရေတွက် — user အတည်ပြုပြီး။) R2 ထဲတွင် Count Voice အသံ **`M1` မှ `M7` အထိ ဂဏန်းတစ်ခုချင်း ဖိုင်တစ်ခုစီ** ရှိသည် (ဖိုင်ပုံစံ/လမ်းကြောင်း အတိအကျ မသိသေး)။ ထို့ကြောင့် meter ၏ beat အရေအတွက် **၇ အထိ** ရေတွက်နိုင်သည်၊ **၇ ထက်များသော meter** (`9/8`၊ `12/8` စသည်) ကို ဘယ်လိုရေတွက်မည်ကို မဖြေရှင်းရသေး။
 - **Count Display** (`1,2,3,4` / `1&,…` / `1e&a,…`) သည် **Video ထဲရှိ COUNT ကွက်လေးထဲတွင်သာ** ပြမည် (§၁၃)။
 
 **အသံ:** Preview တွင်ပါ အသံပါရမည် (Count-in အသံ + Drum အသံ) (§၅၊ §၁၂)။
@@ -966,7 +966,7 @@ Drum video ၏ Notation ကို **Notation အပိုင်း၏ ဧရိ�
 8. **Sound Model** (`Natural` / `Studio` / `Room`) တစ်ခုချင်းစီ၏ အဓိပ္ပာယ်၊ Default ကို ဘယ်ဟာထားမလဲ။
 9. Audio/video sync ရည်မှန်းချက် (~၄၀ ms) နှင့် phone တွင် latency လက်ခံနိုင်ပမာဏ။
 10. (ဖြေပြီး) **Horizontal ၏ အစွန်း** — note တစ်ဝက်မပြတ်၊ အပြည့်အဝ ပြ။ ကျန်သည်မှာ အကောင်အထည်ဖော်ပုံကို OpenHands က ရွေးရန်။
-11. **Count Voice ၏ R2 path / ဖိုင်အမည်** ကိုသာ ကျန် (`4/4` → `1, 2, 3, 4` ဖြစ်သဖြင့် **ဂဏန်းတစ်ခုချင်း အသံ** လိုမည်ဟု ယူဆ)၊ နှင့် `6/8` စသည့် compound meter ၏ ရေတွက်ပုံ။
+11. **Count Voice ၏ R2 လမ်းကြောင်း/ဖိုင် extension** — ဖိုင်အမည် `M1`–`M7` ဟုသိရပြီး၊ folder နှင့် extension ကျန်။ **၇ ထက်များသော meter** (`9/8`၊ `12/8` …) ရေတွက်ပုံ — `M8` ထက်ကျော်ဖိုင် ထပ်ထည့်မလား၊ အုပ်စုခွဲ၍ ရေတွက်မလား (ဥပမာ `12/8` → `1, 2, 3, 4`)။
 12. (ဖြေပြီး) Thank You ဖိုင်အမည်ပုံစံကို user အတည်ပြုပြီး — Video Engine က ကျန်တူရိယာအားလုံးအတွက် အမည်များကို စစ်ဆေးအတည်ပြုရန်သာ ကျန်။
 
 ## Sound Engine နှင့် MuseScore SoundFont — 2026-11-13
