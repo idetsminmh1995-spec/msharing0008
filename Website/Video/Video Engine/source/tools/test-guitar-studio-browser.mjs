@@ -405,6 +405,50 @@ print(background, other, white, neck)
   // The neck is the first band of the stack and must carry the drawing.
   assert.ok(neckPixels > 20000, `The guitar neck band is empty: only ${neckPixels} pixels painted`);
 
+  // The pin on the instrument band may only take room away, never all of
+  // it: at 16:9 the acoustic neck measures more ink than the frame has free
+  // height, and a pin taken whole left the notation band zero rows -- the
+  // default picture and the default orientation produce a video with no
+  // notation on it.
+  await evaluate(`(() => {
+    window.__notationBand = null;
+    const original = VideoEngine.prepareNotationFor;
+    VideoEngine.prepareNotationFor = (file, settings, parts) => {
+      const layout = VideoEngine.layoutFor(settings.instrument, {
+        width: settings.size.width, height: settings.size.height, shares: settings.shares, parts,
+      });
+      window.__notationBand = layout.rects.notation;
+      return original(file, settings, parts);
+    };
+    return true;
+  })()`);
+  await evaluate("(() => { const set = (selector, value) => { const el = document.querySelector(selector); el.value = value; el.dispatchEvent(new Event('change', {bubbles:true})); }; set('[data-guitar-aspect]', '16x9'); set('[data-guitar-photo]', 'acoustic-drawn'); })()");
+  await evaluate("document.querySelector('[data-studio-generate]').click()");
+  const landscape = await waitForRender('Guitar render in 16:9', 120000, state.href);
+  assert.ok(landscape.status.startsWith('Rendered '), `16:9 guitar render did not complete: ${landscape.status}`);
+  const band = JSON.parse(await evaluate('JSON.stringify(window.__notationBand)'));
+  assert.ok(band && band.height > 200,
+    `The landscape frame gave the notation band no room: ${JSON.stringify(band)}`);
+  const landscapePath = `${output}-landscape.${landscape.name.split('.').pop()}`;
+  await writeFile(landscapePath, Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(landscape.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64'));
+  const landscapeFrame = `${output}-landscape.png`;
+  await exec('ffmpeg', ['-v', 'error', '-y', '-ss', '1.0', '-i', landscapePath, '-frames:v', '1', landscapeFrame]);
+  const { stdout: landscapeInk } = await exec('python3', ['-c', `
+from PIL import Image
+image = Image.open(${JSON.stringify(landscapeFrame)}).convert('RGB')
+pixels = image.load()
+band = ${JSON.stringify({ x: band.x, y: band.y, width: band.width, height: band.height })}
+inked = 0
+for y in range(band['y'] + 2, band['y'] + band['height'] - 2):
+    for x in range(band['x'] + 2, band['x'] + band['width'] - 2, 2):
+        r, g, b = pixels[x, y]
+        if abs(r - 11) + abs(g - 16) + abs(b - 24) > 30: inked += 1
+print(inked)
+`]);
+  const notationInk = Number(landscapeInk.trim());
+  assert.ok(notationInk > 500, `The landscape notation band is empty: only ${notationInk} pixels painted`);
+  await evaluate("(() => { const el = document.querySelector('[data-guitar-aspect]'); el.value = '9x16'; el.dispatchEvent(new Event('change',{bubbles:true})); })()");
+
   // The Plan's last part of the length: the Thank You clip closes the video
   // and is counted in it. The clip is two seconds, so four becomes six.
   const clipPath = join(profile, 'thank-you.mp4');
@@ -415,7 +459,7 @@ print(background, other, white, neck)
   thankYouClip = await readFile(clipPath);
   thankYouRequests = [];
   await evaluate("document.querySelector('[data-studio-generate]').click()");
-  const thanked = await waitForRender('Guitar render with a Thank You clip', 120000, state.href);
+  const thanked = await waitForRender('Guitar render with a Thank You clip', 120000, landscape.href);
   assert.ok(thanked.status.startsWith('Rendered '), `Guitar render did not complete: ${thanked.status}`);
   assert.match(thanked.status, /Thank You ending/, 'Guitar export does not report its Thank You ending');
   // A guitar page asks for the guitar clip, not the drum set that every

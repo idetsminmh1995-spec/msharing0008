@@ -20,6 +20,7 @@ M Sharing Website ၏ လက်ရှိ implementation နှင့် မပ�
 - [Video Delivery Size and Length Cap Removal](Video-Delivery-Size-2026-11-18.md) — 1080p shared delivery size (1920×1080 / 1080×1080 / 1080×1920) နှင့် Metronome ၏ 12 sec ကန့်သတ်ချက် ဖယ်ရှားခြင်း
 - [Video Single Look, Notation Band and Ratio Folder](Video-Single-Look-Notation-Band-2026-11-18.md)
 - [Video Overlay Removal](Video-Overlay-Removal-2026-11-18.md) — နောက်ခံရှိ အနီ radial glow၊ notation စာရွက်အဖြူ plate နှင့် preview CSS အလင်းများ ဖြုတ်ခြင်း — §၁၃.၃ (က)(ဂ) တစ်သားတည်း ပုံစံ၊ ratio ဖိုဒါ စစ်ဆေးမှု၊ V21 notation band နှင့် Thank You/sync တိုင်းတာမှု ပြင်ဆင်ချက်
+- [Guitar — Notation Band Restoration](Guitar-Notation-Band-2026-11-18.md) — Guitar video ၏ 16:9 output တွင် notation band ပျောက်ခဲ့ခြင်း (instrument share pin = 1) ကို ရှာ၍ ပြင်ခြင်း၊ regression check ထည့်ခြင်း
 - [Count Display and Count Voice](Count-Display-And-Count-Voice-2026-11-18.md) — Count ကို COUNT ကွက်တစ်နေရာတည်း ပြခြင်း (ထပ်နေသော count row ဖယ်ရှား)၊ Count Voice ၏ `{n}.wav` / `M{n}.wav` ဖိုင်စု ရွေးချယ်မှုနှင့် app cache key ပြန်ထုတ်ခြင်း
 - [Video Engine Implementation Status](../Video/Video%20Engine%20Doc/README.md) — Engine code inventory, test results, and remaining production integration work
 - [Metronome Engine Implementation Status](../Metronome/Metronome%20Engine%20Doc/DOC.md) — Studio connection, click-track export, responsive checks, tests, and remaining work

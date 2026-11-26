@@ -342,7 +342,15 @@
       const inkBottom = Math.max(...probeShapes.map((shape) => (shape.y ?? 0) + (shape.height ?? 0)));
       const contentHeight = Math.max(1, inkBottom - inkTop);
       const free = settings.height - probe.pad * 2;
-      settings.shares = { instrument: Math.min(1, contentHeight / Math.max(1, free)) };
+      // The pin may only shrink the instrument band. A neck taller than the
+      // share the layout declares would otherwise take the notation's band
+      // with it -- at 16:9 the widest pictures measured more ink than the
+      // frame's free height, the band filled the frame, and the sheet was
+      // handed no rows to draw in.
+      const declaredInstrument = probe.rects.instrument.height / Math.max(1, free);
+      settings.shares = {
+        instrument: Math.min(declaredInstrument, contentHeight / Math.max(1, free)),
+      };
 
       setStatus('Laying out the notation…');
       const notation = await engine.prepareNotationFor(file, { ...settings, palette }, PARTS);
