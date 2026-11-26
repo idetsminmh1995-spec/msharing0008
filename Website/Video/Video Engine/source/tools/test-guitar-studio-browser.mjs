@@ -173,6 +173,8 @@ async function waitForRender(label, timeoutMs = 120000, previousHref = null) {
  * for it: `clip` is its bytes, or null for the 404 the Plan allows.
  */
 let thankYouClip = null;
+/** Every Thank You address the page asked for, in order. */
+let thankYouRequests = [];
 /**
  * A picture the page is told not to find. Plan §5 says a required asset that
  * will not load stops the export; a neck drawn without its strings would be
@@ -190,10 +192,11 @@ async function serveThankYou() {
       });
       return;
     }
-    if (!event.request.url.includes('/thank-you/')) {
+    if (!event.request.url.includes('/Thank%20Video/')) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
     }
+    thankYouRequests.push(event.request.url);
     if (!thankYouClip) {
       await cdp.call('Fetch.fulfillRequest', {
         requestId: event.requestId,
@@ -375,15 +378,32 @@ width, height = image.size
 pixels = image.load()
 background = 0
 other = 0
+white = 0
 for y in range(0, height, 2):
     for x in range(0, width, 2):
         r, g, b = pixels[x, y]
+        if r > 250 and g > 250 and b > 250: white += 1
         if abs(r - 11) + abs(g - 16) + abs(b - 24) <= 24: background += 1
         else: other += 1
-print(background, other)
+top = int(height * 0.02)
+bottom = int(height * 0.46)
+left = int(width * 0.10)
+right = int(width * 0.90)
+neck = 0
+for y in range(top, bottom):
+    for x in range(left, right):
+        r, g, b = pixels[x, y]
+        if abs(r - 11) + abs(g - 16) + abs(b - 24) > 30: neck += 1
+print(background, other, white, neck)
 `]);
-  const [backgroundPixels, otherPixels] = ink.trim().split(/\s+/).map(Number);
-  assert.ok(otherPixels > backgroundPixels, `The guitar frame is mostly empty: ${otherPixels} painted of ${backgroundPixels + otherPixels}`);
+  const [backgroundPixels, otherPixels, whitePixels, neckPixels] = ink.trim().split(/\s+/).map(Number);
+  assert.ok(otherPixels > 0, `The guitar frame has nothing drawn on it: ${otherPixels} painted of ${backgroundPixels + otherPixels}`);
+  // The sheet is the frame's own background (§၁၃.၃(က)), so a white notation
+  // panel would be an overlay the frame no longer carries.
+  assert.ok(whitePixels < (backgroundPixels + otherPixels) * 0.01,
+    `The guitar frame still carries a white notation panel: ${whitePixels} white samples`);
+  // The neck is the first band of the stack and must carry the drawing.
+  assert.ok(neckPixels > 20000, `The guitar neck band is empty: only ${neckPixels} pixels painted`);
 
   // The Plan's last part of the length: the Thank You clip closes the video
   // and is counted in it. The clip is two seconds, so four becomes six.
@@ -393,10 +413,15 @@ print(background, other)
     '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', clipPath]);
   thankYouClip = await readFile(clipPath);
+  thankYouRequests = [];
   await evaluate("document.querySelector('[data-studio-generate]').click()");
   const thanked = await waitForRender('Guitar render with a Thank You clip', 120000, state.href);
   assert.ok(thanked.status.startsWith('Rendered '), `Guitar render did not complete: ${thanked.status}`);
   assert.match(thanked.status, /Thank You ending/, 'Guitar export does not report its Thank You ending');
+  // A guitar page asks for the guitar clip, not the drum set that every
+  // page used to share.
+  assert.ok(thankYouRequests[0]?.includes('/guitar/'),
+    `The guitar page did not ask for a guitar clip: ${thankYouRequests[0]}`);
   const thankedBytes = Buffer.from(await evaluate(`(async () => { const response = await fetch(${JSON.stringify(thanked.href)}); const bytes = new Uint8Array(await response.arrayBuffer()); let binary = ''; for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000)); return btoa(binary); })()`), 'base64');
   const thankedPath = `${output}-thanked.mp4`;
   await writeFile(thankedPath, thankedBytes);

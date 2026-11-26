@@ -65,7 +65,7 @@
       ...size,
       instrument: 'violin',
       size,
-      notation: 'landscape',
+      notation: 'page',
       color: 'black',
     };
   }
@@ -156,7 +156,7 @@
       };
 
       setStatus('Laying out the notation…');
-      const notation = await engine.prepareNotationFor(file, settings, PARTS);
+      const notation = await engine.prepareNotationFor(file, { ...settings, palette }, PARTS);
       if (notation?.error) throw new Error(`The notation could not be prepared: ${notation.error}`);
 
       const segments = [{
@@ -175,13 +175,13 @@
                 titleOne: parsed.score?.title || file.name,
                 titleTwo: settings.aspect,
               }),
-              notation: (target, rect) => engine.drawNotationPart(target, rect, at, notation),
+              notation: (target, rect) => engine.drawNotationPart(target, rect, at, notation, palette),
               instrument: (target, rect) => drawViolin(target, rect),
             },
           });
         },
       }];
-      const ending = await engine.thankYouSegment(settings.width, settings.height);
+      const ending = await engine.thankYouSegment(settings.width, settings.height, { instrument: 'violin', color: settings.color });
       if (ending) segments.push(ending);
 
       const result = await engine.render({

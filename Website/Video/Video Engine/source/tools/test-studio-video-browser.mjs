@@ -7,7 +7,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
-import { mkdtemp, readFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -110,18 +110,58 @@ async function evaluate(expression, options = {}) {
 }
 
 /**
- * The Thank You clip is the engine's own R2 asset, so the test stands in
- * for R2: every request to it is answered here. `clip` is the clip's
- * bytes, or null for a 404 -- the two states the Plan cares about.
+ * The Thank You clip and the spoken count are the engine's own R2 assets,
+ * so the test stands in for R2: every request to either is answered here.
+ * `thankYouClip` is the clip's bytes, or null for a 404 -- the two states
+ * the Plan cares about. `countVoice` is the WAV handed back for every
+ * count recording, or null for a 404.
  */
 let thankYouClip = null;
+let countVoice = null;
+/** When true the newer folder answers 404 and only `Voices` has the file. */
+let countVoicePrimaryMissing = false;
+/** Every count-recording address the page asked for, in order. */
+let countVoiceRequests = [];
+/** The bucket's kit manifest, or null for a 404 -- the two states §၁၀ names. */
+let drumManifest = null;
+/** Every Thank You address the page asked for, in order. */
+let thankYouRequests = [];
+/**
+ * Every drum-kit address the page asked for, in order. §၁၃.၃(ဂ) makes the
+ * ratio folder a rule rather than a convention, so the check reads the
+ * addresses the browser actually requested instead of the ratio the code
+ * reports. The cache is off while it runs, or a warm preview would answer
+ * from memory and the log would stay empty.
+ */
+let kitRequests = [];
+/** Addresses the stand-in should answer 404, so a fallback can be exercised. */
+let thankYouMissing = [];
 async function serveThankYou() {
   cdp.on('Fetch.requestPaused', async (event) => {
-    if (!event.request.url.includes('/thank-you/')) {
+    const { url } = event.request;
+    // The engine asks `Counts  vocal` first and `Voices` second, so the
+    // stand-in answers both names -- otherwise the first request would go
+    // to the real bucket and the test would be measuring the network.
+    const isPrimary = url.includes('/Counts%20%20vocal/');
+    const isCountVoice = isPrimary || url.includes('/Voices/');
+    const isManifest = url.endsWith('/drums/manifest.json');
+    const isThankYou = url.includes('/Thank%20Video/');
+    // A kit picture is any image under `drums/`; the manifest is not one.
+    const isKitPicture = !isManifest && url.includes('/drums/') && /\.(png|webp|jpe?g)(\?|$)/i.test(url);
+    if (isThankYou) thankYouRequests.push(url);
+    if (isKitPicture) kitRequests.push(url);
+    if (isCountVoice) countVoiceRequests.push(url);
+    if (!isThankYou && !isCountVoice && !isManifest) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
     }
-    if (!thankYouClip) {
+    const withheld = isThankYou && thankYouMissing.some((part) => url.includes(part));
+    const body = isManifest
+      ? drumManifest
+      : (isCountVoice
+        ? (isPrimary && countVoicePrimaryMissing ? null : countVoice)
+        : (withheld ? null : thankYouClip));
+    if (!body) {
       await cdp.call('Fetch.fulfillRequest', {
         requestId: event.requestId,
         responseCode: 404,
@@ -134,10 +174,10 @@ async function serveThankYou() {
       requestId: event.requestId,
       responseCode: 200,
       responseHeaders: [
-        { name: 'Content-Type', value: 'video/mp4' },
+        { name: 'Content-Type', value: isManifest ? 'application/json' : (isCountVoice ? 'audio/wav' : 'video/mp4') },
         { name: 'Access-Control-Allow-Origin', value: '*' },
       ],
-      body: thankYouClip.toString('base64'),
+      body: (isManifest ? Buffer.from(JSON.stringify(body)) : body).toString('base64'),
     });
   });
   await cdp.call('Fetch.enable', { patterns: [{ urlPattern: '*', requestStage: 'Request' }] });
@@ -163,6 +203,7 @@ try {
   cdp = new Cdp(page.webSocketDebuggerUrl);
   await cdp.call('Page.enable');
   await cdp.call('Runtime.enable');
+  await cdp.call('Network.enable');
   await serveThankYou();
 
   const startedAt = Date.now();
@@ -214,6 +255,36 @@ try {
       `The ${stream.width}x${stream.height} picture does not fit the level it declares (level ${level}, ${macroblocks} macroblocks)`);
   };
 
+  /**
+   * §၁၃.၃(ဂ): a ratio's export may only ask for that ratio's kit pictures,
+   * never another ratio's stretched to fit. The check reads the addresses
+   * the browser actually requested, so a fallback would be caught even if
+   * the code reported the right ratio.
+   *
+   * The page decodes each picture once and keeps it, so a request can land
+   * when the preview redraws rather than when Generate is pressed. The mark
+   * is where the log stood before the export was asked for; a preview that
+   * already fetched this ratio's picture still counts as evidence, because
+   * what the rule forbids is a picture from any *other* folder.
+   */
+  const assertKitRequestsInRatio = (mark, ratioPath, label) => {
+    const during = kitRequests.slice(mark);
+    assert.deepEqual(during.filter((url) => !url.includes(`/${ratioPath}/`)), [],
+      `The ${label} export asked for another ratio's kit picture: ${JSON.stringify(during)}`);
+    assert.ok(kitRequests.some((url) => url.includes(`/${ratioPath}/`)),
+      `The ${label} export never asked for a ${ratioPath} kit picture: ${JSON.stringify(kitRequests)}`);
+  };
+
+  // §၅: the Studio opens on a sounding model, so a first export is not
+  // silent. This baseline render is asked for the silent model on purpose:
+  // its job is the picture, and a silent file takes the WebCodecs path,
+  // which is the one that carries the frame's own colour tag.
+  const openedOn = await evaluate("document.querySelector('[data-sound-model]').value");
+  assert.notEqual(openedOn, 'visual',
+    'The Studio opened on Visual Only, so a first export would be silent');
+  await evaluate("(() => { const model = document.querySelector('[data-sound-model]'); model.value = 'visual'; model.dispatchEvent(new Event('change', { bubbles: true })); })()");
+
+  const landscapeMark = kitRequests.length;
   await evaluate("document.querySelector('[data-studio-generate]').click()");
 
   const renderStarted = Date.now();
@@ -245,6 +316,7 @@ try {
   assert.equal(probe.streams[0].height, 1080);
 
   assertAvcLevel(probe.streams[0]);
+  assertKitRequestsInRatio(landscapeMark, '16x9', 'landscape');
 
   // ---------------------------------------------------------------
   // Live Preview (§၁၂). The page opens it from the same settings the file
@@ -270,6 +342,10 @@ try {
     }
     return state;
   })())`;
+  // The baseline file above was silent so that it took the WebCodecs path;
+  // the preview now goes back to the sounding default, which is the state
+  // the page opens in.
+  await evaluate("(() => { const model = document.querySelector('[data-sound-model]'); model.value = 'natural'; model.dispatchEvent(new Event('change', { bubbles: true })); })()");
   // Touching a control is how the page is told the settings are worth
   // previewing; the value stays the same, so the frame is the export's.
   await evaluate("(() => { const title = document.querySelector('[data-title-one]'); title.dispatchEvent(new Event('change', { bubbles: true })); })()");
@@ -284,19 +360,60 @@ try {
   assert.ok(previewState.ink > 0, 'The live preview canvas is blank');
   assert.equal(previewState.videoHidden, true, 'The empty <video> was left on show under the preview');
   assert.match(previewState.source, /Live preview/, `The preview does not say it is live: ${previewState.source}`);
+  // §၅: the sound is ready before Play is offered, not fetched after the
+  // first press. The label says so, and it is the only claim made here --
+  // the audio itself is checked through the exported file.
+  const soundAt = Date.now();
+  while (Date.now() - soundAt < 30000 && !/with sound|sound unavailable/.test(previewState.source)) {
+    await sleep(100);
+    previewState = JSON.parse(await evaluate(previewRead));
+  }
+  assert.match(previewState.source, /with sound/,
+    `The live preview did not prepare its sound: ${previewState.source}`);
   assert.equal(previewState.playDisabled, false, 'Play stayed disabled while a live preview was on show');
   assert.equal(previewState.timelineDisabled, false, 'The timeline stayed disabled while a live preview was on show');
-  // The preview is the export's shape at a smaller pixel count, not a
-  // re-layout: 16:9 stays 16:9.
-  assert.equal(previewState.width * 9, previewState.height * 16,
-    `The preview is not the export's 16:9 shape: ${previewState.width}x${previewState.height}`);
-  assert.ok(Math.max(previewState.width, previewState.height) <= 960,
-    `The preview was not drawn small: ${previewState.width}x${previewState.height}`);
+  // §၁၅: the preview is the export's frame, at the export's own size --
+  // not a smaller re-layout that could hide a difference.
+  assert.equal(previewState.width, 1920,
+    `The preview canvas is not the export's width: ${previewState.width}x${previewState.height}`);
+  assert.equal(previewState.height, 1080,
+    `The preview canvas is not the export's height: ${previewState.width}x${previewState.height}`);
+
+  // The reference picture's corner mark (§၁၃) reaches the Studio's own
+  // frame, not only the engine's helper. Its containment is checked where
+  // it can be isolated -- in test-drum-reference-browser.mjs -- because the
+  // Title band's own logo is red as well.
+  const corner = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const canvas = document.querySelector('[data-video-preview]');
+    const ctx = canvas.getContext('2d');
+    const box = Math.round(Math.min(canvas.width, canvas.height) * 0.12);
+    const read = (x, y, w, h) => {
+      const data = ctx.getImageData(x, y, w, h).data;
+      let red = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] > 150 && data[i + 1] < 110 && data[i + 2] < 110) red += 1;
+      }
+      return red;
+    };
+    return {
+      width: canvas.width,
+      height: canvas.height,
+      inCorner: read(canvas.width - box, canvas.height - box, box, box),
+    };
+  })())`));
+  assert.ok(corner.inCorner > 20, `The corner mark is not on the Studio frame: ${JSON.stringify(corner)}`);
 
   // Frame rate: the Plan asks for 24 fps or better. The engine's own draw
   // call is counted, so this is frames put on the canvas, not rAF ticks.
   await evaluate("(() => { window.__previewDraws = 0; const original = window.VideoEngine.drawFrameAt; window.VideoEngine.drawFrameAt = function (...args) { window.__previewDraws += 1; return original.apply(this, args); }; })()");
-  await evaluate("document.querySelector('[data-video-play]').click()");
+  // §၅: pressing Play must start the sound, not only the picture. The
+  // browser's own source node is observed, so this measures the real
+  // playback path rather than a flag the page sets for itself.
+  await evaluate("(() => { window.__previewAudioStarts = 0; const start = AudioBufferSourceNode.prototype.start; AudioBufferSourceNode.prototype.start = function (...args) { if (this.buffer && this.buffer.duration > 0.2) window.__previewAudioStarts += 1; return start.apply(this, args); }; })()");
+  // A real press carries the user activation a browser requires before it
+  // will open an audio context; a bare .click() does not, so the sound
+  // would be blocked by the browser rather than by the page.
+  await evaluate("document.querySelector('[data-video-play]').click()", { userGesture: true });
   const playedAt = Date.now();
   await sleep(1000);
   const playing = JSON.parse(await evaluate("JSON.stringify({button:document.querySelector('[data-video-play]').textContent, label:document.querySelector('[data-video-time]').textContent})"));
@@ -308,6 +425,9 @@ try {
   }
   const playedSeconds = (Date.now() - playedAt) / 1000;
   const previewFps = (await evaluate('window.__previewDraws')) / playedSeconds;
+  const audioStarts = await evaluate('window.__previewAudioStarts');
+  assert.ok(audioStarts >= 1,
+    `Play started no sound in the live preview (${audioStarts} source nodes started)`);
   assert.ok(previewFps >= 24, `The live preview ran at ${previewFps.toFixed(1)} fps, under the Plan's 24`);
 
   // Seek parity: the frame the canvas shows at t is the file's frame at t,
@@ -329,6 +449,13 @@ try {
 from PIL import Image
 a = Image.open(${JSON.stringify(left)}).convert('RGB')
 b = Image.open(${JSON.stringify(right)}).convert('RGB').resize(a.size, Image.LANCZOS)
+# Both are shrunk to a common small size before comparing: at the export's
+# own 1080p the H.264 artefacts alone are worth a few units per pixel, and
+# they say nothing about whether the two frames are the same picture.
+width = 480
+height = max(1, round(a.size[1] * width / a.size[0]))
+a = a.resize((width, height), Image.LANCZOS)
+b = b.resize((width, height), Image.LANCZOS)
 pa, pb = a.load(), b.load()
 total = 0
 count = 0
@@ -383,6 +510,47 @@ print(total / max(1, count))
   // one drawn frame; the measured value goes in the Doc.
   console.log(`TITLE_LATENCY_MS ${titleLatency}`);
   assert.ok(titleLatency <= 900, `The preview took ${titleLatency} ms to follow a Title change`);
+
+  // Main Plan V15: choosing another Brand/Model/ratio has to change the
+  // picture set the preview draws, not just the numbers in a select. The
+  // instrument band is fingerprinted (its colours and a coarse checksum) so
+  // a re-render of the same art cannot pass as new art.
+  const bandSignature = `(() => {
+    const canvas = document.querySelector('[data-video-preview]');
+    const ctx = canvas.getContext('2d');
+    const top = Math.round(canvas.height * 0.6);
+    const { data } = ctx.getImageData(0, top, canvas.width, canvas.height - top);
+    const colours = new Set();
+    let checksum = 0;
+    for (let i = 0; i < data.length; i += 16) {
+      colours.add((data[i] << 16) | (data[i + 1] << 8) | data[i + 2]);
+      checksum = (checksum * 31 + data[i] + data[i + 1] * 3 + data[i + 2] * 7) % 1000000007;
+    }
+    return JSON.stringify({ colours: colours.size, checksum });
+  })()`;
+  const chooseKit = async (ratio) => {
+    await evaluate(`(() => {
+      const brand = document.querySelector('[data-drum-brand]');
+      brand.value = 'MSDrums';
+      brand.dispatchEvent(new Event('change', { bubbles: true }));
+      const model = document.querySelector('[data-drum-model]');
+      model.value = 'MS Drum 1';
+      model.dispatchEvent(new Event('change', { bubbles: true }));
+      const ratioInput = document.querySelector('[data-video-ratio]');
+      ratioInput.value = ${JSON.stringify(ratio)};
+      ratioInput.dispatchEvent(new Event('change', { bubbles: true }));
+    })()`);
+    await sleep(2500);
+    return JSON.parse(await evaluate(bandSignature));
+  };
+  const landscapeArt = await chooseKit('16:9');
+  const portraitArt = await chooseKit('9:16');
+  assert.ok(landscapeArt.colours > 200,
+    `The 16:9 preview band holds no photograph: ${JSON.stringify(landscapeArt)}`);
+  assert.ok(portraitArt.colours > 200,
+    `The 9:16 preview band holds no photograph: ${JSON.stringify(portraitArt)}`);
+  assert.notEqual(landscapeArt.checksum, portraitArt.checksum,
+    `The preview kept one picture set across ratios: ${JSON.stringify({ landscapeArt, portraitArt })}`);
 
   // Keyboard play/pause, and no clock left running after repeated plays.
   await evaluate("document.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true }))");
@@ -442,7 +610,12 @@ print(total / max(1, count))
   // normal MP4 of the same length.
   await evaluate("(() => { const title = document.querySelector('[data-title-one]'); title.value = 'DRUM PERFORMANCE'; title.dispatchEvent(new Event('input', { bubbles: true })); })()");
 
-  await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); const color = document.querySelector('[data-video-color]'); const count = document.querySelector('[data-count-voice-enabled]'); ratio.value = '9:16'; ratio.dispatchEvent(new Event('change', { bubbles: true })); color.value = 'white'; color.dispatchEvent(new Event('change', { bubbles: true })); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
+  // Main Plan §၁၃.၁ keeps one picture set per ratio and forbids drawing
+  // one ratio's art into another, so the three-ratio export runs on the kit
+  // the bucket holds all three of. Roland's kit is landscape-only, which is
+  // checked on its own further down.
+  const portraitMark = kitRequests.length;
+  await evaluate("(() => { const brand = document.querySelector('[data-drum-brand]'); brand.value = 'MSDrums'; brand.dispatchEvent(new Event('change', { bubbles: true })); const model = document.querySelector('[data-drum-model]'); model.value = 'MS Drum 1'; model.dispatchEvent(new Event('change', { bubbles: true })); const ratio = document.querySelector('[data-video-ratio]'); const color = document.querySelector('[data-video-color]'); const count = document.querySelector('[data-count-voice-enabled]'); ratio.value = '9:16'; ratio.dispatchEvent(new Event('change', { bubbles: true })); color.value = 'white'; color.dispatchEvent(new Event('change', { bubbles: true })); count.value = 'on'; count.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
   const portraitStartedAt = Date.now();
   let portraitState;
   while (Date.now() - portraitStartedAt < 60000) {
@@ -464,11 +637,13 @@ print(total / max(1, count))
   assert.equal(portraitProbe.streams[0].width, 1080);
   assert.equal(portraitProbe.streams[0].height, 1920);
   assertAvcLevel(portraitProbe.streams[0]);
+  assertKitRequestsInRatio(portraitMark, '9x16', 'portrait');
 
   // The Plan's B0 asks for an export in each of the three ratios, not just
   // the one the page happens to open with. 16:9 is measured at the top of
   // this file and 9:16 above; 1:1 is measured here. A page that kept a size
   // of its own for the square case would fail rather than go unnoticed.
+  const squareMark = kitRequests.length;
   await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); ratio.value = '1:1'; ratio.dispatchEvent(new Event('change', { bubbles: true })); document.querySelector('[data-studio-generate]').click(); })()");
   const squareStartedAt = Date.now();
   let squareState;
@@ -489,6 +664,7 @@ print(total / max(1, count))
   assert.equal(squareProbe.streams[0].height, 1080, `Square video height is wrong: ${JSON.stringify(squareProbe)}`);
   assertAvcLevel(squareProbe.streams[0]);
   assert.match(squareState.download, /1x1/, `The square export is not named for its ratio: ${squareState.download}`);
+  assertKitRequestsInRatio(squareMark, '1x1', 'square');
 
   // A real score must reach the Notation part, and its own cursor must be
   // drawn: the Plan puts both inside the frame the Video Engine composes.
@@ -504,7 +680,7 @@ print(total / max(1, count))
     input.files = transfer.files;
     input.dispatchEvent(new Event('change', { bubbles: true }));
     const view = document.querySelector('[data-notation-view]');
-    view.value = 'landscape';
+    view.value = 'page';
     view.dispatchEvent(new Event('change', { bubbles: true }));
     const ratio = document.querySelector('[data-video-ratio]');
     ratio.value = '16:9';
@@ -626,6 +802,109 @@ print(len(colours))
     `The stroke without a picture was not marked: ${JSON.stringify(missingProbe)}`);
   assert.equal(missingProbe.summary, 'no picture for note 81',
     `The missing picture was not named in the status line: ${JSON.stringify(missingProbe)}`);
+
+  // Main Plan §၁၀ makes the bucket's manifest the authority on which kits
+  // exist, so a kit uploaded to R2 must reach the video without a code
+  // change. The test stands a kit the built-in table has never heard of in
+  // front of the module and asks whether it is now listed, and then takes
+  // the manifest away to check the built-in list survives with a reason.
+  const manifestProbe = JSON.parse(await evaluate(`(async () => {
+    const before = Object.keys(window.DrumKit.KITS).slice();
+    window.__manifestPayload = null;
+    const listed = await window.DrumKit.loadManifest({ reload: true });
+    return JSON.stringify({ before, after: Object.keys(window.DrumKit.KITS).slice(), state: listed });
+  })()`));
+  assert.deepEqual(manifestProbe.after, manifestProbe.before,
+    `A 404 manifest changed the kit list: ${JSON.stringify(manifestProbe)}`);
+  assert.equal(manifestProbe.state.source, 'built-in',
+    `A 404 manifest was not reported as the built-in fallback: ${JSON.stringify(manifestProbe.state)}`);
+  assert.ok(manifestProbe.state.error, `A 404 manifest left no reason behind: ${JSON.stringify(manifestProbe.state)}`);
+
+  drumManifest = {
+    schemaVersion: 1,
+    kits: [
+      { brand: 'RolandDrums', model: 'VAD716', label: 'Roland VAD716', ratios: ['16x9'] },
+      { brand: 'TestDrums', brandLabel: 'Test Drums Co', model: 'Manifest Only', label: 'Manifest Only Kit', hits: { 38: ['custom-snare.png'] } },
+    ],
+  };
+  const manifestApplied = JSON.parse(await evaluate(`(async () => {
+    const state = await window.DrumKit.loadManifest({ reload: true });
+    return JSON.stringify({
+      state,
+      keys: Object.keys(window.DrumKit.KITS),
+      label: window.DrumKit.KITS['TestDrums/Manifest Only']?.label ?? null,
+      background: window.DrumKit.KITS['TestDrums/Manifest Only']?.background ?? null,
+      brandLabel: window.DrumKit.KITS['TestDrums/Manifest Only']?.brandLabel ?? null,
+      ratios: window.DrumKit.KITS['RolandDrums/VAD716']?.ratios ?? null,
+      // A kit that names its own stroke picture must be read from the
+      // manifest, not guessed from the note number.
+      declared: window.DrumKit.imageCandidates('RH', 38, new Map(), { 38: ['custom-snare.png'] }),
+      guessed: window.DrumKit.imageCandidates('RH', 38, new Map(), null),
+    });
+  })()`));
+  assert.equal(manifestApplied.state.source, 'manifest',
+    `A served manifest was not used as the kit list: ${JSON.stringify(manifestApplied.state)}`);
+  assert.deepEqual(manifestApplied.keys.sort(), ['RolandDrums/VAD716', 'TestDrums/Manifest Only'],
+    `The kit list is not the manifest's: ${JSON.stringify(manifestApplied.keys)}`);
+  assert.equal(manifestApplied.label, 'Manifest Only Kit',
+    `A manifest kit lost its label: ${JSON.stringify(manifestApplied)}`);
+  assert.equal(manifestApplied.background, 'Drum Bg.png',
+    `A manifest kit with no background did not fall back to the default name: ${JSON.stringify(manifestApplied)}`);
+  assert.deepEqual(manifestApplied.ratios, ['16x9'],
+    `A manifest kit lost its ratio list: ${JSON.stringify(manifestApplied)}`);
+  assert.equal(manifestApplied.brandLabel, 'Test Drums Co',
+    `A manifest brand's display name was lost: ${JSON.stringify(manifestApplied)}`);
+  assert.deepEqual(manifestApplied.declared, ['custom-snare.png'],
+    `A manifest's own stroke file names were not used: ${JSON.stringify(manifestApplied)}`);
+  assert.deepEqual(manifestApplied.guessed, ['R38.png', '38.png'],
+    `The note-number naming rule changed when no manifest lists the picture: ${JSON.stringify(manifestApplied)}`);
+
+  // A kit the manifest lists but the bucket has no picture for must be
+  // reported rather than drawn as an empty band.
+  const noArt = await evaluate(`(async () => {
+    try { await window.DrumKit.loadArt('TestDrums/Manifest Only', '16:9'); return 'loaded'; }
+    catch (error) { return String(error.message); }
+  })()`);
+  assert.match(noArt, /no background picture/,
+    `A kit with no art was not reported: ${noArt}`);
+
+  // Main Plan §၁၃.၁ gives every ratio its own picture set and forbids
+  // drawing one ratio's art into another. A kit whose manifest names only
+  // landscape folders must therefore refuse the other two rather than
+  // stretch its landscape photograph to fit.
+  const wrongRatio = JSON.parse(await evaluate(`(async () => {
+    const out = {};
+    for (const ratio of ['1:1', '9:16']) {
+      try { await window.DrumKit.loadArt('RolandDrums/VAD716', ratio); out[ratio] = 'loaded'; }
+      catch (error) { out[ratio] = String(error.message); }
+    }
+    return JSON.stringify(out);
+  })()`));
+  for (const ratio of ['1:1', '9:16']) {
+    assert.match(wrongRatio[ratio], /no 1x1 pictures|no 9x16 pictures/,
+      `The ${ratio} render used the landscape art: ${wrongRatio[ratio]}`);
+  }
+  drumManifest = null;
+  await evaluate("window.DrumKit.loadManifest({ reload: true })");
+
+  // The picture that is drawn is the one in the requested ratio's folder:
+  // the decoded image's own address is the evidence, so a fallback to
+  // another folder cannot pass as its own.
+  const folderPerRatio = JSON.parse(await evaluate(`(async () => {
+    const out = {};
+    for (const ratio of ['16:9', '1:1', '9:16']) {
+      const art = await window.DrumKit.loadArt('MSDrums/MS Drum 1', ratio);
+      out[ratio] = { ratioPath: art.ratioPath, src: art.background.src };
+    }
+    return JSON.stringify(out);
+  })()`));
+  for (const [ratio, folder] of Object.entries({ '16:9': '16x9', '1:1': '1x1', '9:16': '9x16' })) {
+    const art = folderPerRatio[ratio];
+    assert.equal(art.ratioPath, folder,
+      `The ${ratio} kit art came from the ${art.ratioPath} folder: ${JSON.stringify(art)}`);
+    assert.ok(decodeURIComponent(art.src).includes(`/MS Drum 1/${folder}/Drum Bg.png`),
+      `The ${ratio} kit art was not read from its own folder: ${JSON.stringify(art)}`);
+  }
 
   // A score that names its drums with <midi-unpitched> must light the kit,
   // and the stroke must change the instrument band: the background alone
@@ -806,6 +1085,124 @@ print(sum(1 for value in pixels if value > 10), max(pixels))
   const counted = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-in.musicxml', twoPart.href);
   assert.ok(Math.abs(counted.seconds - 6) < 0.4, `The count-in was not added to the length: ${counted.seconds}s instead of 6s`);
 
+  // The count-in frame carries the count once, in the Title band's COUNT
+  // box. A second, large count in the middle of the frame is what the owner
+  // asked to have removed, so the centre of a count-in frame has to be the
+  // plain background.
+  const countInFrame = `${output}.count-in-frame.png`;
+  await exec('ffmpeg', ['-v', 'error', '-y', '-ss', '0.5', '-i', counted.path, '-frames:v', '1', countInFrame]);
+  const centre = JSON.parse((await exec('python3', ['-c', `
+import json
+from PIL import Image
+image = Image.open(${JSON.stringify(countInFrame)}).convert('RGB')
+width, height = image.size
+box = (int(width * 0.25), int(height * 0.25), int(width * 0.75), int(height * 0.75))
+pixels = list(image.crop(box).getdata())
+background = pixels[0]
+off = sum(1 for pixel in pixels if max(abs(a - b) for a, b in zip(pixel, background)) > 24)
+print(json.dumps({'pixels': len(pixels), 'offBackground': off, 'background': background}))
+`])).stdout);
+  assert.ok(centre.offBackground / centre.pixels < 0.002,
+    `The count-in frame still draws something large in the middle: ${JSON.stringify(centre)}`);
+
+  // ...and it still counts: the COUNT box moves between two beats of the
+  // count-in, which is the one place the count is allowed to show.
+  const boxFrame = async (seconds) => {
+    const path = `${output}.count-in-${seconds}.png`;
+    await exec('ffmpeg', ['-v', 'error', '-y', '-ss', String(seconds), '-i', counted.path, '-frames:v', '1', path]);
+    return path;
+  };
+  const boxInk = async (path) => JSON.parse((await exec('python3', ['-c', `
+import json
+from collections import Counter
+from PIL import Image
+image = Image.open(${JSON.stringify(path)}).convert('RGB')
+width, height = image.size
+# The COUNT box is the rightmost of the three. Its digit sits on the value
+# line, under the label, so the crop covers the digit and nothing else.
+box = (int(width * 0.925), int(height * 0.043), int(width * 0.972), int(height * 0.076))
+pixels = list(image.crop(box).getdata())
+fill = Counter(pixels).most_common(1)[0][0]
+ink = sum(1 for pixel in pixels if max(abs(a - b) for a, b in zip(pixel, fill)) > 40)
+checksum = 0
+for pixel in pixels:
+    for channel in pixel:
+        checksum = (checksum * 31 + channel) % 1000000007
+print(json.dumps({ 'ink': ink, 'pixels': len(pixels), 'checksum': checksum }))
+`])).stdout);
+  const firstBeatBox = await boxInk(await boxFrame(0.1));
+  const fourthBeatBox = await boxInk(await boxFrame(1.5));
+  assert.ok(firstBeatBox.ink > 0 && fourthBeatBox.ink > 0,
+    `The COUNT box is empty during the count-in: ${JSON.stringify({ firstBeatBox, fourthBeatBox })}`);
+  assert.notEqual(firstBeatBox.checksum, fourthBeatBox.checksum,
+    `The COUNT box did not change between two count-in beats: ${JSON.stringify({ firstBeatBox, fourthBeatBox })}`);
+
+  // The spoken count is its own sound: R2's `Voices/{n}.wav` is played over
+  // the click, and it is heard even when the drum model is Visual Only.
+  // The two renders below differ in nothing but whether the recordings
+  // answer, so the extra loudness can only be the voice.
+  const voicePath = join(profile, 'count-voice.wav');
+  await exec('ffmpeg', ['-v', 'error', '-y',
+    '-f', 'lavfi', '-i', 'sine=frequency=880:duration=0.3',
+    '-af', 'volume=8', '-ac', '2', '-ar', '44100', '-c:a', 'pcm_s16le', voicePath]);
+  countVoice = await readFile(voicePath);
+  countVoiceRequests = [];
+  const spoken = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-voice.musicxml', counted.href);
+  // The click is over within 50 ms of the beat, so the second half of each
+  // beat is the window where only the spoken count can be heard.
+  const loudnessOf = async (path, from, to) => {
+    const wav = `${path}.count-in.wav`;
+    await exec('ffmpeg', ['-v', 'error', '-y', '-i', path, '-ac', '1', '-ar', '48000', '-c:a', 'pcm_s16le', wav]);
+    const { stdout } = await exec('python3', ['-c', `
+import json, math, struct, wave
+handle = wave.open(${JSON.stringify(wav)})
+frames = handle.getnframes()
+rate = handle.getframerate()
+samples = struct.unpack('<%dh' % frames, handle.readframes(frames))
+start, end = int(${from} * rate), int(${to} * rate)
+window = samples[start:end]
+print(json.dumps(math.sqrt(sum(v * v for v in window) / max(1, len(window)))))
+`]);
+    return JSON.parse(stdout);
+  };
+  // Between the beats: the click has decayed, the recording is still on.
+  const clickOnly = await loudnessOf(counted.path, 0.15, 0.4);
+  const withVoice = await loudnessOf(spoken.path, 0.15, 0.4);
+  assert.ok(withVoice > Math.max(clickOnly * 4, 300),
+    `The spoken count was not played over the click: ${withVoice} against ${clickOnly}`);
+  // The count is over before the score starts, so the voice does not leak
+  // into the music.
+  const afterCount = await loudnessOf(spoken.path, 2.5, 3.5);
+  assert.ok(afterCount < withVoice * 0.5,
+    `The spoken count runs into the score: ${afterCount} against ${withVoice}`);
+
+  // The older `Voices` folder is the fallback: with the newer name gone,
+  // the count still speaks. That keeps a rename on the bucket from
+  // silencing the count.
+  countVoicePrimaryMissing = true;
+  const fallback = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-voice-fallback.musicxml', spoken.href);
+  const fallbackVoice = await loudnessOf(fallback.path, 0.15, 0.4);
+  assert.ok(fallbackVoice > Math.max(clickOnly * 4, 300),
+    `The count fell silent when only the Voices folder answered: ${fallbackVoice} against ${clickOnly}`);
+  countVoicePrimaryMissing = false;
+
+  // The bucket's two sets are different sounds, so the page's choice has to
+  // reach the request: with `marker` chosen, the M-files are asked for
+  // before the spoken ones.
+  assert.ok(countVoiceRequests.length > 0 && /\/Counts%20%20vocal\/1\.wav$/.test(countVoiceRequests[0]),
+    `The spoken set was not the default: ${JSON.stringify(countVoiceRequests.slice(0, 3))}`);
+  await evaluate("(() => { const voice = document.querySelector('[data-count-voice]'); voice.value = 'marker'; voice.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  countVoiceRequests = [];
+  const marked = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-voice-marker.musicxml', spoken.href);
+  assert.ok(countVoiceRequests.length > 0 && /\/Counts%20%20vocal\/M1\.wav$/.test(countVoiceRequests[0]),
+    `The marker set was not asked for first: ${JSON.stringify(countVoiceRequests.slice(0, 3))}`);
+  const markerVoice = await loudnessOf(marked.path, 0.15, 0.4);
+  assert.ok(markerVoice > Math.max(clickOnly * 4, 300),
+    `The marker count was not played: ${markerVoice} against ${clickOnly}`);
+  // Put the page back on the default so the checks below see the spoken set.
+  await evaluate("(() => { const voice = document.querySelector('[data-count-voice]'); voice.value = 'spoken'; voice.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  countVoice = null;
+
   // The Plan's last part: the Thank You clip closes the video and is
   // counted in its length. The clip is two seconds of a known colour, so
   // both the length and the picture can be checked.
@@ -815,9 +1212,20 @@ print(sum(1 for value in pixels if value > 10), max(pixels))
     '-f', 'lavfi', '-i', 'sine=frequency=440:duration=2',
     '-c:v', 'libx264', '-pix_fmt', 'yuv420p', '-c:a', 'aac', '-shortest', clipPath]);
   thankYouClip = await readFile(clipPath);
-  await evaluate("(() => { const count = document.querySelector('[data-count-voice-enabled]'); count.value = 'off'; count.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  // The earlier renders left the page on a portrait frame; this one starts
+  // from a known landscape, white frame so the address it asks for is known
+  // in advance. White keeps the score's own background far from the clip's
+  // dark colour, which is what the picture check below compares.
+  await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); ratio.value = '16:9'; ratio.dispatchEvent(new Event('change', { bubbles: true })); const colour = document.querySelector('[data-video-color]'); colour.value = 'white'; colour.dispatchEvent(new Event('change', { bubbles: true })); const count = document.querySelector('[data-count-voice-enabled]'); count.value = 'off'; count.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  thankYouRequests = [];
   const thanked = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'thank-you-score.musicxml', counted.href);
   assert.ok(Math.abs(thanked.seconds - 6) < 0.5, `The Thank You clip was not counted in the length: ${thanked.seconds}s instead of 6s`);
+  // The Plan gives the clip one address per ratio, instrument and colour.
+  // The page must ask for the drum set in the chosen colour at the frame's
+  // own ratio -- not a letterboxed clip from another shape.
+  assert.ok(thankYouRequests.length > 0, 'The page never asked for a Thank You clip');
+  assert.ok(thankYouRequests[0].includes('/16x9/drum/16x9%20White%20Drum.mp4'),
+    `The Thank You clip was not asked for by ratio, instrument and colour: ${thankYouRequests[0]}`);
   const clipFrames = [];
   for (const second of ['3.5', '5.0']) {
     const framePath = `${output}.thank-${second}.png`;
@@ -848,6 +1256,52 @@ print(*image.load()[image.size[0] // 2, image.size[1] // 2])
   assert.ok(thankedStreams.some((stream) => stream.codec_type === 'audio'),
     `The Thank You clip's sound is missing: ${JSON.stringify(thankedStreams)}`);
 
+  // Black is a different clip, and a ratio change is a different folder.
+  // Both are asked for by name, so the page cannot quietly keep one clip
+  // for every setting.
+  await evaluate("(() => { const colour = document.querySelector('[data-video-color]'); colour.value = 'black'; colour.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  thankYouRequests = [];
+  const white = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'thank-you-black.musicxml', thanked.href);
+  assert.ok(white.seconds > 0, 'The black-colour render produced no video');
+  assert.ok(thankYouRequests[0]?.includes('/16x9/drum/16x9%20Black%20Drum.mp4'),
+    `Black did not ask for the black clip: ${thankYouRequests[0]}`);
+
+  await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); ratio.value = '1:1'; ratio.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  thankYouRequests = [];
+  const square = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'thank-you-square.musicxml', white.href);
+  assert.ok(square.seconds > 0, 'The square render produced no video');
+  assert.ok(thankYouRequests[0]?.includes('/1x1/drum/1x1%20Black%20Drum.mp4'),
+    `The square ratio did not ask for the 1x1 clip: ${thankYouRequests[0]}`);
+  await evaluate("(() => { const ratio = document.querySelector('[data-video-ratio]'); ratio.value = '16:9'; ratio.dispatchEvent(new Event('change', { bubbles: true })); })()");
+
+  // A second render must not keep a stale clip: the white and square
+  // requests above prove the address follows the settings.
+  thankYouRequests = [];
+
+  // The bucket is not complete: 1:1 Black Guitar and 9:16 White Guitar
+  // have no file. The candidate list is what keeps such a combination from
+  // losing its ending, so its order is checked directly.
+  const candidates = JSON.parse(await evaluate(`JSON.stringify((() => {
+    const engine = window.VideoEngine;
+    return {
+      guitarBlackSquare: engine.thankYouCandidates(1080, 1080, { instrument: 'guitar', color: 'black' }),
+      pianoPortrait: engine.thankYouCandidates(1080, 1920, { instrument: 'piano', color: 'white' }),
+      nearSquare: engine.thankYouCandidates(1000, 900, {}),
+    };
+  })())`));
+  assert.ok(candidates.guitarBlackSquare[0].includes('/1x1/guitar/1x1%20Black%20Guitar.mp4'),
+    `The exact guitar clip was not tried first: ${candidates.guitarBlackSquare[0]}`);
+  assert.ok(candidates.guitarBlackSquare.some((url) => url.includes('/1x1/guitar/1x1%20White%20Guitar.mp4')),
+    `The same instrument in the other colour was not tried: ${JSON.stringify(candidates.guitarBlackSquare)}`);
+  assert.ok(candidates.guitarBlackSquare.at(-1).includes('/1x1/drum/'),
+    `The drum set was not the last resort: ${candidates.guitarBlackSquare.at(-1)}`);
+  assert.ok(candidates.pianoPortrait.every((url) => url.includes('/9x16/')),
+    `A candidate left the frame's own ratio: ${JSON.stringify(candidates.pianoPortrait)}`);
+  // `ratioOf` snaps an odd frame to its nearest shape, so even a 1000x900
+  // canvas is served a 1x1 clip rather than losing its ending.
+  assert.ok(candidates.nearSquare.every((url) => url.includes('/1x1/')),
+    `A near-square frame was not served a 1x1 clip: ${JSON.stringify(candidates.nearSquare)}`);
+
   // The drum sound. A Sound Model other than Visual Only means the file
   // carries the drums the picture shows, and Visual Only means it does not:
   // the status and the streams must agree, because a silent file described
@@ -857,6 +1311,9 @@ print(*image.load()[image.size[0] // 2, image.size[1] // 2])
   // own sound, so leaving it in would give every export an audio track and
   // say nothing about whether the drums themselves are heard.
   thankYouClip = null;
+  // §၅: the page now opens on a sounding model, so Visual Only is asked
+  // for rather than assumed -- the default is checked below.
+  await evaluate("(() => { const model = document.querySelector('[data-sound-model]'); model.value = 'visual'; model.dispatchEvent(new Event('change', { bubbles: true })); })()");
   const visualOnly = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'visual-only.musicxml', thanked.href);
   assert.match(visualOnly.status, /visual only · no drum sound/,
     `Visual Only did not say the drums are absent: ${visualOnly.status}`);
@@ -895,7 +1352,224 @@ print(json.dumps({'peak': max(peaks) if peaks else 0, 'at': peaks}))
   assert.ok(onBeat > offBeat * 2,
     `The drums do not land on the beat: ${onBeat} on the beat against ${offBeat} between beats`);
 
-  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds, thankYouSeconds: thanked.seconds, visualOnlyStatus: visualOnly.status, audibleStatus: audible.status, drumPeak: loudness.peak, kitBandColours: bandColours.map(({ stdout }) => Number(stdout.trim())), kitProbe, kitStrokeChangedPixels: changedPixels, kitStrokePeakDelta: peakDelta, kitOverlayProbe: drawProbe }, null, 2));
+  // §၅ / V9: the sound and the picture are one performance, so a hit has to
+  // be heard where it is seen. Both streams are read from the file that was
+  // written -- when a stroke lights from the encoded frames, when a hit is
+  // heard from the samples -- and the two curves are slid against each other.
+  // The lag with the best overlap is the offset; a claim about sync is worth
+  // nothing that a measurement cannot contradict.
+  //
+  // The whole file is read, not the first seconds: a drum video opens on the
+  // count-in, which has no stroke in it, so a short window would measure the
+  // count against silence.
+  const syncFrames = join(profile, 'sync');
+  await mkdir(syncFrames, { recursive: true });
+  await exec('ffmpeg', ['-v', 'error', '-y', '-i', audible.path,
+    '-vf', 'fps=30', join(syncFrames, 'f%04d.png')]);
+  const picture = JSON.parse((await exec('python3', ['-c', `
+import json, glob, os
+from PIL import Image
+paths = sorted(glob.glob(os.path.join(${JSON.stringify(syncFrames)}, '*.png')))
+# The instrument band is the bottom of a drum frame. The kit photo does not
+# move, so the median value of a pixel over the run is its unlit state; a
+# frame where it differs from that has a stroke over it. Every fourth pixel
+# is read -- a stroke covers hundreds of them.
+step = 4
+bands = []
+for path in paths:
+    image = Image.open(path).convert('L')
+    width, height = image.size
+    band = image.crop((0, int(height * 0.60), width, height))
+    pixels = band.load()
+    bands.append([pixels[x, y] for y in range(0, band.size[1], step) for x in range(0, width, step)])
+reference = [sorted(column)[len(column) // 2] for column in zip(*bands)]
+lit = []
+for band in bands:
+    count = 0
+    for index, value in enumerate(band):
+        if abs(value - reference[index]) > 20:
+            count += 1
+    lit.append(count)
+print(json.dumps({'frames': len(lit), 'lit': lit}))
+`])).stdout);
+  assert.ok(picture.frames > 30, `The drum export is too short to measure sync: ${picture.frames} frames`);
+
+  const audio = JSON.parse((await exec('python3', ['-c', `
+import json, struct, wave
+handle = wave.open(${JSON.stringify(wavPath)})
+rate = handle.getframerate()
+samples = struct.unpack('<%dh' % handle.getnframes(), handle.readframes(handle.getnframes()))
+window = rate // 30
+level = []
+for index in range(0, len(samples) // window):
+    piece = samples[index * window:(index + 1) * window]
+    level.append(max(abs(value) for value in piece))
+print(json.dumps({'level': level}))
+`])).stdout);
+
+  // The picture is a count of changed pixels and the sound a peak per frame;
+  // both are scaled to their own range so the overlap compares shape, not
+  // loudness. The lag is searched one frame either side, which is more than
+  // the Plan's ~40 ms budget allows.
+  const normalise = (values) => {
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    return max === min ? values.map(() => 0) : values.map((value) => (value - min) / (max - min));
+  };
+  const pictureCurve = normalise(picture.lit);
+  const audioCurve = normalise(audio.level.slice(0, pictureCurve.length));
+  let bestLag = 0;
+  let bestScore = -Infinity;
+  for (let lag = -2; lag <= 2; lag += 1) {
+    let score = 0;
+    for (let index = 0; index < pictureCurve.length; index += 1) {
+      const other = index + lag;
+      if (other < 0 || other >= audioCurve.length) continue;
+      score += pictureCurve[index] * audioCurve[other];
+    }
+    if (score > bestScore) { bestScore = score; bestLag = lag; }
+  }
+  const syncError = Math.abs(bestLag) / 30;
+  // A frame is 33 ms, so one frame is the finest the picture can say; the
+  // Plan's budget is ~40 ms.
+  assert.ok(syncError <= 0.04,
+    `The sound is ${Math.round(syncError * 1000)} ms from the picture (best lag ${bestLag} frames)`);
+
+  // §၁៣.៣(က): Count-in, the score and the Thank You clip are one file that
+  // runs on, with no black frame where one part meets the next. Each frame at
+  // a join is compared, pixel by pixel, with a frame taken from inside each
+  // of the two parts. A blank frame differs from both of them everywhere; a
+  // frame of either part differs only where its own content moved. Brightness
+  // alone would not do: the clip's picture is nearly black and the score's is
+  // nearly white, so no single threshold can call both of them pictures.
+  const joinDiff = async (path, seconds) => {
+    const out = [];
+    for (const second of seconds) {
+      const framePath = `${output}.join-${second}.png`;
+      await exec('ffmpeg', ['-v', 'error', '-y', '-ss', String(second), '-i', path, '-frames:v', '1', framePath]);
+      out.push(framePath);
+    }
+    const { stdout } = await exec('python3', ['-c', `
+import json
+from PIL import Image
+# A third of the pixels, on a grid, is enough to tell a picture from a blank.
+step = 3
+frames = []
+for path in ${JSON.stringify(out)}:
+    image = Image.open(path).convert('L')
+    width, height = image.size
+    pixels = image.load()
+    frames.append([pixels[x, y] for y in range(0, height, step) for x in range(0, width, step)])
+def differs(a, b):
+    return sum(1 for left, right in zip(a, b) if abs(left - right) > 40) / len(a)
+first, *middle = frames
+last = frames[-1]
+print(json.dumps({
+  'middle': [round(min(differs(frame, first), differs(frame, last)), 3) for frame in middle],
+  'parts': [round(differs(first, last), 3), round(sum(first) / len(first), 1), round(sum(last) / len(last), 1)],
+}))
+`]);
+    return JSON.parse(stdout.trim());
+  };
+  // `counted` is the count-in followed by the score, so the join is at 2.0 s.
+  const countJoin = await joinDiff(counted.path, [1.5, 1.9, 1.97, 2.03, 2.1, 2.5]);
+  assert.ok(countJoin.middle.every((share) => share < 0.5),
+    `A frame at the count-in join is neither part's picture: ${JSON.stringify(countJoin)}`);
+  // `thanked` is the score followed by the Thank You clip, so the join is at
+  // 4.0 s. The two parts must also be different pictures, or the check above
+  // would pass on a file that never changed over.
+  const thankJoin = await joinDiff(thanked.path, [3.5, 3.9, 3.97, 4.03, 4.1, 4.5]);
+  assert.ok(thankJoin.middle.every((share) => share < 0.5),
+    `A frame at the Thank You join is neither part's picture: ${JSON.stringify(thankJoin)}`);
+  assert.ok(thankJoin.parts[0] > 0.5,
+    `The Thank You clip did not replace the score at the join: ${JSON.stringify(thankJoin.parts)}`);
+
+  // ...and the sound runs on across the same joins: a silent stretch in the
+  // middle of the file is the audio cut the Plan rules out.
+  const silence = JSON.parse((await exec('python3', ['-c', `
+import json, struct, wave
+handle = wave.open(${JSON.stringify(wavPath)})
+rate = handle.getframerate()
+samples = struct.unpack('<%dh' % handle.getnframes(), handle.readframes(handle.getnframes()))
+peak = max(abs(value) for value in samples) or 1
+window = rate // 100
+quiet = 0
+longest = 0
+for index in range(0, len(samples) // window):
+    piece = samples[index * window:(index + 1) * window]
+    if max(abs(value) for value in piece) < peak * 0.01:
+        quiet += 1
+        longest = max(longest, quiet)
+    else:
+        quiet = 0
+print(json.dumps({'longestSilence': round(longest / 100, 2)}))
+`])).stdout);
+  assert.ok(silence.longestSilence < 0.4,
+    `The drum sound has a ${silence.longestSilence}s silent gap in it`);
+
+  // Main Plan V15: the Brand select decides which Models are offered, so a
+  // model from another brand -- a folder the bucket does not hold -- cannot
+  // be chosen.
+  const modelLists = JSON.parse(await evaluate(`(() => {
+    const brand = document.querySelector('[data-drum-brand]');
+    const model = document.querySelector('[data-drum-model]');
+    const read = (value) => {
+      brand.value = value;
+      brand.dispatchEvent(new Event('change', { bubbles: true }));
+      return [...model.options].map((option) => option.value);
+    };
+    const out = { RolandDrums: read('RolandDrums'), MSDrums: read('MSDrums') };
+    brand.value = 'MSDrums';
+    brand.dispatchEvent(new Event('change', { bubbles: true }));
+    model.value = 'MS Drum 1';
+    model.dispatchEvent(new Event('change', { bubbles: true }));
+    return JSON.stringify(out);
+  })()`));
+  assert.deepEqual(modelLists.RolandDrums, ['VAD716'],
+    `A brand offered another brand's models: ${JSON.stringify(modelLists)}`);
+  assert.deepEqual(modelLists.MSDrums, ['MS Drum 1', 'MS Drum 2'],
+    `A brand did not offer its own models: ${JSON.stringify(modelLists)}`);
+
+  // And a brand the page has never heard of reaches the selects from the
+  // bucket's manifest alone: the lists are rebuilt when it answers.
+  drumManifest = {
+    schemaVersion: 1,
+    kits: [
+      { brand: 'MSDrums', brandLabel: 'M Sharing', model: 'MS Drum 1', label: 'M Sharing Drum 1' },
+      { brand: 'TestDrums', brandLabel: 'Test Drums Co', model: 'Manifest Only', label: 'Manifest Only Kit' },
+    ],
+  };
+  await evaluate('location.reload()');
+  const reloadStartedAt = Date.now();
+  let manifestSelects = { brands: [], models: [] };
+  while (Date.now() - reloadStartedAt < 20000) {
+    manifestSelects = JSON.parse(await evaluate(`(() => {
+      const brand = document.querySelector('[data-drum-brand]');
+      const model = document.querySelector('[data-drum-model]');
+      if (!brand || !model) return JSON.stringify({ brands: [], models: [] });
+      if (![...brand.options].some((option) => option.value === 'TestDrums')) {
+        return JSON.stringify({ brands: [...brand.options].map((o) => o.value), models: [] });
+      }
+      brand.value = 'TestDrums';
+      brand.dispatchEvent(new Event('change', { bubbles: true }));
+      return JSON.stringify({
+        brands: [...brand.options].map((o) => o.value),
+        labels: [...brand.options].map((o) => o.textContent),
+        models: [...model.options].map((o) => o.value),
+      });
+    })()`));
+    if (manifestSelects.models.length) break;
+    await sleep(200);
+  }
+  assert.ok(manifestSelects.brands.includes('TestDrums'),
+    `A manifest brand never reached the Brand select: ${JSON.stringify(manifestSelects)}`);
+  assert.ok(manifestSelects.labels?.includes('Test Drums Co'),
+    `A manifest brand's display name was not used: ${JSON.stringify(manifestSelects)}`);
+  assert.deepEqual(manifestSelects.models, ['Manifest Only'],
+    `A manifest brand did not offer exactly its own models: ${JSON.stringify(manifestSelects)}`);
+  drumManifest = null;
+
+  console.log(JSON.stringify({ status: result.status, bytes: result.bytes, extension, ffprobe: probe, notation: firstInk, slowScoreSeconds: slow.seconds, twoVoiceSeconds: twoVoice.seconds, repeatSeconds: repeated.seconds, twoPartSeconds: twoPart.seconds, countInSeconds: counted.seconds, countInCentre: centre, countInBox: { first: firstBeatBox, fourth: fourthBeatBox }, countVoiceLoudness: { clickOnly, withVoice, afterCount, fallbackVoice }, thankYouSeconds: thanked.seconds, visualOnlyStatus: visualOnly.status, audibleStatus: audible.status, drumPeak: loudness.peak, kitBandColours: bandColours.map(({ stdout }) => Number(stdout.trim())), kitProbe, kitStrokeChangedPixels: changedPixels, kitStrokePeakDelta: peakDelta, kitOverlayProbe: drawProbe }, null, 2));
 } finally {
   cdp?.close();
   for (const child of [browser, server]) {

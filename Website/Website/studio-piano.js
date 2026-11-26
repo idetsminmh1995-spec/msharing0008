@@ -65,7 +65,7 @@
       size,
       // The page has no Notation View control, so the sheet is the
       // landscape page the other video pages default to.
-      notation: 'landscape',
+      notation: 'page',
       color: 'black',
     };
   }
@@ -370,7 +370,7 @@
       settings.shares = { instrument: Math.min(1, keyboardHeight / Math.max(1, free)) };
 
       setStatus('Laying out the notation…');
-      const notation = await engine.prepareNotationFor(file, settings, PARTS);
+      const notation = await engine.prepareNotationFor(file, { ...settings, palette }, PARTS);
       if (notation?.error) throw new Error(`The notation could not be prepared: ${notation.error}`);
 
       const segments = [{
@@ -390,7 +390,7 @@
                 titleOne: parsed.score?.title || file.name,
                 titleTwo: `${keys.length} notes · ${settings.aspect}`,
               }),
-              notation: (target, rect) => engine.drawNotationPart(target, rect, at, notation),
+              notation: (target, rect) => engine.drawNotationPart(target, rect, at, notation, palette),
               instrument: (target, rect) => drawKeyboard(target, rect, at, view, palette),
             },
           });
@@ -400,7 +400,7 @@
       // performance segment and starts with it.
       setStatus('Synthesizing the piano sound…');
       segments[0].audio = await createPianoAudio({ keys, seconds });
-      const ending = await engine.thankYouSegment(settings.width, settings.height);
+      const ending = await engine.thankYouSegment(settings.width, settings.height, { instrument: 'piano', color: settings.color });
       if (ending) segments.push(ending);
 
       const result = await engine.render({

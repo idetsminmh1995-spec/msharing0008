@@ -168,7 +168,7 @@ try {
 
     const settings = {
       instrument: 'drums',
-      notation: 'landscape',
+      notation: 'page',
       size: { width: 1920, height: 1080 },
     };
     const state = await VideoEngine.prepareNotationFor(file, settings);

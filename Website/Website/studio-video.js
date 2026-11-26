@@ -45,17 +45,14 @@
   // Only for a score that states no tempo: 120 BPM is the MusicXML default.
   const QUARTER_SECONDS = 0.5;
   const DEFAULT_LOGO = 'assets/logo/m-sharing-drum-logo.svg';
+  // The reference picture's own second mark, on the frame's corner.
+  const CORNER_LOGO = 'assets/logo/m-sharing-mark.svg';
   const DEFAULT_META = { beats: 4, beatType: 4, bpm: 120, key: '' };
   const RATIO_SIZES = {
     '16:9': { width: 1920, height: 1080 },
     '1:1': { width: 1080, height: 1080 },
     '9:16': { width: 1080, height: 1920 },
   };
-  const LANES = [
-    { id: 'kick', label: 'KICK', y: 0.46, color: '#ff7b55' },
-    { id: 'snare', label: 'SNARE', y: 0.64, color: '#ffcf5a' },
-    { id: 'hihat', label: 'HI-HAT', y: 0.82, color: '#78a8ff' },
-  ];
 
   const selectedTool = (new URLSearchParams(window.location.search).get('tool') || 'drums').toLowerCase();
 
@@ -85,6 +82,7 @@
   let cancelRequested = false;
   let objectUrl = null;
   let logoImage = null;
+  let cornerLogoImage = null;
 
   const setStatus = (message) => {
     if (status) status.textContent = message;
@@ -102,38 +100,35 @@
     titleTwoSize: Number(titleTwoSize?.value) || 11,
     brand: drumBrand?.value.trim() || 'M Sharing',
     model: drumModel?.value || 'custom',
-    notation: notationView?.value || 'landscape',
-    soundModel: soundModel?.value || 'visual',
+    notation: notationView?.value || 'page',
+    soundModel: soundModel?.value || 'natural',
     soundVolume: Number(soundVolume?.value) || 0,
     countEnabled: countVoiceEnabled?.value === 'on',
-    countVoice: countVoice?.value || 'one-two',
+    countVoice: countVoice?.value || 'spoken',
     countVolume: Number(countVolume?.value) || 0,
     countDisplay: countDisplay?.value || 'beats',
     // The Drum reference picture puts TIME / BPM / COUNT boxes in the Title
     // band; the other pages keep the plain stats row until their own
     // reference exists.
     infoBoxes: true,
+    // The reference picture rings the note being played with a rounded box.
+    cursorShape: 'box',
     color: videoColor?.value || 'black',
     ratio: videoRatio?.value || '16:9',
     size: getSize(),
     logoImage,
+    cornerLogoImage,
     musicXmlName: musicXmlInput?.files?.[0]?.name || '',
   });
-
-  const hexToRgba = (hex, alpha) => {
-    const clean = String(hex).replace('#', '');
-    const value = clean.length === 3 ? clean.split('').map((part) => part + part).join('') : clean;
-    const red = Number.parseInt(value.slice(0, 2), 16) || 242;
-    const green = Number.parseInt(value.slice(2, 4), 16) || 13;
-    const blue = Number.parseInt(value.slice(4, 6), 16) || 61;
-    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-  };
 
   const getPalette = (color) => engine.paletteFor(color);
 
   const syncControlState = () => {
     const settings = getSettings();
     if (formatLabel) formatLabel.textContent = `${settings.ratio} · ${settings.size.width}×${settings.size.height}`;
+    // The stage takes the video's own shape, so a portrait preview is not
+    // letterboxed inside a landscape box (§၁၅).
+    if (stage) stage.dataset.videoRatio = settings.ratio;
     if (soundVolumeValue) soundVolumeValue.value = `${settings.soundVolume}%`;
     if (countVolumeValue) countVolumeValue.value = `${settings.countVolume}%`;
     const countOn = settings.countEnabled;
@@ -322,110 +317,50 @@
   }
 
 
-  /** The instrument part: the drum lanes the performance is read from. */
-  function drawInstrumentPart(ctx, rect, at, hits, duration, settings, palette) {
-    const scale = Math.max(0.6, Math.min(1.2, Math.min(rect.width / 640, rect.height / 360)));
-    const labelWidth = Math.round(78 * scale);
-    const left = rect.x + labelWidth;
-    const right = rect.x + rect.width - Math.round(16 * scale);
-    const trackWidth = Math.max(1, right - left);
-    const lanePositions = LANES.map((lane, index) => ({
-      ...lane,
-      y: Math.round(rect.y + rect.height * (0.2 + index * 0.3)),
-    }));
-
-    const gridStep = Math.max(1, Math.ceil(duration / 8));
-    ctx.font = `${Math.max(9, Math.round(10 * scale))}px monospace`;
-    for (let second = 0; second <= duration; second += gridStep) {
-      const x = left + (second / duration) * trackWidth;
-      ctx.strokeStyle = palette.grid;
-      ctx.beginPath();
-      ctx.moveTo(x, rect.y + Math.round(6 * scale));
-      ctx.lineTo(x, rect.y + rect.height - Math.round(6 * scale));
-      ctx.stroke();
-      ctx.fillStyle = palette.muted;
-      ctx.fillText(`${second}s`, x + 3, rect.y + Math.round(18 * scale));
-    }
-    for (const lane of lanePositions) {
-      ctx.fillStyle = palette.muted;
-      ctx.font = `600 ${Math.max(9, Math.round(10 * scale))}px Inter, system-ui, sans-serif`;
-      ctx.fillText(lane.label, rect.x + Math.round(10 * scale), lane.y + Math.round(4 * scale));
-      ctx.strokeStyle = palette.line;
-      ctx.beginPath();
-      ctx.moveTo(left, lane.y);
-      ctx.lineTo(right, lane.y);
-      ctx.stroke();
-    }
-    for (const hit of hits) {
-      const lane = lanePositions.find((candidate) => candidate.id === hit.type);
-      if (!lane) continue;
-      const x = left + (Math.min(hit.at, duration) / duration) * trackWidth;
-      const active = Math.abs(at - hit.at) < 0.12;
-      ctx.beginPath();
-      ctx.fillStyle = lane.color;
-      ctx.globalAlpha = active ? 1 : 0.78;
-      ctx.arc(x, lane.y, active ? Math.round(8 * scale) : Math.round(5 * scale), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.globalAlpha = 1;
-    }
-    const playheadX = left + Math.min(1, at / duration) * trackWidth;
-    ctx.strokeStyle = '#f20d3d';
-    ctx.lineWidth = Math.max(1, Math.round(2 * scale));
-    ctx.beginPath();
-    ctx.moveTo(playheadX, rect.y + Math.round(6 * scale));
-    ctx.lineTo(playheadX, rect.y + rect.height - Math.round(6 * scale));
-    ctx.stroke();
-    ctx.lineWidth = 1;
-    ctx.fillStyle = palette.muted;
-    ctx.font = `${Math.max(10, Math.round(11 * scale))}px monospace`;
-    ctx.fillText(`${at.toFixed(1)} / ${duration.toFixed(1)} sec`, rect.x + Math.round(10 * scale), rect.y + rect.height - Math.round(10 * scale));
-  }
-
   /**
-   * The kit pictures this render will draw, or `null` when the bucket
-   * cannot be reached.
+   * The kit's pictures for the frame being rendered, or an error that stops
+   * the render.
    *
-   * A kit is decoration, not evidence: if R2 is down the video still
-   * renders, with the lane chart it drew before. What must NOT happen is a
-   * half-loaded kit -- a background with no sticks on it looks like a kit
-   * nobody played -- so a failed load falls back whole.
+   * Main Plan §၁၃.၁ gives every ratio its own picture set and makes the
+   * base picture a required asset, so a kit with no art for the chosen
+   * ratio stops the export and says which ratios it does carry. A video
+   * drawn from another ratio's photographs, or from a lane chart standing
+   * in for the kit, is not the video the Plan describes.
    */
   async function loadKit(settings, hits) {
     const drumKit = window.DrumKit;
-    if (!drumKit) return null;
-    const name = `${settings.brand}/${settings.model}`;
-    if (!drumKit.KITS[name]) return null;
-    try {
-      setStatus('Loading the drum kit from R2…');
-      const art = await drumKit.loadArt(name, settings.ratio);
-      const strokes = hits
-        .filter((hit) => Number.isFinite(hit.midi))
-        .map((hit) => ({ note: hit.midi, at: hit.at }));
-      const limbs = drumKit.solveLimbs(strokes.map((stroke) => ({ time: stroke.at, note: stroke.note })));
-      strokes.forEach((stroke, index) => { stroke.limb = limbs[index]; });
-      const resolved = await drumKit.loadHitImages(art, strokes);
-      return {
-        draw: (ctx, rect, at) => drumKit.draw(ctx, rect, art, at, strokes, resolved),
-        missing: drumKit.missingSummary(strokes),
-      };
-    } catch (error) {
-      console.warn('Drum kit pictures unavailable; drawing the lane chart instead.', error);
-      setStatus(`Drum kit unavailable (${error.message || error}). Drawing the lane chart instead.`);
-      return null;
+    if (!drumKit) throw new Error('The drum kit module is not loaded, so no kit pictures are available.');
+    // The bucket's manifest is the authority on which kits exist (§၁၀), so
+    // it is read before the kit is looked up: a kit uploaded to R2 must
+    // reach the video without a code change.
+    const manifest = drumKit.loadManifest ? await drumKit.loadManifest() : null;
+    if (manifest?.source === 'built-in' && manifest.error) {
+      console.warn(`The drum kit manifest could not be read (${manifest.error}); using the built-in kit list.`);
     }
+    const name = `${settings.brand}/${settings.model}`;
+    if (!drumKit.KITS[name]) {
+      throw new Error(`No drum kit is known by the name "${name}".`);
+    }
+    setStatus('Loading the drum kit from R2…');
+    const art = await drumKit.loadArt(name, settings.ratio);
+    const strokes = hits
+      .filter((hit) => Number.isFinite(hit.midi))
+      .map((hit) => ({ note: hit.midi, at: hit.at }));
+    const limbs = drumKit.solveLimbs(strokes.map((stroke) => ({ time: stroke.at, note: stroke.note })));
+    strokes.forEach((stroke, index) => { stroke.limb = limbs[index]; });
+    const resolved = await drumKit.loadHitImages(art, strokes);
+    return {
+      draw: (ctx, rect, at) => drumKit.draw(ctx, rect, art, at, strokes, resolved),
+      missing: drumKit.missingSummary(strokes),
+    };
   }
 
-  async function drawPerformance(ctx, at, hits, duration, settings, meta, kit, notationState) {
+  async function drawPerformance(ctx, at, settings, meta, kit, notationState) {
     const { width, height } = settings.size;
     const palette = getPalette(settings.color);
 
     ctx.fillStyle = palette.background;
     ctx.fillRect(0, 0, width, height);
-    const glow = ctx.createRadialGradient(width * 0.72, height * 0.12, 4, width * 0.72, height * 0.12, Math.max(180, width * 0.4));
-    glow.addColorStop(0, hexToRgba('#f20d3d', settings.color === 'white' ? 0.1 : 0.24));
-    glow.addColorStop(1, hexToRgba('#f20d3d', 0));
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, width, height * 0.55);
 
     await engine.composeFrame(ctx, {
       instrument: selectedTool,
@@ -434,10 +369,13 @@
       parts: {
         title: (target, rect) => engine.drawTitlePart(target, rect, at, meta, palette, settings),
         notation: (target, rect) => engine.drawNotationPart(target, rect, at, notationState, palette),
-        instrument: (target, rect) => (kit
-          ? kit.draw(target, rect, at)
-          : drawInstrumentPart(target, rect, at, hits, duration, settings, palette)),
+        instrument: (target, rect) => kit.draw(target, rect, at),
       },
+    });
+    // Outside composeFrame's bands: the reference picture puts this mark on
+    // the frame's own corner, over whatever band happens to be there.
+    engine.drawCornerLogo(ctx, {
+      width, height, palette, image: settings.cornerLogoImage,
     });
   }
 
@@ -451,7 +389,10 @@
     return meta.beats * beatSeconds;
   };
 
-  /** The count-in frame: the Title band, and the count called out large. */
+  /**
+   * The count-in frame: the Title band, whose COUNT box is the count. The
+   * count has one home on the frame, so nothing here draws it a second time.
+   */
   async function drawCountIn(ctx, at, settings, meta) {
     const { width, height } = settings.size;
     const palette = getPalette(settings.color);
@@ -465,16 +406,7 @@
         title: (target, rect) => engine.drawTitlePart(target, rect, at, meta, palette, settings),
       },
     });
-    const tokens = engine.countTokens(settings.countDisplay, meta.beats);
-    const active = engine.currentCountToken(tokens, settings.countDisplay, meta, at);
-    if (active < 0 || active >= tokens.length) return;
-    ctx.save();
-    ctx.fillStyle = palette.accent;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.font = `700 ${Math.round(Math.min(width, height) * 0.22)}px Inter, system-ui, sans-serif`;
-    ctx.fillText(tokens[active], width / 2, height / 2);
-    ctx.restore();
+    engine.drawCornerLogo(ctx, { width, height, palette, image: settings.cornerLogoImage });
   }
 
   /**
@@ -527,32 +459,57 @@
    * The drum performance as one AudioBuffer covering the whole video,
    * count-in included: the count is spoken over a click, so a silent
    * count-in would leave the first bar out of time with the picture.
+   *
+   * The spoken count is its own sound, not a property of the drum model,
+   * so it is heard even when the drum model is Visual Only.
    */
   async function createDrumAudio({ settings, hits, countIn, duration, meta }) {
-    const model = SOUND_MODELS[settings.soundModel] || SOUND_MODELS.visual;
-    if (model.level === 0) return null;
+    // §၅: a page with no Sound Model chosen still gets its drums heard.
+    const model = SOUND_MODELS[settings.soundModel] || SOUND_MODELS.natural;
+    const wantsDrums = model.level > 0;
+    // A count-in of zero seconds has nothing to count, so asking for the
+    // recordings there would be a download with no sound behind it.
+    const wantsCount = settings.countEnabled && countIn > 0;
+    if (!wantsDrums && !wantsCount) return null;
     const OfflineContext = window.OfflineAudioContext || window.webkitOfflineAudioContext;
     if (!OfflineContext) throw new Error('This browser cannot synthesize the drum sound. Try a current version of Chrome, Edge, Safari, or Firefox.');
+
+    // The recordings are fetched before the context is built: an offline
+    // render cannot wait for a network read once it has started.
+    const voices = wantsCount ? await engine.countVoiceSamples(meta.beats, settings.countVoice) : [];
 
     const sampleRate = 48000;
     const total = countIn + duration;
     const context = new OfflineContext(2, Math.max(1, Math.ceil(total * sampleRate)), sampleRate);
 
     const soundGain = settings.soundVolume / 100;
-    for (const hit of hits) {
-      addStroke(context, hit.type, countIn + hit.at, soundGain, model);
+    if (wantsDrums) {
+      for (const hit of hits) {
+        addStroke(context, hit.type, countIn + hit.at, soundGain, model);
+      }
     }
 
-    if (settings.countEnabled) {
+    if (wantsCount) {
       const beatSeconds = (60 / Math.max(1, meta.bpm)) * (4 / Math.max(1, meta.beatType));
       const countGain = settings.countVolume / 100;
       for (let beat = 0; beat < meta.beats; beat += 1) {
         const at = beat * beatSeconds;
         if (at >= countIn) break;
-        // The count is a woodblock: a bright click on every beat, the
-        // downbeat higher, so the player hears where the bar starts.
+        // The count is a woodblock under the voice: a bright click on every
+        // beat, the downbeat higher, so the player hears where the bar
+        // starts even if a recording is missing.
         addStroke(context, 'hihat', at, countGain * 0.8, model);
         if (beat === 0) addStroke(context, 'snare', at, countGain * 0.35, model);
+        const voice = voices[beat];
+        if (voice) {
+          const source = context.createBufferSource();
+          const gain = context.createGain();
+          source.buffer = voice;
+          gain.gain.value = countGain;
+          source.connect(gain);
+          gain.connect(context.destination);
+          source.start(at);
+        }
       }
     }
 
@@ -603,7 +560,7 @@
     if (countIn > 0) {
       segments.push({ seconds: countIn, draw: (ctx, at) => drawCountIn(ctx, at, settings, meta) });
     }
-    segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, hits, duration, settings, meta, kit, notationState) });
+    segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, settings, meta, kit, notationState) });
 
     // The sound spans the count-in and the performance together, so it
     // rides on the first of those two segments and starts at zero.
@@ -611,7 +568,7 @@
     if (audio) segments[0].audio = audio;
     // The Plan's last part of the length: the Thank You clip. The engine
     // owns its address and shape, so the page only asks for it.
-    const ending = await engine.thankYouSegment(settings.size.width, settings.size.height);
+    const ending = await engine.thankYouSegment(settings.size.width, settings.size.height, { instrument: 'drum', color: settings.color });
     if (ending) segments.push(ending);
     return { segments, audio, meta, source, notationState, countIn, duration, kit };
   }
@@ -622,14 +579,6 @@
   // canvas is what the file will hold. It never touches an encoder.
   // ---------------------------------------------------------------
 
-  const PREVIEW_LONG_SIDE = 960;
-  const PREVIEW_MIN_LONG_SIDE = 480;
-  const PREVIEW_TARGET_FPS = 24;
-  // A long score would need a soundtrack buffer measured in hundreds of
-  // megabytes just to preview it; past this the preview stays silent and
-  // says so, and the export still carries the sound.
-  const PREVIEW_AUDIO_LIMIT = 600;
-
   const preview = {
     plan: null,
     size: null,
@@ -638,6 +587,10 @@
     audioBuffer: null,
     audioContext: null,
     source: null,
+    // When the buffer is playing the audio clock is the master: the frame
+    // and the timeline follow it, so the picture cannot drift from the sound.
+    audioStartedAt: 0,
+    audioOffset: 0,
     startedAt: 0,
     offset: 0,
     playing: false,
@@ -645,16 +598,14 @@
     token: 0,
     drawing: false,
     pendingAt: null,
-    frames: 0,
-    measuredAt: 0,
-    slowStrikes: 0,
   };
 
-  /** The preview's own frame size: same ratio, smaller pixels. */
-  const previewSizeFor = (size) => {
-    const scale = Math.min(1, PREVIEW_LONG_SIDE / Math.max(size.width, size.height));
-    return { width: Math.round(size.width * scale), height: Math.round(size.height * scale) };
-  };
+  /**
+   * The preview draws at the export's own pixel size (§၁၅): the canvas is
+   * 1920x1080 (or 1080x1080 / 1080x1920) and CSS scales it down into the
+   * stage. A smaller canvas would be a different picture, not the same one.
+   */
+  const previewSizeFor = (size) => ({ width: size.width, height: size.height });
 
   const previewVisible = () => Boolean(preview.plan) && !previewCanvas?.hidden;
 
@@ -726,7 +677,12 @@
     if (timeLabel) timeLabel.textContent = `${formatTime(shown)} / ${formatTime(total)}`;
   }
 
-  const previewClock = () => preview.offset + (performance.now() - preview.startedAt) / 1000;
+  const previewClock = () => {
+    if (preview.playing && preview.source && preview.audioContext) {
+      return preview.audioOffset + (preview.audioContext.currentTime - preview.audioStartedAt);
+    }
+    return preview.offset + (performance.now() - preview.startedAt) / 1000;
+  };
 
   function previewTick() {
     if (!preview.playing) return;
@@ -738,26 +694,6 @@
       updatePreviewControls(preview.seconds);
       return;
     }
-    // The auto-shrink watches the frames actually drawn: a machine that
-    // cannot hold 24 fps at 960 px is asked to hold it at half that.
-    const now = performance.now();
-    preview.frames += 1;
-    if (!preview.measuredAt) preview.measuredAt = now;
-    else if (now - preview.measuredAt >= 1000) {
-      const fps = (preview.frames * 1000) / (now - preview.measuredAt);
-      preview.frames = 0;
-      preview.measuredAt = now;
-      if (fps < PREVIEW_TARGET_FPS && preview.size && Math.max(preview.size.width, preview.size.height) > PREVIEW_MIN_LONG_SIDE) {
-        preview.slowStrikes += 1;
-        if (preview.slowStrikes >= 2) {
-          preview.slowStrikes = 0;
-          void shrinkPreview();
-          return;
-        }
-      } else {
-        preview.slowStrikes = 0;
-      }
-    }
     void drawPreviewFrame(at);
     preview.rafId = requestAnimationFrame(previewTick);
   }
@@ -767,15 +703,13 @@
     if (preview.offset >= preview.seconds) preview.offset = 0;
     preview.startedAt = performance.now();
     preview.playing = true;
-    preview.frames = 0;
-    preview.measuredAt = 0;
     if (playButton) playButton.textContent = '❚❚';
     stage?.classList.add('is-playing');
-    // Starting the sound can wait on the audio context; a pause that lands
-    // in that gap must win, or the clock would come back on its own.
-    await startPreviewAudio(preview.offset);
-    if (!preview.playing) return;
+    // The picture starts at once: a browser that has not opened its audio
+    // context yet must not freeze the frame. The sound joins the running
+    // clock when the context opens, and from then on it is the master.
     preview.rafId = requestAnimationFrame(previewTick);
+    void startPreviewAudio(preview.offset);
   }
 
   function pausePreview() {
@@ -786,31 +720,28 @@
 
   async function startPreviewAudio(offset) {
     if (!preview.audioBuffer) return;
-    try {
-      if (!preview.audioContext) preview.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-      if (preview.audioContext.state === 'suspended') await preview.audioContext.resume();
-      if (preview.source) { try { preview.source.stop(); } catch { /* already stopped */ } preview.source.disconnect(); }
-      const source = preview.audioContext.createBufferSource();
-      source.buffer = preview.audioBuffer;
-      source.connect(preview.audioContext.destination);
-      source.start(0, Math.min(offset, Math.max(0, preview.audioBuffer.duration - 0.01)));
-      preview.source = source;
-    } catch (error) {
-      setStatus(`Live preview is visual only: ${error.message || error}`);
+    if (!preview.audioContext) preview.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    if (preview.audioContext.state === 'suspended') await preview.audioContext.resume();
+    // §၅: a preview that looks audible but is not is the failure the Plan
+    // names. A context the browser refuses to open is said out loud.
+    if (preview.audioContext.state !== 'running') {
+      setSource('preview', 'Live preview · sound blocked');
+      setStatus('The browser blocked the preview sound. Press Play again to allow it.');
+      return;
     }
-  }
-
-  /** The preview rebuilt at a smaller size, because it could not keep up. */
-  async function shrinkPreview() {
-    if (!preview.settings || !preview.size) return;
-    const next = {
-      width: Math.max(2, Math.round(preview.size.width / 2)),
-      height: Math.max(2, Math.round(preview.size.height / 2)),
-    };
-    const at = previewClock();
-    const wasPlaying = preview.playing;
-    stopPreviewClock();
-    await startPreview(preview.settings, { size: next, at, autoplay: wasPlaying });
+    if (preview.source) { try { preview.source.stop(); } catch { /* already stopped */ } preview.source.disconnect(); }
+    // The context can take a moment to open; the picture has been running
+    // meanwhile, so the sound joins it where it is rather than where Play
+    // was pressed.
+    const wanted = preview.playing ? previewClock() : offset;
+    const start = Math.min(wanted, Math.max(0, preview.audioBuffer.duration - 0.01));
+    const source = preview.audioContext.createBufferSource();
+    source.buffer = preview.audioBuffer;
+    source.connect(preview.audioContext.destination);
+    source.start(0, start);
+    preview.source = source;
+    preview.audioOffset = start;
+    preview.audioStartedAt = preview.audioContext.currentTime;
   }
 
   /**
@@ -844,10 +775,14 @@
       if (playButton) playButton.disabled = false;
       if (timeline) timeline.disabled = false;
       preview.offset = Math.min(Math.max(0, at), Math.max(0, plan.seconds - 1 / FPS));
-      setSource('preview', plan.seconds > PREVIEW_AUDIO_LIMIT ? 'Live preview · visual only' : 'Live preview');
+      setSource('preview', 'Live preview');
       await drawPreviewFrame(preview.offset);
       if (token !== preview.token) return;
-      if (plan.seconds <= PREVIEW_AUDIO_LIMIT) void loadPreviewAudio(plan, token);
+      // §၅: the sound is built before Play is offered, however long the
+      // score is. A preview that opens silent and finds its voice later
+      // would be the one thing the Plan rules out.
+      await loadPreviewAudio(plan, token);
+      if (token !== preview.token) return;
       if (autoplay) await playPreview();
     } catch (error) {
       if (token !== preview.token) return;
@@ -858,13 +793,20 @@
   async function loadPreviewAudio(plan, token) {
     try {
       const buffer = await engine.timelineAudio(plan);
-      if (token !== preview.token || !buffer) return;
+      if (token !== preview.token) return;
+      // Visual Only has no sound to prepare; saying so is the honest label,
+      // and it is the same words the export uses.
+      if (!buffer) { setSource('preview', 'Live preview · visual only'); return; }
       preview.audioBuffer = buffer;
       setSource('preview', 'Live preview · with sound');
       if (preview.playing) await startPreviewAudio(previewClock());
-    } catch {
-      // A silent preview is still a preview; the export carries the sound.
-      if (token === preview.token) setSource('preview', 'Live preview · visual only');
+    } catch (error) {
+      // §၅: a preview the user believes is audible but is not is worse than
+      // one that says it failed. Say so; the export still carries the sound.
+      if (token === preview.token) {
+        setSource('preview', 'Live preview · sound unavailable');
+        setStatus(`Live preview has no sound: ${error.message || error}`);
+      }
     }
   }
 
@@ -945,9 +887,12 @@
       // The status names the drum sound, because that is the part the
       // Sound Model controls. The Thank You clip carries its own sound
       // whether or not the drums do, so claiming the whole file is silent
-      // would be a lie once the ending is attached.
+      // would be a lie once the ending is attached. The spoken count is a
+      // sound of its own too, so Visual Only with a count-in is not silent.
       const audioNote = audio
-        ? `${settings.soundModel} drum sound`
+        ? (SOUND_MODELS[settings.soundModel]?.level > 0
+          ? `${settings.soundModel} drum sound`
+          : 'count voice only')
         : 'visual only · no drum sound';
       // A kit that had no picture for a note leaves that stroke unlit. Say
       // so, rather than shipping a video with a silent hole in it.
@@ -998,6 +943,7 @@
       preview.offset = Math.min(at, Math.max(0, preview.seconds - 1 / FPS));
       if (preview.playing) {
         preview.startedAt = performance.now();
+        if (preview.source) { try { preview.source.stop(); } catch { /* already stopped */ } preview.source.disconnect(); preview.source = null; }
         void startPreviewAudio(preview.offset);
       }
       void drawPreviewFrame(preview.offset);
@@ -1028,12 +974,26 @@
   settingsForm?.addEventListener('submit', (event) => event.preventDefault());
   // The bucket names a kit by brand AND model, so the model list is the
   // brand's own: a model left over from another brand would name a folder
-  // that does not exist and the render would quietly lose its kit.
-  const syncModelOptions = () => {
+  // that does not exist and the render would quietly lose its kit. Both
+  // lists follow the bucket's manifest, so a brand it adds is selectable
+  // without touching the page.
+  const syncKitOptions = () => {
     const kits = window.DrumKit?.KITS;
-    if (!drumModel || !kits) return;
-    const brand = drumBrand?.value;
-    const models = Object.values(kits).filter((kit) => kit.brand === brand);
+    if (!drumBrand || !drumModel || !kits) return;
+    const entries = Object.values(kits);
+    const previousBrand = drumBrand.value;
+    const brands = [...new Set(entries.map((kit) => kit.brand))];
+    if (brands.length) {
+      drumBrand.replaceChildren(...brands.map((brand) => {
+        const kit = entries.find((entry) => entry.brand === brand);
+        const option = document.createElement('option');
+        option.value = brand;
+        option.textContent = kit?.brandLabel || brand;
+        return option;
+      }));
+      drumBrand.value = brands.includes(previousBrand) ? previousBrand : brands[0];
+    }
+    const models = entries.filter((kit) => kit.brand === drumBrand.value);
     if (!models.length) return;
     const previous = drumModel.value;
     drumModel.replaceChildren(...models.map((kit) => {
@@ -1044,8 +1004,11 @@
     }));
     drumModel.value = models.some((kit) => kit.model === previous) ? previous : models[0].model;
   };
-  syncModelOptions();
-  drumBrand?.addEventListener('change', syncModelOptions);
+  syncKitOptions();
+  drumBrand?.addEventListener('change', syncKitOptions);
+  // The lists above start from the built-in table; the bucket's manifest is
+  // the authority, so they are rebuilt once it answers.
+  window.DrumKit?.loadManifest?.().then(syncKitOptions).catch(() => {});
   [titleOne, titleOneColor, titleOneSize, titleTwo, titleTwoColor, titleTwoSize, drumBrand, drumModel, notationView, soundModel, soundVolume, countVoiceEnabled, countVoice, countVolume, countDisplay, videoColor, videoRatio].forEach((control) => {
     control?.addEventListener('input', () => { syncControlState(); schedulePreview(); });
     control?.addEventListener('change', () => { syncControlState(); schedulePreview(); });
@@ -1104,6 +1067,10 @@
   logoImage = new Image();
   logoImage.onload = () => schedulePreview();
   logoImage.src = DEFAULT_LOGO;
+
+  cornerLogoImage = new Image();
+  cornerLogoImage.onload = () => schedulePreview();
+  cornerLogoImage.src = CORNER_LOGO;
   syncControlState();
   // The Plan opens the preview as soon as the settings are valid, so the
   // page never shows an empty stage while a render is still unasked for.

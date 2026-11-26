@@ -55,7 +55,7 @@ Implemented behavior:
 - Generate Video re-renders the captured drum event log using the current settings.
 - Phone layout collapses the settings fields into a single-column form while preserving the same controls.
 
-Drum-specific limitations: MusicXML and Sound Model/Count Voice behavior follow the status recorded in the Studio history below; Drum export remains visual-only. Metronome has its separate synthesized click-track adapter. Guitar is connected through `studio-guitar.js` with its own tablature reader and Canvas painter; Piano and Bass are connected the same way through `studio-piano.js` and `studio-bass.js`, and Strings draws the violin through `studio-violin.js`. Nothing marks the violin: it has no frets and no fingering engine, so only the drawing is placed in the frame. Voice is connected through `studio-voice.js`: it decodes an imported audio file or a microphone recording into an `AudioBuffer` and passes that buffer as the segment's audio, so the export is audible rather than a silent waveform.
+Drum-specific limitations: MusicXML and Sound Model/Count Voice behavior follow the status recorded in the Studio history below. The Drum export is no longer visual-only: `studio-video.js` synthesizes the kit and plays R2's `Voices/{n}.wav` over the count-in. Metronome has its separate synthesized click-track adapter. Guitar is connected through `studio-guitar.js` with its own tablature reader and Canvas painter; Piano and Bass are connected the same way through `studio-piano.js` and `studio-bass.js`, and Strings draws the violin through `studio-violin.js`. Nothing marks the violin: it has no frets and no fingering engine, so only the drawing is placed in the frame. Voice is connected through `studio-voice.js`: it decodes an imported audio file or a microphone recording into an `AudioBuffer` and passes that buffer as the segment's audio, so the export is audible rather than a silent waveform.
 
 Verification for this update: Studio JavaScript syntax and control-marker checks passed; Video Engine source-to-production sync check passed; existing Video Engine automated tests passed (20/20); Wrangler nested deployment dry-run passed. The public Worker still serves the previous deployment until a commit is pushed and Cloudflare deploy is run.
 
@@ -84,15 +84,26 @@ The standard 16:9 export is now `1920×1080`; square and portrait exports are `1
 - `OfflineAudioContext` မှ bar downbeat accent ပါသော mono click-track `AudioBuffer` ကို adapter ကဖန်တီးပြီး shared Video Engine သို့ပေးသည်။ ဤ click track သည် Sound Engine မဟုတ်ပါ။ WebCodecs/MediaRecorder support အလိုက် MP4 သို့မဟုတ် WebM ထွက်နိုင်သည်။ စမ်းသပ်ထားသော Chromium run တွင် VP8 video နှင့် 48 kHz mono Opus audio ထွက်ခဲ့သည်။
 - UI တွင် opening-frame preview, progress/cancel, output preview, play/seek/download ပါဝင်သည်။ Metronome card click navigation ကို Chromium integration test ဖြင့်စစ်ထားသည်။
 
+## Drum Studio — R2 kit manifest မှ kit စာရင်းဖတ်ခြင်း (B8၊ 2026-11-18)
+
+- **ပြဿနာ** — Main Plan §၁၀ က Drum Animation Engine သည် R2 ထဲရှိ Drum data ကို **manifest မှ ဖတ်၍ မကျန်အောင်** ပြရမည်၊ ဖိုင်အမည်ကို code ထဲ hard-code မလုပ်ရ ဟု ဆိုသည်။ ယခင် `drum-kit.js` တွင် kit စာရင်း (`RolandDrums/VAD716` စသည်) နှင့် ပုံအမည် (`Drum Bg.png`, `R38.png`) ကို code ထဲ တိုက်ရိုက် ရေးထားခဲ့သည်။ R2 သို့ kit အသစ် တင်လျှင် code ပြင်ရသည်။
+- **ပြင်ဆင်မှု** — `DrumKit.loadManifest()` က `drums/manifest.json` ကို ဖတ်ပြီး kit စာရင်းကို အစားထိုးသည်။ Manifest entry တစ်ခုစီသည် `brand`, `brandLabel`, `model`, `label`, `background`, `ratios`, `hits` ကို ပေးနိုင်သည်။ `background` နှင့် `hits` ပါလျှင် ထို အမည်များကို သုံးသည်၊ မပါလျှင် ယခင် အမည်သတ်မှတ်စည်းမျဉ်းအတိုင်း ဆက်လုပ်သည်။ Manifest ကို page တစ်ခုလျှင် တစ်ကြိမ်သာ ဖတ်သည် (`loadManifest({ reload: true })` ဖြင့် အတင်းပြန်ဖတ်နိုင်သည်) — preview တစ်ချီ rebuild တိုင်း ပြန် download မလုပ်ပါ။
+- **UI** — Drum Brand / Drum Model ရွေးချယ်မှု နှစ်ခုလုံးကို manifest ထဲက kit စာရင်းမှ တည်ဆောက်သည်။ ယခင် HTML တွင် hard-code ထားသော `RolandDrums`/`MSDrums` စာရင်းကို အစားထိုးသဖြင့် R2 သို့ brand အသစ် တင်လျှင် ရွေးနိုင်သည်။ Brand အမည်ကို `brandLabel` ဖြင့် ပေးသည် (မပါလျှင် folder အမည်အတိုင်း)။
+- **မရလျှင်** — Manifest မရ (404/ကွက်လပ်/ဖတ်မရ) ဖြစ်လျှင် ယခင် kit စာရင်းကို ဆက်သုံးပြီး `manifestState().error` တွင် အကြောင်းရင်းကို မှတ်ထားသည်။ `studio-video.js` က ၎င်းကို console warning အဖြစ် ပြသည် — တိတ်တိတ် မကျော်ပါ။
+- **မရှိသော ပုံ** — Manifest က စာရင်းတင်ထားသော်လည်း R2 တွင် ပုံမရှိသော kit ကို `no background picture` ဟု ငြင်းပယ်သည်; stroke တစ်ခုအတွက် ပုံမရှိလျှင် ယခင်အတိုင်း `missingSummary()` က note နံပါတ်ကို အမည်တပ်ပြသည်။
+- **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် (၁) manifest 404 ဖြစ်လျှင် kit စာရင်း မပြောင်း၊ `source: 'built-in'` နှင့် အကြောင်းရင်း ရှိကြောင်း; (၂) manifest ရလျှင် kit စာရင်း၊ label၊ `brandLabel`၊ background default၊ ratios နှင့် `hits` အမည်များ တိတိကျကျ လိုက်နာကြောင်း; (၃) ပုံမရှိသော manifest kit ကို ငြင်းပယ်ကြောင်း စစ်သည်။
+
+**လက်ကျန်:** R2 တွင် `drums/manifest.json` မရှိသေးပါ (404)။ ထို့ကြောင့် ယခု အခြေအနေတွင် built-in စာရင်းကို ဆက်သုံးသည် — behavior မပြောင်းပါ။ Manifest ကို R2 သို့ တင်ပြီးပါက ကုဒ် ပြင်ရန် မလိုဘဲ kit/brand အသစ် ပေါ်လာမည်။
+
 ## Drum Studio — ဗီဒီယိုထဲတွင် ဒရမ်အသံ (2026-11-24)
 
 - **အသံ ချိတ်ပြီးပါပြီ။** ယခင် Drum export သည် အသံမပါသော ဗီဒီယိုသာ ဖြစ်ပြီး Sound Model ရွေးလျှင် status တွင် "audio adapter pending" ဟု ပြခဲ့သည်။ ယခု `studio-video.js` က `OfflineAudioContext` ဖြင့် ဒရမ်အသံကို တိုက်ရိုက် ဖန်တီးပြီး segment ၏ `audio` အဖြစ် Video Engine သို့ ပေးသည်။ Metronome adapter ၏ နည်းလမ်းအတိုင်း ဖြစ်သည် — Plan က `Sound Engine` folder ကို implementation ရှိသကဲ့သို့ မယူဆရန် ဆိုထားသဖြင့် adapter ကိုယ်တိုင် synthesize လုပ်သည်။
 - **အသံ ၃ မျိုး** — kick (နိမ့်သော tone ကျဆင်းမှု၊ noise နည်း)၊ snare (အလယ် tone + noise များ)၊ hi-hat (မြင့်သော tone + noise များ)။ noise ကို ပုံသေ seed ဖြင့် ဖန်တီးသဖြင့် render တစ်ချီနှင့်တစ်ချီ ထပ်တူဖြစ်သည်။
 - **Sound Model ၄ မျိုး** — Visual Only (အသံ လုံးဝမထုတ်)၊ Natural၊ Studio၊ Room။ တစ်ခုစီသည် room length နှင့် brightness ဖြင့် ကွဲပြားသည်။ ရွေးထားသော model ကို status တွင် ပြသည်။
-- **Count Voice အသံ** — Count Voice On ဖြစ်လျှင် count-in ကို ကြိမ်သံဖြင့် တီးသည် (downbeat တွင် ပိုမြင့်သည်)။ count-in သည် အသံပါသော segment ဖြစ်သဖြင့် ပထမ bar သည် ရုပ်နှင့် အသံ ကိုက်ညီသည်။
+- **Count Voice အသံ** — Count Voice On ဖြစ်လျှင် count-in တွင် R2 ၏ `Voices/{n}.wav` ကို ကြိမ်သံအပေါ် ထပ်တွဲ တီးသည် (downbeat တွင် ပိုမြင့်သည်)။ count-in သည် အသံပါသော segment ဖြစ်သဖြင့် ပထမ bar သည် ရုပ်နှင့် အသံ ကိုက်ညီသည်။
 - **Status မှန်ကန်မှု** — ယခင် "silent visual video" ဟု အမြဲပြခဲ့သည်။ ယခု ဒရမ်အသံ မပါလျှင် "visual only · no drum sound"၊ ပါလျှင် "<model> drum sound" ဟု ပြသည်။ Thank You clip တွင် ကိုယ်ပိုင်အသံ ပါသဖြင့် ဖိုင်တစ်ခုလုံးကို "silent" ဟု မခေါ်တော့ပါ။
 - **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် case ၂ ခု ထည့်သည်: (၁) Visual Only သည် audio stream မထုတ်ကြောင်း၊ status က ဒရမ်အသံမရှိကြောင်း ပြောကြောင်း; (၂) Natural သည် audio stream ထုတ်ကြောင်း၊ peak > 3000 ရှိကြောင်း၊ beat ပေါ်တွင် ကျကြောင်း (beat ပေါ် peak သည် beat ကြားထက် ၂ ဆ ကျော်)။ နှစ်ခုလုံးအတွက် Thank You clip ကို ဖယ်ထားသည် — clip ၏ ကိုယ်ပိုင်အသံက ဒရမ်အသံကို ဖုံးလွှမ်းမည် ဖြစ်သောကြောင့်။
-- **ကျန်ရှိ** — count ကို စကားဖြင့် (spoken "one, two, three, four") မခေါ်သေးဘဲ ကြိမ်သံဖြင့်သာ တီးသည်။ Count Voice အသံဖိုင် (သို့) speech synthesis ကို နောက်ပိုင်း ချိတ်ရန် ကျန်သည်။
+- **ကျန်ရှိ** — `Voices/{n}.wav` တွင် ၁–၇ အထိသာ ရှိသည်။ ထို့ကြောင့် ရှစ်ခုနှင့်အထက် beat ရှိသော metre (ဥပမာ 8/4၊ 12/8) တွင် ပထမ ၇ beat သာ အသံထွက်ပြီး ကျန်သည်မှာ ကြိမ်သံသာ ဖြစ်သည်။ ဖိုင်များ R2 သို့ တင်ပြီးပါက ကုဒ် ပြင်ရန် မလိုပါ။
 
 **အတည်ပြုထားသော စမ်းသပ်မှုများ:** Metronome Engine verify 20/20; Video Engine muxer 15/15; cleanup/safety 5/5; Video Engine MP4 smoke, updated Drum settings/export regression နှင့် Metronome card-to-export browser integration pass. Metronome test output: 3/8, quarter-note 96 BPM, 1 bar, 28 frames/0.933 sec, 1080×1920 VP8 + 48kHz mono Opus; `ffprobe` က stream နှစ်ခုလုံးကိုဖတ်နိုင်သည်။ Test သည် ယခု ratio ၃ မျိုးလုံးကို တိုင်းသည် — 16:9 = 1920×1080၊ 1:1 = 1080×1080၊ 9:16 = 1080×1920။ 375×812 phone နှင့် 1280×900 desktop viewport တွင် horizontal overflow မရှိ။ ဖုန်းအစစ်၊ Safari/Firefox နှင့် MediaRecorder-only fallback ကို မစစ်ရသေးပါ။
 
@@ -104,7 +115,7 @@ Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Eng
 - Hit အချိန်များကို ဖိုင်၏ tempo map အတိုင်း (`api.tickToSeconds`) တွက်သည်။ ယခင် ပုံသေ `QUARTER_SECONDS = 0.5` (120 BPM) ကြောင့် tempo ကွာသော score တွင် lane marker နှင့် notation cursor မကိုက်ညီဖြစ်ခဲ့သည်။ ဖိုင်တွင် tempo မပါမှသာ 120 BPM ကို သုံးသည်။
 - Default drum pattern ကို quarter ၈ ခု (၂ bar) အနေဖြင့် ပြင်ရေးပြီး score နှင့် တူညီသော tempo map ဖြင့် အချိန်ချိန်သည်။
 - Chromium စမ်းသပ်မှုတွင် ၄/၄ bar ၄ ခု၊ 60 BPM (စက္ကန့် ၁၆) score ကို `ffprobe` ဖြင့် တိုင်းပြီး အရှည်မှန်ကန်ကြောင်း အတည်ပြုထားသည်။ ဖုန်း/desktop layout၊ 16:9 နှင့် 9:16 output၊ notation band နှင့် cursor စစ်ဆေးချက်များ ဆက်လက် အောင်မြင်သည်။
-- ကျန် ကန့်သတ်ချက် — Video Engine ၏ memory guard သာ safety အဖြစ် ကျန်သည်။ Drum အသံ နှင့် Count Voice အသံ မချိတ်ရသေးပါ။
+- ကျန် ကန့်သတ်ချက် — Video Engine ၏ memory guard သာ safety အဖြစ် ကျန်သည်။ Drum အသံ နှင့် Count Voice အသံ နှစ်ခုလုံး ယခု ချိတ်ပြီးပါပြီ (အောက်ပါ အပိုင်းများကို ကြည့်ပါ)။
 
 ## Drum Studio — voice နှစ်ခုနှင့် repeat ပါသော score (2026-11-23)
 
@@ -113,9 +124,30 @@ Implementation Plan/Doc: [Metronome Engine Plan](../../Metronome/Metronome%20Eng
 - **Notation cursor** — `video-engine.js` သည် ယခင် `secondsToTick` ဖြင့်သာ တွက်သဖြင့် repeat ဒုတိယချီတွင် cursor က ရှေ့ဆက် ရွေ့နေခဲ့သည်။ ယခု repeat ရှိလျှင် `api.performanceSecondsToWritten` ဖြင့် ဖတ်သဖြင့် pass အသစ်စတိုင်း cursor က repeat အစသို့ ပြန်ခုန်သည်။ repeat မရှိလျှင် ယခင် လမ်းကြောင်းအတိုင်း ဖြစ်သည်။
 - **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် case ၆ ခု ထည့်ထားသည်: 60 BPM ၄ bar (၁၆ စက္ကန့်)၊ voice ၂ ခု ၂ bar (၄ စက္ကန့်)၊ repeat ၂ bar (written ၄ → played ၈ စက္ကန့်)၊ drum + bass part ၂ ခု (၄ စက္ကန့်)၊ Count Voice ဖွင့်ထားသော ၂ bar (၂ + ၄ = ၆ စက္ကန့်)၊ Thank You clip ၂ စက္ကန့် ပါသော ၂ bar (၄ + ၂ = ၆ စက္ကန့်)။ ခြောက်ခုလုံးကို Chromium မှ render ပြီး `ffprobe` ဖြင့် အရှည်တိုင်းသည်။ နောက်ဆုံးတွင် clip ၏ ပုံနှင့် အသံ ပါကြောင်းပါ စစ်သည်။
 - **Part များ** — score ထဲတွင် drum အပြင် bass ကဲ့သို့ အခြား part ပါလာလျှင် parser သည် part အားလုံး၏ measure များကို ဖတ်သဖြင့် video က score တစ်ခုလုံး စုပုံသလောက် ရှည်ခဲ့သည်။ ယခု percussion clef ရှိသော part (မရှိလျှင် unpitched note ရှိသော part) ကိုသာ drum performance အဖြစ် ဖတ်သည်။
-- **Count Voice count-in** — Plan §7 ၏ အရှည်စည်းမျဉ်းအရ video အရှည်တွင် count-in ပါသည်။ Count Voice ကို On ထားလျှင် score မစမီ bar တစ်ခု (score ၏ metre နှင့် tempo အတိုင်း) ကို segment အဖြစ် ထပ်ထည့်ပြီး ဗဟိုတွင် ရေတွက်သည့် ဂဏန်းကို ပြသည်။ 4/4၊ 120 BPM တွင် ၂ စက္ကန့် ဖြစ်သည်။
+- **Count Voice count-in** — Plan §7 ၏ အရှည်စည်းမျဉ်းအရ video အရှည်တွင် count-in ပါသည်။ Count Voice ကို On ထားလျှင် score မစမီ bar တစ်ခု (score ၏ metre နှင့် tempo အတိုင်း) ကို segment အဖြစ် ထပ်ထည့်သည်။ 4/4၊ 120 BPM တွင် ၂ စက္ကန့် ဖြစ်သည်။ **ရေတွက်သည့် ဂဏန်းကို count-in frame ၏ ဗဟိုတွင် သီးခြား မဆွဲတော့ပါ** — ရေတွက်မှု၏ တစ်ခုတည်းသော နေရာမှာ Title band ၏ COUNT ကွက်ဖြစ်သည်။ frame ဗဟိုသည် နောက်ခံအရောင်သာ ဖြစ်သည်။
 - **Thank You segment** — Plan §7 အရ video အရှည်တွင် Thank You clip ပါသည်။ ဖိုင်အမည်၊ R2 path နှင့် မရလျှင် လုပ်ပုံကို Engine ထဲတွင်သာ ထားသည် — `thankYouUrl()` က frame ၏ ပုံစံအလိုက် `thank-you/landscape.mp4`၊ `square.mp4`၊ `portrait.mp4` ကို ပြန်ပေးပြီး `thankYouSegment()` က segment တစ်ခု ထုတ်ပေးသည်။ Page က clip ၏ လိပ်စာကို မသိရပါ။ Clip ကို တစ်ကြိမ်သာ ယူပြီး cache လုပ်သည်; မရလျှင် export ကို မတားဘဲ အဆုံးပိုင်း မပါဘဲ ထွက်သည်၊ သို့သော် "မရ" ကို မမှတ်ထားပါ (နောက် export တွင် ပြန်ရှာသည်)။
-- **ကျန်ရှိ** — `MAX_SECONDS` ကဲ့သို့ ကိုယ်ပိုင် ကန့်သတ်ချက် မရှိတော့ပါ; Video Engine ၏ memory guard သာ safety အဖြစ် ကျန်သည်။ Count-in ၏ အသံ (Count Voice အသံဖိုင်) ကို မချိတ်ရသေးပါ။ R2 ထဲ Thank You ဖိုင် အမှန်တကယ် တင်ရန် ကျန်သည်။
+- **ကျန်ရှိ** — `MAX_SECONDS` ကဲ့သို့ ကိုယ်ပိုင် ကန့်သတ်ချက် မရှိတော့ပါ; Video Engine ၏ memory guard သာ safety အဖြစ် ကျန်သည်။ R2 ထဲ Thank You ဖိုင် အမှန်တကယ် တင်ရန် ကျန်သည်။
+
+## Drum Studio — count-in ဗဟိုဂဏန်း ဖြုတ်ခြင်း (2026-11-25)
+
+- **ပြဿနာ** — Count Voice ဖွင့်ထားသော video ၏ အစ count-in segment တွင် `drawCountIn()` က frame ဗဟို၌ ရေတွက်သည့် ဂဏန်းကို frame ၏ ၂၂% အရွယ်ဖြင့် သီးခြား ဆွဲခဲ့သည်။ ထို့ကြောင့် ရေတွက်မှုသည် နေရာ ၂ ခုတွင် ပေါ်ခဲ့သည် — Title band ၏ COUNT ကွက်နှင့် frame ဗဟို။
+- **ပြင်ဆင်မှု** — `studio-video.js` ၏ `drawCountIn()` မှ ဗဟိုဂဏန်း ဆွဲသည့် အပိုင်းကို ဖယ်သည်။ ယခု count-in frame တွင် Title band (TIME / BPM / COUNT ကွက်) နှင့် ထောင့် logo သာ ရှိသည်။ ရေတွက်မှု၏ တစ်ခုတည်းသော နေရာမှာ COUNT ကွက် ဖြစ်သည်။ Count Voice အသံသည် မပြောင်းလဲပါ — R2 မှ အသံသည် ယခင်အတိုင်း ကြိမ်သံအပေါ် ထပ်တီးသည်။
+- **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် case ၂ ခု ထည့်သည်: (၁) count-in frame ၏ အလယ် ၅၀% ဧရိယာတွင် နောက်ခံနှင့် မတူသော pixel ၀.၂% အောက်သာ ရှိကြောင်း (ဗဟိုဂဏန်း မရှိတော့ကြောင်း)၊ (၂) COUNT ကွက် ဧရိယာသည် beat ၁ နှင့် beat ၄ တွင် မတူညီကြောင်း (ရေတွက်မှု ဆက်အလုပ်လုပ်ကြောင်း)။
+
+## Drum Studio — Count ကို COUNT ကွက်တစ်နေရာတည်း ပြခြင်း (2026-11-18)
+
+- **ပြဿနာ** — `settings.infoBoxes` ဖွင့်ထားသော Drum ကဲ့သို့ page တွင် `drawInfoBand()` သည် `drawInfoBoxes()` (TIME/BPM/COUNT ကွက်) ကို ဆွဲပြီးနောက် `settings.countEnabled` ဖြစ်လျှင် `drawCountRow()` ကို ပါ ထပ်ခေါ်ခဲ့သည်။ ရလဒ်မှာ count တစ်ခုတည်းကို ကွက်ထဲတစ်ချက်၊ ကွက်အောက် row တစ်ချက် — နှစ်နေရာ ပြခဲ့သည်။
+- **ပြင်ဆင်မှု** — `infoBoxes` လမ်းကြောင်းတွင် `drawCountRow()` ခေါ်မှုကို ဖယ်သည်။ ယခု count သည် COUNT ကွက်ထဲတွင်သာ ပေါ်သည်။ `infoBoxes: false` ဖြစ်သော အခြား studio များအတွက် row က ဆက်လက် အလုပ်လုပ်သည်။
+- **စမ်းသပ်မှု** — `tools/test-drum-reference-browser.mjs` တွင် count token ကို တစ်ကြိမ်သာ ဆွဲကြောင်း၊ ဆွဲသည့်နေရာက BPM ကွက်၏ ဂဏန်းနှင့် တစ်တန်းတည်း ဖြစ်ကြောင်း တိုင်းထားသည်။
+
+## Drum Studio — Count Voice ကို R2 မှ အသံဖြင့် ချိတ်ခြင်း (2026-11-18)
+
+- **ဖိုင်နေရာ** — R2 public bucket တွင် `Voices/1.wav` … `Voices/7.wav` (နှင့် `M1`–`M4`) ရှိသည်။ `1.wav` နှင့် `M1.wav` သည် 1.5 s၊ ကျန်သည် 0.375 s၊ 44.1 kHz stereo။ `Counts  vocal/` (space နှစ်ခု) တွင်လည်း ထို ဖိုင်များ အတိအကျ ရှိသည် — MD5 တူသည်၊ ထို့ကြောင့် `Voices/` ၏ ပုံတူသာ ဖြစ်သည်။ `Counts vocal/` (space တစ်ခု)၊ `count-voice/` စသည်တို့မှာ 404 ဖြစ်သည်။
+- **နှစ်နာမည် ရှာခြင်း** — Engine က `Counts  vocal/{n}.wav` ကို အရင်တောင်းပြီး မရမှ `Voices/{n}.wav` သို့ ကျသည် (`COUNT_VOICE_BASES`)။ ထို့ကြောင့် folder တစ်ခုကို အမည်ပြောင်းခြင်း/ဖျက်ခြင်းက count အသံကို တိတ်မသွားစေပါ။ Cache key က ပထမလိပ်စာဖြစ်သဖြင့် beat တစ်ခုလျှင် တစ်ကြိမ်သာ ရှာသည်။
+- **Engine ဘက်** — `countVoiceUrls(beat)` နှင့် `countVoiceSamples(beats)` ကို `video-engine.js` တွင် ထည့်သည်။ Thank You clip နှင့် ပုံစံတူ — လိပ်စာနှင့် ဖိုင်အမည်ကို engine ထဲတွင်သာ ထားပြီး page က beat အရေအတွက်သာ တောင်းသည်။ decode လုပ်ပြီးသော buffer ကို cache လုပ်သည်; မရသော beat ကို မမှတ်ထားပါ။
+- **Adapter ဘက်** — `createDrumAudio()` သည် `countVoiceSamples(meta.beats)` ကို context မတည်မီ ယူပြီး beat တစ်ခုစီတွင် ကြိမ်သံအပေါ် `countVolume` ဖြင့် ထပ်တွဲသည်။ Count Voice သည် Sound Model ၏ အစိတ်အပိုင်း မဟုတ်သဖြင့် Visual Only တွင်လည်း အသံထွက်သည်။
+- **Status** — Visual Only + Count Voice ဖြစ်လျှင် "count voice only" ဟု ပြသည်; ယခင် "no drum sound" ဟု ပြခဲ့သည်မှာ မှားသည်။
+- **စမ်းသပ်မှု** — `tools/test-studio-video-browser.mjs` တွင် R2 ကို အစားထိုးပြီး (၁) အသံဖိုင် ရှိလျှင် beat ကြားကာလတွင် အသံ ပိုကျယ်ကြောင်း၊ (၂) count-in ပြီးနောက် score ထဲသို့ voice မကူးကြောင်း တိုင်းသည်။
 
 ## Piano Studio — key-only visual adapter (2026-11-23)
 
@@ -335,7 +367,12 @@ Adapter က export မစမီ လိုအပ်သော asset ကို က�
 - `titleSettings(options, palette)` က Title အရောင် မပေးလျှင် theme ၏ `titleOne`/`titleTwo` ကို ယူသည်၊ ထို့ကြောင့် White frame တွင် အဖြူစာလုံး မကျန်ပါ။
 - Page ဘက်တွင် `videoColor` ပြောင်းလျှင် အသုံးပြုသူ မပြင်ရသေးသော Title အရောင်များ နောက်လိုက်သည် (ကိုယ်တိုင်ရွေးထားသော အရောင်ကို မဖျက်ပါ)။ Notation cache key တွင် `color` ပါသဖြင့် အရောင်ပြောင်းလျှင် စာရွက် အသစ် ဆွဲသည်။
 
-**စမ်းသပ်မှု** — `tools/test-drum-reference-browser.mjs` က (၁) ratio တစ်ခုချင်းစီ၏ band အချိုး၊ (၂) TIME/BPM/COUNT ကွက်၏ နေရာနှင့် COUNT ၏ beat တိုင်းပြောင်းမှု၊ (၃) theme နှစ်ခုလုံးတွင် ink က နောက်ခံနှင့် ကွဲပြားမှု၊ (၄) live preview က Video Color ကို လိုက်မှု — အားလုံးကို တိုင်းသည်။
+**Cursor shape and the corner mark (§၁၃)** — ရည်ညွှန်းပုံတွင် နှစ်ချက် ပါသည်၊ ယခု ကုဒ်တွင် နှစ်ခုလုံး ရှိသည်။
+
+- **Cursor** — `prepareNotationFor()` သို့ `cursorShape: 'box'` ပေးလျှင် ကွက်သည် နှစ်ဖက်စလုံး အနီရောင် ထောင့်ဝိုင်းဘောင်ဖြင့် ဝိုင်းသည် (အတွင်းတွင် အနည်းငယ် ဖျော့ဖျော့ ဖြည့်သည်)။ မပေးလျှင် ယခင် ဒေါင်လိုက်မျဉ်း (`bar`) အတိုင်း။ နှစ်မျိုးလုံး `drawCursor()` တစ်ခုတည်းမှ ဆွဲပြီး အရောင်ကို `state.cursor` မှ ယူသဖြင့် Video Color ကို လိုက်သည်။
+- **Corner mark** — `engine.drawCornerLogo(ctx, { width, height, palette, image })` သည် frame ၏ ညာအောက်ထောင့်တွင် logo သေးသေး ဆွဲသည်။ `composeFrame()` ၏ band များ အပြင်ဘက်တွင် ဆွဲသဖြင့် မည်သည့် band ဖြစ်နေနေ ပေါ်သည်။ ပုံ မရောက်သေးလျှင် `false` ပြန်ပြီး ဘာမှ မဆွဲပါ။ Drum Studio က `assets/logo/m-sharing-mark.svg` ကို ပေးသည်။
+
+**စမ်းသပ်မှု** — `tools/test-drum-reference-browser.mjs` က (၁) ratio တစ်ခုချင်းစီ၏ band အချိုး၊ (၂) TIME/BPM/COUNT ကွက်၏ နေရာနှင့် COUNT ၏ beat တိုင်းပြောင်းမှု၊ (၃) theme နှစ်ခုလုံးတွင် ink က နောက်ခံနှင့် ကွဲပြားမှု၊ (၄) live preview က Video Color ကို လိုက်မှု၊ (၅) box cursor က bar ထက် ပိုကျယ်မှုနှင့် တီးနေသော note ကို ဝိုင်းမှု၊ (၆) corner mark က ညာအောက်ထောင့်တွင်သာ ပေါ်မှု — အားလုံးကို တိုင်းသည်။
 
 ## `.mxl` score support (2026-11-18)
 

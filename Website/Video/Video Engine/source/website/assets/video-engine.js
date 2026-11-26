@@ -601,6 +601,16 @@
       name,
       u16(0x0018), u16(0xffff),
       box('avcC', video.description),
+      // The encoder hands back full-range YUV, and a file that does not say
+      // so is decoded as limited range: the export then looks darker and
+      // flatter than the frame the preview drew from the same canvas.
+      // `nclx` states the range, and BT.709 primaries with the sRGB transfer
+      // for the matrix the encoder used.
+      box('colr', [
+        ascii('nclx'),
+        u16(1), u16(13), u16(1),
+        u8(0x80),
+      ]),
     ]);
 
     const mp4a = !audio
@@ -1502,7 +1512,9 @@
         highlight: '#f8c9c9',
         highlightText: '#7f1220',
         notationInk: '#101828',
-        notationBackground: '#ffffff',
+        // §၁၃.၃(က): the sheet is the frame's own background, so the notation
+        // band has no panel edge against the bands beside it.
+        notationBackground: '#f7f9fc',
         logoVariant: 'light',
         titleOne: '#ffaa00',
         titleTwo: '#111827',
@@ -1518,7 +1530,7 @@
         highlight: '#7f1220',
         highlightText: '#ffd9dd',
         notationInk: '#f8fafc',
-        notationBackground: '#0b1220',
+        notationBackground: '#080d16',
         logoVariant: 'dark',
         titleOne: '#ffaa00',
         titleTwo: '#e2e8f0',
@@ -1678,6 +1690,10 @@
     portrait: [30, 42],
     square: [30, 30],
   };
+  // The Plan gives Notation View two choices only, `Page` and `Horizontal`,
+  // and the page's own shape follows the frame's ratio rather than being a
+  // third setting (§၁၃.၃ ခ).
+  const PAGE_SHAPE_BY_RATIO = { '16:9': 'landscape', '1:1': 'square', '9:16': 'portrait' };
 
   let notationEnginePromise = null;
   let bravuraBase64 = null;
@@ -1746,6 +1762,10 @@
     if (!file) return null;
     const api = await loadNotationEngine();
     const mode = settings.notation === 'horizontal' ? 'scroll' : 'page';
+    // Page's shape is the frame's own: a landscape video gets a landscape
+    // sheet. The old landscape/portrait/square values are read as `Page`
+    // so a saved setting keeps working.
+    const pageShape = PAGE_SHAPE_BY_RATIO[ratioOf(settings.size.width, settings.size.height)] || 'landscape';
     // Only a page that offers Video Color passes a palette; the rest keep
     // the paper-and-ink sheet they have always had.
     const palette = settings.palette ?? null;
@@ -1756,9 +1776,9 @@
         : { ink: '#101828', background: '#ffffff' },
     };
     if (mode === 'page') {
-      // The chosen page shape, in staff spaces -- the same A4 proportions
-      // the engine defaults to, turned or squared as the user asked.
-      const [pageWidth, pageHeight] = PAGE_SHAPES[settings.notation] || PAGE_SHAPES.landscape;
+      // The sheet, in staff spaces -- the same A4 proportions the engine
+      // defaults to, turned or squared to match the frame.
+      const [pageWidth, pageHeight] = PAGE_SHAPES[pageShape];
       config.page = {
         pageWidth,
         pageHeight,
@@ -1767,6 +1787,13 @@
         marginLeft: 1.4,
         marginRight: 1.4,
       };
+    }
+    // The sheet the engine was asked for, reported so a caller can check
+    // that a frame's ratio reached the page layout.
+    let sheet = null;
+    if (mode === 'page') {
+      const [width, height] = PAGE_SHAPES[pageShape];
+      sheet = { shape: pageShape, width, height };
     }
     const parsed = api.parseMusicXml(await readScoreText(file));
     const rendered = api.renderParsedMusicXml(parsed, { config });
@@ -1782,17 +1809,73 @@
     const systemYs = [...new Set(rendered.playback.measureNumbersInOrder
       .map((number) => rendered.playback.placementByMeasureNumber.get(number).systemY))]
       .sort((left, right) => left - right);
+    // §၁၃.၂ wants the staff, stems, beams and marks whole inside the band, so
+    // the band has to know where each system's ink begins and ends. The row
+    // profile the ink measure already walked gives that, per system: systems
+    // differ in height (a tempo mark or a repeat makes one taller), which is
+    // why one shared height is not enough. The staff line `systemY` is what
+    // the cursor is drawn on, so the ink is measured as the worst reach above
+    // and below that line -- fitting a total height would let the lower side
+    // spill past the band's bottom edge.
+    const imagePerSpace = image.naturalWidth / viewBox.width;
+    // A score with one system has no neighbour to halve the gap to, so its
+    // band is the whole sheet. Reading the second system there would be
+    // `undefined` and every band would come out NaN.
+    const gapAbove = systemYs.length > 1 ? (systemYs[1] - systemYs[0]) / 2 : systemYs[0];
+    const systemBands = systemYs.map((start, index) => {
+      // Each system owns half the gap to its neighbours, so a tall tempo mark
+      // above one staff is not mistaken for part of the system above it.
+      const previous = index > 0 ? (systemYs[index - 1] + start) / 2 : start - gapAbove;
+      const following = index + 1 < systemYs.length
+        ? (start + systemYs[index + 1]) / 2
+        : start + (start - systemYs[index - 1]);
+      let top = Infinity;
+      let bottom = -Infinity;
+      const first = Math.max(0, Math.floor(previous * imagePerSpace));
+      const last = Math.min(ink.rows.length - 1, Math.ceil(following * imagePerSpace));
+      for (let y = first; y <= last; y += 1) {
+        if (!ink.rows[y]) continue;
+        const spaces = y / imagePerSpace;
+        if (spaces < top) top = spaces;
+        if (spaces > bottom) bottom = spaces;
+      }
+      return top === Infinity ? null : { top, bottom };
+    });
+    let inkAbove = 0;
+    let inkBelow = 0;
+    systemBands.forEach((band, index) => {
+      if (!band) return;
+      inkAbove = Math.max(inkAbove, systemYs[index] - band.top);
+      inkBelow = Math.max(inkBelow, band.bottom - systemYs[index]);
+    });
+    if (inkAbove + inkBelow === 0 && systemYs.length > 0) {
+      // No system band could be measured. The sheet's own ink still says how
+      // far the notation reaches, so a band is drawn rather than collapsed to
+      // nothing while the score's picture is fine.
+      const inkTop = ink.y / imagePerSpace;
+      const inkBottom = (ink.y + ink.height) / imagePerSpace;
+      inkAbove = Math.max(0, systemYs[0] - inkTop);
+      inkBelow = Math.max(0, inkBottom - systemYs[0]);
+    }
     return {
       api,
       mode,
+      sheet,
       playback: rendered.playback,
       image,
       width: image.naturalWidth,
       height: image.naturalHeight,
       systemYs,
+      systemBands,
+      inkAbove,
+      inkBelow,
       viewBox,
       ink,
       cursor: api.resolveConfig().cursor,
+      // The Drum reference picture rings the note being played with a
+      // rounded box rather than the engine's own vertical bar. A page that
+      // names no shape keeps the bar.
+      cursorShape: settings.cursorShape === 'box' ? 'box' : 'bar',
       seconds: rendered.playback.performance?.totalSeconds ?? 0,
     };
   };
@@ -1817,12 +1900,14 @@
     let top = canvas.height;
     let right = -1;
     let bottom = -1;
+    const rows = new Array(canvas.height).fill(0);
     for (let y = 0; y < canvas.height; y += 1) {
       for (let x = 0; x < canvas.width; x += 1) {
         const offset = (y * canvas.width + x) * 4;
         const luminance = 0.299 * data[offset] + 0.587 * data[offset + 1] + 0.114 * data[offset + 2];
         const ink = darkInk ? luminance < 160 : luminance > 96;
         if (!ink || data[offset + 3] < 32) continue;
+        rows[y] += 1;
         if (x < left) left = x;
         if (x > right) right = x;
         if (y < top) top = y;
@@ -1831,8 +1916,8 @@
     }
     canvas.width = 0;
     canvas.height = 0;
-    if (right < 0) return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight };
-    return { x: left, y: top, width: right - left + 1, height: bottom - top + 1 };
+    if (right < 0) return { x: 0, y: 0, width: image.naturalWidth, height: image.naturalHeight, rows };
+    return { x: left, y: top, width: right - left + 1, height: bottom - top + 1, rows };
   };
 
   /**
@@ -1856,11 +1941,43 @@
     }
   };
 
+  /**
+   * The slice of the sheet one system owns: its ink plus a small margin, in
+   * staff spaces, measured from the system's staff line. A system with no
+   * measured ink (an empty score) falls back to the whole sheet so the view
+   * still draws something rather than a blank band.
+   */
+  const SYSTEM_WINDOW_MARGIN = 0.6;
+  function systemWindow(state, systemY) {
+    const bands = state.systemBands;
+    if (Array.isArray(bands) && bands.length) {
+      const index = state.systemYs.indexOf(systemY);
+      const band = index >= 0 ? bands[index] : null;
+      if (band) {
+        const above = Math.max(0, systemY - band.top) + SYSTEM_WINDOW_MARGIN;
+        const below = Math.max(0, band.bottom - systemY) + SYSTEM_WINDOW_MARGIN;
+        return { above, below, height: above + below };
+      }
+    }
+    // Four staff spaces is the height a staff and its marks need; a window
+    // smaller than that would clip the very system it is meant to show.
+    const above = Math.max(state.inkAbove ?? 0, 4);
+    const below = Math.max(state.inkBelow ?? 0, 4);
+    return { above, below, height: above + below };
+  }
+
   function drawNotationPart(ctx, rect, at, state, palette = null) {
     ctx.save();
     ctx.translate(rect.x, rect.y);
     ctx.fillStyle = palette ? palette.notationBackground : '#ffffff';
     ctx.fillRect(0, 0, rect.width, rect.height);
+    // §၁၃.၂: the part draws only inside its own rect. `composeFrame` already
+    // clips each part, but a page may call a part drawer directly (the
+    // preview does), so the drawer holds the same rule itself rather than
+    // relying on the caller.
+    ctx.beginPath();
+    ctx.rect(0, 0, rect.width, rect.height);
+    ctx.clip();
     if (!state) {
       ctx.fillStyle = palette ? palette.muted : '#8b95a7';
       ctx.font = `600 ${Math.max(10, Math.round(rect.height * 0.07))}px Inter, system-ui, sans-serif`;
@@ -1904,32 +2021,120 @@
       return;
     }
 
-    // Page: the sheet is as wide as the part and slides bottom to top, one
-    // system at a time -- the Plan's own wording for this view.
-    const pxPerSpace = (rect.width * 0.98) / viewBox.width;
+    // Page: the sheet slides bottom to top, one system at a time -- the
+    // Plan's own wording for this view.
+    //
+    // §၁၃.၂ asks for the staff whole inside the band, so the sheet is scaled
+    // to fit one system's ink rather than to the band's width alone: a
+    // width-scaled sheet drew one system 1313 px tall in a 342 px band at
+    // 16:9 and sliced every staff at both edges. The ink is fitted above and
+    // below the staff line the cursor sits on, so the reading line keeps its
+    // place on the frame while the sheet travels. Whichever of the two fits
+    // -- width or height -- wins, so a narrow frame still shows the width.
+    // The window is this system's own ink plus a hair of margin, so the
+    // system is whole inside it and no neighbour can reach the band's edges.
     const placement = api.computeCursorPlacement(state.playback, tick, { mode: 'cursorMoves' });
+    const window = systemWindow(state, placement.systemY);
+    const byWidth = (rect.width * 0.98) / viewBox.width;
+    // The reading line sits a little above the middle, where the reference
+    // picture puts it, and it holds still while the sheet travels under it.
+    const lineY = rect.height * 0.4;
+    // Both sides of that fixed line are budgets of their own: the ink reaches
+    // further below the staff than above it, so a single total-height fit
+    // would push the lower notes past the band's bottom edge. The budgets are
+    // the score's worst system, not this frame's, so the notation keeps one
+    // size from the first system to the last instead of zooming between them.
+    const pad = rect.height * 0.02;
+    // The window's margin is part of the budget, not spare room on top of it:
+    // a margin the scale did not pay for would push the ink past the band.
+    const worstAbove = Math.max(state.inkAbove ?? 0, 0) + SYSTEM_WINDOW_MARGIN;
+    const worstBelow = Math.max(state.inkBelow ?? 0, 0) + SYSTEM_WINDOW_MARGIN;
+    const byInk = worstAbove + worstBelow > 0
+      ? Math.min(
+        worstAbove > 0 ? (lineY - pad) / worstAbove : Infinity,
+        worstBelow > 0 ? (rect.height - lineY - pad) / worstBelow : Infinity,
+      )
+      : Infinity;
+    const pxPerSpace = Math.min(byWidth, byInk);
+    const placementY = placement.systemY * pxPerSpace;
     const sheetHeight = state.image.naturalHeight * (pxPerSpace / imageSpace);
     const originX = (rect.width - viewBox.width * pxPerSpace) / 2;
-    const systemTop = placement.systemY * pxPerSpace;
-    const originY = sheetHeight <= rect.height
-      ? (rect.height - sheetHeight) / 2
-      : Math.min(0, Math.max(rect.height - sheetHeight, rect.height * 0.4 - systemTop));
+    const originY = lineY - placementY;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, lineY - window.above * pxPerSpace, rect.width, window.height * pxPerSpace);
+    ctx.clip();
     ctx.drawImage(state.image, originX, originY,
       state.image.naturalWidth * (pxPerSpace / imageSpace), sheetHeight);
+    ctx.restore();
     drawCursor(ctx, state, originX + placement.markerX * pxPerSpace,
-      originY + systemTop, CURSOR_SPACES * pxPerSpace, pxPerSpace);
+      lineY, CURSOR_SPACES * pxPerSpace, pxPerSpace);
     ctx.restore();
   }
 
-  /** The engine's cursor config, drawn as a bar rather than a re-decoded glyph. */
+  // Half the reference picture's cursor box, in staff spaces: the box is
+  // about two spaces wide, so a notehead and its stem sit inside it.
+  const CURSOR_BOX_SPACES = 1;
+
+  /**
+   * The engine's cursor config, drawn rather than re-decoded from a glyph.
+   * `bar` is the engine's own marker; `box` is the rounded box the Drum
+   * reference picture uses to ring the note being played.
+   */
   const drawCursor = (ctx, state, x, top, height, pxPerSpace) => {
+    const alpha = state.cursor.opacity ?? 0.85;
+    const thickness = Math.max(1.5, state.cursor.thickness * pxPerSpace);
     ctx.save();
-    ctx.globalAlpha = state.cursor.opacity ?? 0.85;
+    ctx.globalAlpha = alpha;
     ctx.fillStyle = state.cursor.color;
-    ctx.fillRect(x - (state.cursor.thickness * pxPerSpace) / 2, top,
-      Math.max(1.5, state.cursor.thickness * pxPerSpace), height);
+    if (state.cursorShape === 'box') {
+      const half = CURSOR_BOX_SPACES * pxPerSpace;
+      const radius = Math.max(2, half * 0.45);
+      // A wash of the same red inside the outline, so the box reads as a
+      // marker over dense ink instead of as a barline the score never wrote.
+      ctx.globalAlpha = alpha * 0.12;
+      roundedRectPath(ctx, x - half, top, half * 2, height, radius);
+      ctx.fill();
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = state.cursor.color;
+      ctx.lineWidth = thickness;
+      roundedRectPath(ctx, x - half, top, half * 2, height, radius);
+      ctx.stroke();
+      ctx.restore();
+      return;
+    }
+    ctx.fillRect(x - thickness / 2, top, thickness, height);
     ctx.restore();
   };
+
+  // The Plan's §၁၃ reference picture carries a second, small logo in the
+  // bottom-right corner, not only the one beside Title 1.
+  const CORNER_LOGO_FRACTION = 0.045;
+
+  /**
+   * The corner mark, drawn over the composed frame rather than inside a
+   * band, because the reference picture puts it on the frame's own corner.
+   * Its outline comes from the palette so the mark keeps an edge on a
+   * background that matches its own plate (§၁၄).
+   */
+  function drawCornerLogo(ctx, { width, height, palette, image }) {
+    if (!image || !image.complete || image.naturalWidth <= 0) return false;
+    const size = Math.round(Math.min(width, height) * CORNER_LOGO_FRACTION);
+    const pad = Math.round(Math.min(width, height) * 0.022);
+    const x = width - pad - size;
+    const y = height - pad - size;
+    const scale = Math.min(size / image.naturalWidth, size / image.naturalHeight);
+    const drawWidth = image.naturalWidth * scale;
+    const drawHeight = image.naturalHeight * scale;
+    ctx.save();
+    ctx.drawImage(image, x + (size - drawWidth) / 2, y + (size - drawHeight) / 2, drawWidth, drawHeight);
+    ctx.strokeStyle = palette.line;
+    ctx.lineWidth = Math.max(1, Math.round(size * 0.03));
+    roundedRectPath(ctx, x, y, size, size, Math.round(size * 0.22));
+    ctx.stroke();
+    ctx.restore();
+    return true;
+  }
 
   /**
    * Title / Info: logo on the left, Title 1 beside it, Title 2 under it,
@@ -2098,13 +2303,9 @@
     ctx.fillText(fitText(ctx, settings.titleTwo, room), textX + Math.round(2 * scale), top + Math.round(52 * scale));
 
     if (settings.infoBoxes) {
+      // The COUNT box is the count display. A row underneath it would
+      // print the same count a second time, which is what the owner saw.
       drawInfoBoxes(ctx, { at, meta, settings, palette, scale, width, top: top + Math.round(6 * scale) });
-      if (settings.countEnabled) {
-        drawCountRow(ctx, {
-          at, meta, settings, palette, scale, pad: leftEdge,
-          y: top + Math.round(100 * scale), rightEdge,
-        });
-      }
       return;
     }
 
@@ -2135,16 +2336,14 @@
     if (footer.length > 0) {
       ctx.fillText(fitText(ctx, footer.join(' \u00b7 '), rightEdge - leftEdge), leftEdge, statsY + Math.round(20 * scale));
     }
-
-    if (settings.countEnabled) {
-      drawCountRow(ctx, { at, meta, settings, palette, scale, pad: leftEdge, y: statsY + Math.round(40 * scale), rightEdge });
-    }
   }
 
   /**
    * The count as the video prints it: `1, 2, 3, 4` or its eighth/sixteenth
    * subdivision. The Plan keeps this display separate from the Count Voice
-   * SOUND, so this only ever changes what is written on the frame.
+   * SOUND, so this only ever changes what is written on the frame. The
+   * printed count has a single home, the COUNT box; the count-in itself is
+   * heard, never printed.
    */
   const countTokens = (display, beats) => {
     const subdivisions = display === 'sixteenths' ? ['e', '&', 'a'] : display === 'eighths' ? ['&'] : [];
@@ -2165,26 +2364,6 @@
     const within = position - Math.floor(position);
     return beatIndex * perBeat + Math.min(perBeat - 1, Math.floor(within * perBeat));
   };
-
-  function drawCountRow(ctx, { at, meta, settings, palette, scale, pad, y, rightEdge = Infinity }) {
-    const tokens = countTokens(settings.countDisplay, meta.beats);
-    const active = currentCountToken(tokens, settings.countDisplay, meta, at);
-    const size = Math.max(9, Math.round(10 * scale));
-    ctx.font = `600 ${size}px Inter, system-ui, sans-serif`;
-    ctx.textBaseline = 'alphabetic';
-    let x = pad;
-    const gap = Math.round(5 * scale);
-    for (let index = 0; index < tokens.length; index += 1) {
-      const token = tokens[index];
-      const width = ctx.measureText(token).width;
-      // A count that would run off the frame stops at the last token that
-      // fits rather than drawing a partial row past the edge.
-      if (x + width > rightEdge) break;
-      ctx.fillStyle = index === active ? palette.accent : palette.muted;
-      ctx.fillText(token, x, y);
-      x += width + gap;
-    }
-  }
 
   const LAYOUT_TEMPLATES = {
     // The Drum reference picture (Main Plan §၁၃) measures the three bands at
@@ -2407,91 +2586,253 @@
   }
 
   // ---------------------------------------------------------------
+  // The spoken count that counts the score in.
+  //
+  // The Plan hands the file names and the R2 path to the engine, the same
+  // way it hands over the Thank You clip: a page asks for the recordings
+  // it needs and never learns their address. R2 holds one recording per
+  // beat number; a beat with no recording leaves the click alone rather
+  // than failing the export.
+  //
+  // The bucket keeps two recordings of every beat, and they are different
+  // sounds, not two names for one: `{n}.wav` speaks the number while
+  // `M{n}.wav` is the metronome's own short marker. The owner chooses which
+  // one the count uses, so the choice is a parameter here rather than a
+  // fixed name -- a video counting a band in wants the voice, a video
+  // showing tempo wants the marker.
+  //
+  // The recordings also live under two folder names. `Counts  vocal` is the
+  // folder the owner keeps them in (the name carries two spaces); `Voices`
+  // is the older copy, byte for byte the same files. Both are tried, in
+  // that order, so renaming either one does not silence the count.
+  // ---------------------------------------------------------------
+  const COUNT_VOICE_ROOT = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev';
+  // Every folder the recordings are known by, newest name first.
+  const COUNT_VOICE_FOLDERS = ['Counts%20%20vocal', 'Voices'];
+  // The two sets of files the bucket holds. `spoken` is the number said
+  // aloud, `marker` is the metronome's short tick.
+  const COUNT_VOICE_SETS = {
+    spoken: (beat) => `${beat}.wav`,
+    marker: (beat) => `M${beat}.wav`,
+  };
+  const countVoiceCache = new Map();
+
+  /**
+   * Every R2 address that may hold the recording for a beat number.
+   *
+   * The chosen set is asked for first. The other set follows it, so a beat
+   * whose chosen recording is not uploaded still counts in the owner's
+   * other voice rather than falling silent; the order is what makes the
+   * choice audible rather than merely nominal.
+   */
+  function countVoiceUrls(beat, setName = 'spoken') {
+    const number = Math.round(beat);
+    if (!(number >= 1)) return [];
+    const chosenName = COUNT_VOICE_SETS[setName] ? setName : 'spoken';
+    const names = [chosenName, ...Object.keys(COUNT_VOICE_SETS).filter((name) => name !== chosenName)];
+    const urls = [];
+    for (const name of names) {
+      for (const folder of COUNT_VOICE_FOLDERS) {
+        urls.push(`${COUNT_VOICE_ROOT}/${folder}/${COUNT_VOICE_SETS[name](number)}`);
+      }
+    }
+    return urls;
+  }
+
+  /** One beat's recording, decoded once. A missing one resolves to null. */
+  async function loadCountVoice(beat, setName = 'spoken') {
+    const urls = countVoiceUrls(beat, setName);
+    if (urls.length === 0) return null;
+    const key = urls[0];
+    if (countVoiceCache.has(key)) return countVoiceCache.get(key);
+    const pending = (async () => {
+      for (const url of urls) {
+        try {
+          const response = await fetch(url, { mode: 'cors' });
+          if (!response.ok) continue;
+          const bytes = await response.arrayBuffer();
+          const context = new OfflineAudioContext(1, 1, AUDIO_SAMPLE_RATE);
+          return await context.decodeAudioData(bytes);
+        } catch (error) {
+          // Try the next name rather than giving up on the beat.
+        }
+      }
+      return null;
+    })();
+    countVoiceCache.set(key, pending);
+    const sample = await pending;
+    // A miss is not remembered: the next export may find the file uploaded.
+    if (!sample) countVoiceCache.delete(key);
+    return sample;
+  }
+
+  /** One recording per beat, in beat order; a beat with none is null. */
+  async function countVoiceSamples(beats, setName = 'spoken') {
+    const wanted = [];
+    for (let beat = 1; beat <= Math.max(0, Math.round(beats)); beat += 1) {
+      wanted.push(loadCountVoice(beat, setName));
+    }
+    return await Promise.all(wanted);
+  }
+
+  // ---------------------------------------------------------------
   // The Thank You clip that closes every video.
   //
   // The Plan gives this whole matter to the engine: the file names, the
   // R2 path and what happens when a clip is missing are decided here and
-  // nowhere else. One clip per frame shape, named by the shape's own
-  // ratio. A missing clip leaves the video without an ending rather than
-  // failing the export.
+  // nowhere else. The bucket holds one clip per ratio, instrument and
+  // Video Color, at
+  // `Thank Video/{ratio}/{instrument}/{ratio} {Colour} {Instrument}.mp4`.
+  //
+  // Not every combination is uploaded yet (1:1 Black Guitar, 9:16 White
+  // Guitar and others are absent), so the lookup walks a short list of
+  // candidates before giving up: the exact clip, then the same instrument
+  // in the other colour, then the drum set in either colour, which is
+  // complete for all three ratios. A missing clip leaves the video without
+  // an ending rather than failing the export.
   // ---------------------------------------------------------------
-  const THANK_YOU_BASE = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/thank-you';
-  const THANK_YOU_RATIOS = { '16:9': 'landscape', '1:1': 'square', '9:16': 'portrait' };
+  const THANK_YOU_BASE = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev/Thank%20Video';
+  const THANK_YOU_RATIOS = { '16:9': '16x9', '1:1': '1x1', '9:16': '9x16' };
+  const THANK_YOU_COLOURS = ['Black', 'White'];
+  // Drum first in the fallback order because it is the one set uploaded
+  // for every ratio in both colours.
+  const THANK_YOU_INSTRUMENTS = ['drum', 'guitar', 'violin', 'piano', 'bass', 'strings', 'voice', 'metronome'];
 
   const thankYouCache = new Map();
 
-  /** The R2 address of the clip for a frame this shape, or null. */
-  function thankYouUrl(width, height) {
-    const shape = THANK_YOU_RATIOS[ratioOf(width, height)];
-    return shape ? `${THANK_YOU_BASE}/${shape}.mp4` : null;
+  const capitalise = (word) => word.charAt(0).toUpperCase() + word.slice(1);
+
+  /** The R2 address of one exact clip. `ratioOf` snaps to the nearest of the
+   *  three shapes, so every frame has an address. */
+  function thankYouUrl(width, height, { instrument = 'drum', color = 'black' } = {}) {
+    const ratio = THANK_YOU_RATIOS[ratioOf(width, height)];
+    const name = THANK_YOU_INSTRUMENTS.includes(instrument) ? instrument : 'drum';
+    const colour = THANK_YOU_COLOURS.includes(capitalise(color)) ? capitalise(color) : 'Black';
+    return `${THANK_YOU_BASE}/${ratio}/${name}/${ratio}%20${colour}%20${capitalise(name)}.mp4`;
   }
 
   /**
-   * The clip as a playable source plus its sound. Fetched once per shape
-   * and kept: a clip is read for every frame of its segment, and asking
-   * R2 each time would put a download behind every frame.
+   * The clips to try, best first: the exact one, the same instrument in
+   * the other colour, then the complete drum set. Every entry is a real
+   * address, so the caller can stop at the first that answers.
    */
-  async function loadThankYou(width, height) {
-    const url = thankYouUrl(width, height);
-    if (!url) return null;
-    if (thankYouCache.has(url)) return thankYouCache.get(url);
+  function thankYouCandidates(width, height, { instrument = 'drum', color = 'black' } = {}) {
+    const exact = thankYouUrl(width, height, { instrument, color });
+    const ratio = THANK_YOU_RATIOS[ratioOf(width, height)];
+    const name = THANK_YOU_INSTRUMENTS.includes(instrument) ? instrument : 'drum';
+    const colour = THANK_YOU_COLOURS.includes(capitalise(color)) ? capitalise(color) : 'Black';
+    const other = colour === 'Black' ? 'White' : 'Black';
+    const clip = (which, shade) => `${THANK_YOU_BASE}/${ratio}/${which}/${ratio}%20${shade}%20${capitalise(which)}.mp4`;
+    const candidates = [exact];
+    const sameOtherColour = clip(name, other);
+    if (!candidates.includes(sameOtherColour)) candidates.push(sameOtherColour);
+    for (const shade of [colour, other]) {
+      const fallback = clip('drum', shade);
+      if (!candidates.includes(fallback)) candidates.push(fallback);
+    }
+    return candidates;
+  }
+
+  /**
+   * The clip as a playable source plus its sound. Fetched once per
+   * candidate list and kept: a clip is read for every frame of its
+   * segment, and asking R2 each time would put a download behind every
+   * frame. `clip.url` names the address that answered, which may be a
+   * fallback rather than the one asked for.
+   */
+  async function loadThankYou(width, height, options = {}) {
+    const candidates = thankYouCandidates(width, height, options);
+    const key = candidates.join('|');
+    if (thankYouCache.has(key)) return thankYouCache.get(key);
     const pending = (async () => {
-      try {
-        const response = await fetch(url, { mode: 'cors' });
-        if (!response.ok) return null;
-        const blob = await response.blob();
-        // A blob URL is what makes seeking honest: an element reading
-        // from a plain URL reports a zero-length seekable range and stays
-        // on its first frame however far it is asked to go.
-        const objectUrl = URL.createObjectURL(blob);
-        const video = document.createElement('video');
-        video.crossOrigin = 'anonymous';
-        video.preload = 'auto';
-        video.playsInline = true;
-        video.muted = true;
-        video.src = objectUrl;
-        await new Promise((resolve, reject) => {
-          video.onloadeddata = resolve;
-          video.onerror = () => reject(new Error(`Thank You clip could not be played: ${video.error?.code ?? 'unknown'}`));
-          video.load();
-        });
-        let audio = null;
+      for (const url of candidates) {
         try {
-          const context = new OfflineAudioContext(1, 1, AUDIO_SAMPLE_RATE);
-          audio = await context.decodeAudioData(await blob.arrayBuffer());
+          const response = await fetch(url, { mode: 'cors' });
+          if (!response.ok) continue;
+          const blob = await response.blob();
+          // A blob URL is what makes seeking honest: an element reading
+          // from a plain URL reports a zero-length seekable range and stays
+          // on its first frame however far it is asked to go.
+          const objectUrl = URL.createObjectURL(blob);
+          const video = document.createElement('video');
+          video.crossOrigin = 'anonymous';
+          video.preload = 'auto';
+          video.playsInline = true;
+          video.muted = true;
+          video.src = objectUrl;
+          await new Promise((resolve, reject) => {
+            video.onloadeddata = resolve;
+            video.onerror = () => reject(new Error(`Thank You clip could not be played: ${video.error?.code ?? 'unknown'}`));
+            video.load();
+          });
+          let audio = null;
+          try {
+            const context = new OfflineAudioContext(1, 1, AUDIO_SAMPLE_RATE);
+            audio = await context.decodeAudioData(await blob.arrayBuffer());
+          } catch (error) {
+            audio = null;
+          }
+          return { video, audio, objectUrl, seconds: video.duration, url, cacheKey: key };
         } catch (error) {
-          audio = null;
+          // Try the next candidate rather than ending the video here.
         }
-        return { video, audio, objectUrl, seconds: video.duration, url };
-      } catch (error) {
-        return null;
       }
+      return null;
     })();
-    thankYouCache.set(url, pending);
+    thankYouCache.set(key, pending);
     const clip = await pending;
     // A missing clip must not be remembered: the next export may find it
     // uploaded, and a cached "no" would end every video after that one
     // short.
-    if (!clip) thankYouCache.delete(url);
+    if (!clip) thankYouCache.delete(key);
     return clip;
   }
 
-  /** Seeks a clip to `at` and resolves once that frame is the one on show. */
+  /**
+   * Seeks a clip to `at` and resolves once that frame can be drawn.
+   *
+   * `seeked` says the element has moved, not that the decoder has produced
+   * the frame: drawing straight away paints the old picture, which for a
+   * fresh element is black. Waiting for the next painted frame is what
+   * makes the clip's first frames the clip rather than a black rectangle.
+   * The wait is bounded -- a clip that never presents a frame must not stop
+   * an export, and the seek itself already put the right time in place.
+   */
   const seekThankYou = (video, at) => new Promise((resolve, reject) => {
-    if (Math.abs(video.currentTime - at) < 1e-3 && video.readyState >= 2) {
-      resolve();
-      return;
-    }
-    const done = () => {
-      video.removeEventListener('seeked', done);
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
       resolve();
     };
-    video.addEventListener('seeked', done);
-    video.currentTime = at;
-    setTimeout(() => {
-      video.removeEventListener('seeked', done);
+    const painted = () => {
+      if (typeof video.requestVideoFrameCallback === 'function') {
+        video.requestVideoFrameCallback(() => finish());
+      } else {
+        requestAnimationFrame(() => finish());
+      }
+      // Bounded: a paused element does not always present a frame after a
+      // seek, and an export that waits forever is worse than one frame of
+      // the clip drawn a moment early.
+      setTimeout(finish, 250);
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       reject(new Error('Thank You clip did not reach the requested frame'));
     }, 8000);
+    const done = () => {
+      video.removeEventListener('seeked', done);
+      clearTimeout(timer);
+      painted();
+    };
+    if (Math.abs(video.currentTime - at) < 1e-3 && video.readyState >= 2) {
+      clearTimeout(timer);
+      painted();
+      return;
+    }
+    video.addEventListener('seeked', done);
+    video.currentTime = at;
   });
 
   /**
@@ -2499,8 +2840,8 @@
    * frame, letterboxed rather than cropped so nothing of it is lost.
    * `null` when the clip is unavailable, so a page can skip it.
    */
-  async function thankYouSegment(width, height) {
-    const clip = await loadThankYou(width, height);
+  async function thankYouSegment(width, height, options = {}) {
+    const clip = await loadThankYou(width, height, options);
     if (!clip || !Number.isFinite(clip.seconds) || clip.seconds <= 0) return null;
     return {
       seconds: clip.seconds,
@@ -2516,7 +2857,7 @@
       },
       onEnd: () => {
         URL.revokeObjectURL(clip.objectUrl);
-        thankYouCache.delete(clip.url);
+        thankYouCache.delete(clip.cacheKey);
       },
     };
   }
@@ -2646,7 +2987,12 @@
     // The Plan gives the Thank You clip to this engine: a page asks for a
     // segment and appends it, and never learns the clip's address.
     thankYouUrl,
+    thankYouCandidates,
     thankYouSegment,
+    // The spoken count, for the same reason: the recordings' address and
+    // names stay in here, and a page asks for the beats it is counting in.
+    countVoiceUrls,
+    countVoiceSamples,
     // One clock for the encoder and the preview: the plan says where each
     // segment starts in frames, so a preview cannot drift from the file.
     timelinePlan,
@@ -2664,6 +3010,7 @@
     ratioNames,
     DELIVERY_SIZES,
     composeFrame,
+    drawCornerLogo,
     requireAsset,
     resolveRequired,
     rejectRequired,

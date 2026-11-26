@@ -111,7 +111,15 @@ const SCORE = await readFile(new URL(
   import.meta.url,
 ), 'utf8');
 
-const VIEWS = ['landscape', 'portrait', 'square', 'horizontal'];
+// The Plan offers two views only: `Page`, whose sheet shape follows the
+// frame's ratio, and `Horizontal`. Every ratio is measured so a Page that
+// kept one shape for all three would be caught.
+const CASES = [
+  { key: 'page-16:9', notation: 'page', size: { width: 1920, height: 1080 }, sheetWidth: 42 },
+  { key: 'page-1:1', notation: 'page', size: { width: 1080, height: 1080 }, sheetWidth: 30, sheetHeight: 30 },
+  { key: 'page-9:16', notation: 'page', size: { width: 1080, height: 1920 }, sheetWidth: 30, sheetHeight: 42 },
+  { key: 'horizontal', notation: 'horizontal', size: { width: 1920, height: 1080 } },
+];
 
 try {
   const httpPort = await findFreePort();
@@ -144,16 +152,17 @@ try {
 
   const measured = await evaluate(`(async () => {
     const file = new File([${JSON.stringify(SCORE)}], 'long-score.musicxml', { type: 'application/xml' });
-    const views = ${JSON.stringify(VIEWS)};
+    const cases = ${JSON.stringify(CASES)};
     // Spread across the score, so every view crosses system boundaries and
     // the sheet has to travel for the reading line to stay on the notes.
     const times = [2, 40, 80, 120];
     const out = {};
-    for (const view of views) {
-      const settings = { instrument: 'drums', notation: view, size: { width: 1920, height: 1080 } };
+    for (const testCase of cases) {
+      const view = testCase.key;
+      const settings = { instrument: 'drums', notation: testCase.notation, size: testCase.size };
       const state = await VideoEngine.prepareNotationFor(file, settings);
       if (!state || state.error) throw new Error(view + ': ' + (state ? state.error : 'no notation state'));
-      const rect = VideoEngine.layoutFor('drums', { width: 1920, height: 1080 }).rects.notation;
+      const rect = VideoEngine.layoutFor('drums', testCase.size).rects.notation;
       const canvas = document.createElement('canvas');
       canvas.width = rect.width;
       canvas.height = rect.height;
@@ -171,18 +180,32 @@ try {
         VideoEngine.drawNotationPart(ctx, { x: 0, y: 0, width: rect.width, height: rect.height }, at, state);
         const { data } = ctx.getImageData(0, 0, canvas.width, canvas.height);
         let dark = 0, red = 0, redX = 0, redY = 0, white = 0;
+        let redTop = Infinity, redBottom = -Infinity;
+        const rowInk = new Array(canvas.height).fill(0);
+        const colInk = new Array(canvas.width).fill(0);
         for (let y = 0; y < canvas.height; y += 1) {
           for (let x = 0; x < canvas.width; x += 1) {
             const offset = (y * canvas.width + x) * 4;
             const r = data[offset], g = data[offset + 1], b = data[offset + 2];
-            if (r > 140 && g < 90 && b < 90) { red += 1; redX += x; redY += y; }
-            else if (r < 130 && g < 130 && b < 130) dark += 1;
+            if (r > 140 && g < 90 && b < 90) {
+              red += 1; redX += x; redY += y;
+              if (y < redTop) redTop = y;
+              if (y > redBottom) redBottom = y;
+            } else if (r < 130 && g < 130 && b < 130) {
+              dark += 1; rowInk[y] += 1; colInk[x] += 1;
+            }
             else if (r > 240 && g > 240 && b > 240) white += 1;
           }
         }
         return {
           at, sheet, dark, white, red,
           redX: red ? redX / red : 0, redY: red ? redY / red : 0,
+          redTop: red ? redTop : 0, redBottom: red ? redBottom : 0,
+          // §၁၃.၂ / V21: ink on a band edge is an element sliced by the band.
+          cut: {
+            top: rowInk[0], bottom: rowInk[canvas.height - 1],
+            left: colInk[0], right: colInk[canvas.width - 1],
+          },
         };
       });
       const imageSpace = state.image.naturalWidth / state.viewBox.width;
@@ -194,6 +217,7 @@ try {
         : (state.image.naturalHeight * (((rect.width * 0.98) / state.viewBox.width) / imageSpace)) / rect.height;
       out[view] = {
         mode: state.mode,
+        sheet: state.sheet,
         seconds: state.seconds,
         viewBox: state.viewBox,
         rect: { width: rect.width, height: rect.height },
@@ -204,11 +228,11 @@ try {
     return out;
   })()`);
 
-  const pageWidths = { landscape: 42, portrait: 30, square: 30 };
   const falling = (values) => values.every((value, index) => index === 0 || value < values[index - 1]);
   const report = {};
 
-  for (const view of VIEWS) {
+  for (const testCase of CASES) {
+    const view = testCase.key;
     const result = measured[view];
     assert.ok(result, `The ${view} view produced no measurement`);
     const [first] = result.frames;
@@ -222,6 +246,17 @@ try {
     assert.ok(result.overflow > 2,
       `The ${view} sheet fits its part (${result.overflow.toFixed(2)}x), so no direction was tested`);
 
+    // V21 / §၁៣.២: a staff, stem, beam, ledger or accidental running into an
+    // edge is a note the viewer cannot read. Top and bottom are checked for
+    // both views, because neither view scrolls that way -- the band's height
+    // is the sheet's height, so ink there means the sheet was scaled wrong.
+    for (const frame of result.frames) {
+      assert.equal(frame.cut.top, 0,
+        `The ${view} view cut notation at the band's top edge at ${frame.at}s: ${frame.cut.top} px`);
+      assert.equal(frame.cut.bottom, 0,
+        `The ${view} view cut notation at the band's bottom edge at ${frame.at}s: ${frame.cut.bottom} px`);
+    }
+
     if (view === 'horizontal') {
       // Right to left under a marker that stays put: the sheet travels, the
       // cursor holds its reading line.
@@ -234,20 +269,38 @@ try {
       continue;
     }
 
-    // Page: the requested sheet shape, and the sheet climbing bottom to top.
+    // Page: a sheet shaped like the frame, climbing bottom to top.
     assert.equal(result.mode, 'page', `The ${view} view did not use the page layout: ${result.mode}`);
-    assert.equal(result.viewBox.width, pageWidths[view],
-      `The ${view} sheet is ${result.viewBox.width} staff spaces wide, not ${pageWidths[view]}`);
+    assert.equal(result.sheet?.width, testCase.sheetWidth,
+      `The ${view} sheet is ${result.sheet?.width} staff spaces wide, not ${testCase.sheetWidth}`);
+    if (testCase.sheetHeight) {
+      assert.equal(result.sheet?.height, testCase.sheetHeight,
+        `The ${view} sheet is ${result.sheet?.height} staff spaces tall, not ${testCase.sheetHeight}`);
+    }
     const offsets = result.frames.map((frame) => frame.sheet.dy);
     assert.ok(falling(offsets), `The ${view} sheet did not climb bottom to top: ${offsets}`);
     // The reading line is where the cursor is drawn; it has to stay put
-    // while the sheet moves under it.
-    const lines = result.frames.map((frame) => Math.round(frame.redY));
+    // while the sheet moves under it. Its top and bottom edges are what say
+    // so: a centroid slides a pixel whenever a notehead covers part of the
+    // thin bar, which is the note's ink moving, not the marker's.
+    const lines = result.frames.map((frame) => `${frame.redTop}-${frame.redBottom}`);
     assert.equal(new Set(lines).size, 1, `The ${view} view moved its reading line: ${lines}`);
+    // §၁៣.២ also rules out sideways slicing for Page: a sheet that only
+    // travels up and down is the sheet's own width inside the band, so its
+    // side margins must stay clear. Horizontal is left out on purpose -- the
+    // Plan keeps its left/right cut open (§၁៣.២'s open question), and a sheet
+    // that travels sideways is meant to leave the band's sides.
+    for (const frame of result.frames) {
+      assert.equal(frame.cut.left, 0,
+        `The ${view} view cut notation at the band's left edge at ${frame.at}s: ${frame.cut.left} px`);
+      assert.equal(frame.cut.right, 0,
+        `The ${view} view cut notation at the band's right edge at ${frame.at}s: ${frame.cut.right} px`);
+    }
     assert.notEqual(first.sheet.dy, last.sheet.dy,
       `The ${view} view drew the same sheet offset at 2 s and 120 s`);
     report[view] = {
       mode: result.mode,
+      sheet: result.sheet,
       viewBox: result.viewBox,
       offsets,
       readingLines: lines,
@@ -256,7 +309,7 @@ try {
   }
 
   console.log(JSON.stringify({ views: report }, null, 2));
-  console.log('Notation view check passed for landscape, portrait, square and horizontal.');
+  console.log('Notation view check passed: Page at 16:9, 1:1 and 9:16, and Horizontal.');
 } finally {
   cdp?.close();
   browser?.kill();

@@ -168,6 +168,35 @@ Run every command from `Website/Notation/Notation Engine/`.
   it. The owner reaffirmed it again on 2026-11-18 and asked for it to be
   recorded at the start of the session: full permission, write the whole
   implementation, and push what is written before continuing.
+- **Permission is standing — reaffirmed at the start of the 2026-11-18
+  session that found Plan revisions `1695126` and `7f63b0e`.** The owner
+  asked for a read-only pass first ("ချိတ်ဆက်ထားတဲ့ repo ကိုဖတ်ကြည့်ပါပြီးရင် ၊ Code
+  မရေးပါနဲ့အုန်း"), then said the video-export part of the Plan had been
+  updated. That second message is the work instruction, so writing resumes
+  under the standing permission recorded above. Recorded first, as asked:
+  full code-writing permission on `feat/guitar-video-adapter`; push what is
+  already written before starting, then push once at the end.
+  - Plan check this pass: **two new revisions arrived** —
+    `1695126` ("Plan: record decisions - drum sound from Sound Engine, count
+    voice follows meter (4/4 -> 1,2,3,4), no half-cut notes at Horizontal
+    edges, Thank You naming confirmed") and `7f63b0e` ("Plan: Count Voice
+    files M1-M7 in R2, 6/8 counts 1-6 confirmed, open question for meters
+    above 7"). Both are ancestors of no local commit yet; `origin/main` is
+    `7f63b0e` and this branch is based on `24e3fd2`.
+  - What the new revisions decide, and therefore what is now work:
+    **§၅ item 5 / V9** — drum sound comes from the Sound Engine (MuseScore
+    General's GM percussion) instead of the hand-written synthesizer;
+    **V19** — Count Voice is one R2 recording per beat number, `M1`–`M7`,
+    counted to the score's own metre (`4/4` → `1,2,3,4`, `6/8` → `1…6`),
+    with meters above 7 still open;
+    **V21** — a note must not be shown half-cut at a Horizontal edge;
+    **§၁၅ item 14** — the Thank You naming scheme is confirmed.
+  - Verified against the bucket: `Counts  vocal/M1.wav` … `M7.wav` answer
+    `200` and are byte-identical to the older `1.wav` … `7.wav` names;
+    `M8` and `8` answer `404`, which is exactly the "meters above 7" hole
+    the Plan leaves open. The engine currently asks for `1.wav`, so the
+    `M`-prefixed name is the gap this pass closes.
+
 - **Permission is standing — reaffirmed again at the start of the
   2026-11-18 02:05 session.** The owner said, in the same message that
   asked for a read-only pass over the repository, that the code permission
@@ -255,6 +284,71 @@ Run every command from `Website/Notation/Notation Engine/`.
   whatever is written first, then continue from the Plan, then push again.
   Unfinished Plan items are filled in later; a push is not a claim of
   completeness.
+- **Permission is standing — reaffirmed 2026-11-18, eighth time this
+  session.** The owner asked again for the same shape: check what the Plan
+  leaves open, write the full code-writing permission down first, push what
+  is already written, continue from the Plan, and push once at the end.
+  Everything written was already on the remote (`993c115`), so this pass
+  starts from a clean tree. The five-hour refresh had still produced no new
+  Plan revision: `Website/Plan/README.md` has no diff against
+  `origin/main`, and `e8948a7` is still the newest commit touching it on
+  any remote branch. The open items are therefore the ones the Plan's own
+  tables list.
+- **Permission is standing — reaffirmed 2026-11-18, ninth time this
+  session.** The owner asked for the same shape once more: check what the
+  Plan leaves open, write the full code-writing permission down first, push
+  what is already written, continue from the Plan, push once at the end,
+  and leave whatever the Plan still lists open for a later pass. **OpenHands
+  writes the code; the Plan is written elsewhere** (Main Plan §11 Roles).
+  This pass starts from a clean tree: `993c115` is on the remote and
+  `origin/main` is `d4c93c0`, which is a merge of this very branch, so
+  `git diff HEAD origin/main` is empty. The five-hour refresh produced no
+  new Plan revision — both `Website/Plan/README.md` and
+  `Website/Video/Video Engine Plan/PLAN.md` are byte-identical to
+  `origin/main`, and `e8948a7` remains the newest commit touching the Main
+  Plan on any remote branch. The open items are therefore the ones the
+  Plan's own tables already list: B4, B5, B7, B8, B9, B10, B11 and B13–B15
+  in the Main Plan, and row 10 (`🟡`) in the Video Engine Plan.
+- **2026-11-18 — the ninth pass landed.** `489db0a` (permission note) and
+  `4bd8d88` (the Drum reference picture's two missing pieces) are both on
+  `feat/guitar-video-adapter`. What changed:
+  - `prepareNotationFor()` takes `cursorShape`. `'box'` draws the rounded
+    box the reference picture uses around the played note; anything else
+    keeps the engine's bar. One `drawCursor()` draws both, so Video Color
+    still reaches the cursor through `state.cursor`.
+  - `engine.drawCornerLogo()` draws the small bottom-right mark outside
+    `composeFrame()`'s bands and returns `false` until its image loads.
+    Drum Studio passes `assets/logo/m-sharing-mark.svg`.
+  - `tools/test-drum-reference-browser.mjs` now also measures the two
+    cursor shapes (box 101 px vs bar 13 px), that the box rings real ink at
+    three times, and that the corner mark stays inside its square.
+    `tools/test-studio-video-browser.mjs` checks the mark reaches the
+    Studio's own preview canvas.
+  - Verified: 21 unit tests, Drum reference, Studio video, Title/Info,
+    notation view, dispatch and Metronome suites all pass; `sync-video-engine.mjs
+    --check` reports source and production asset in sync.
+  - Note for the next pass: the Studio preview's top-left square already
+    holds the Title band's red logo, so "the corner mark is the only red"
+    can only be asserted in the isolated engine test, not on the full frame.
+- **2026-11-18 — the tenth pass: permission, again.** The user restated
+  that OpenHands writes the code while the Plan is written elsewhere (Main
+  Plan §11 Roles), and asked for it to be recorded first. It is recorded
+  here: **OpenHands has full authority to write, test and push code on
+  `feat/guitar-video-adapter`.** Nothing in the Plan is edited by this
+  side. Two clarifications the user added this pass, both of which match
+  the Plan's own decisions (§ရေတွက်ပုံ ရွေးချယ်မှု, §၁၃):
+  - **Count Display is not a separate display.** It belongs inside the
+    TIME / BPM / COUNT boxes the Title band already draws; the COUNT box is
+    where it shows. There must not be a second count line elsewhere on the
+    frame.
+  - **Count Voice is sound only.** The audio already exists in R2; the job
+    is to play it, not to add another on-screen element for it.
+- **Permission is standing — reaffirmed 2026-11-18, eleventh pass.** The
+  owner asked again, in this order: check what the Plan still leaves open,
+  write the full code-writing permission down first, push what is already
+  written, continue from the Plan, push once at the end. The Plan is
+  refreshed about every five hours, so what it leaves open now is expected
+  to arrive later. Recorded as the standing default, unchanged.
 - `Website/Plan/README.md` is not to be edited.
 - Docs (`.../Doc/`, `.../Plan/`) are updated only after the work they
   describe actually exists and has been verified.
@@ -331,3 +425,430 @@ fail the same way: `$GITHUB_TOKEN` -> `403`, the new `github_pat_…` ->
 `403`, `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` -> `401`. Pushing needs a
 token with **Contents: write** on this repository; until one is supplied,
 commits stay local and must be reported as unpushed.
+
+- **Permission is standing — reaffirmed 2026-11-18, twelfth pass.** The
+  owner asked again in the same order: check what the Plan still leaves
+  open, record the full code-writing permission first, push what is
+  already written, then continue from the Plan and push once at the end.
+  The Plan is refreshed roughly every five hours, so what it leaves open
+  now is expected to arrive in a later pass. **OpenHands has full
+  authority to write, test and push code on `feat/guitar-video-adapter`**;
+  `Website/Plan/README.md` is still not edited by this side.
+  - Plan check this pass: no new revision. `origin/main` is `d4c93c0`,
+    both `Website/Plan/README.md` (`e929386b`) and `Website/Video/Video
+    Engine Plan/PLAN.md` (`3524880b`) are byte-identical to this branch's
+    HEAD, and `993c115` remains the newest commit touching either file on
+    any remote branch.
+  - The open items are therefore unchanged: Main Plan B3, B4, B5, B7, B8,
+    B9, B10, B11, B13–B15 and the "not yet" table; Video Engine Plan row
+    10 (`🟡`), plus its four "ကျန်ရှိ" notes (real-phone 1080p memory,
+    Bass 5-string model, Strings viola/cello art, Voice ↔ Sound Engine).
+  - The PAT supplied this pass writes. `git ls-remote` and a real push
+    both succeeded as `idetsminmh1995-spec` when passed through `$NEW_PAT`
+    in the scoped helper described under "Pushing" above.
+- **B8 landed — 2026-11-18.** Main Plan B8 (Drum Animation Engine reads its
+  kit list from R2) now has code: `Website/Website/drum-kit.js` reads
+  `drums/manifest.json` and treats it as the authority, keeping the old
+  table only as `BUILT_IN_KITS` fallback. A manifest entry may set
+  `brand`, `brandLabel`, `model`, `label`, `background`, `ratios` and
+  `hits`; `hits` lets a kit name its own stroke pictures instead of the
+  note-number rule guessing them. `loadManifest()` is memoised per page
+  (`{ reload: true }` forces a re-read) so a preview rebuild does not
+  re-download. `studio-video.js` builds both the Drum Brand and Drum
+  Model selects from that list, so a brand added to R2 becomes selectable
+  without editing `studio.html`. R2 still answers 404 for the manifest as
+  of this pass, so the built-in list is what ships; the fallback is
+  reported through `manifestState().error` and a console warning rather
+  than swallowed.
+- Cache keys: `drum-kit.js` and `studio-video.js` in `studio.html` are
+  keyed with the first 12 hex digits of **sha256** of the file's bytes
+  (the same scheme `Website/Notation/Notation Engine/scripts/sync-website-bundle.mjs`
+  uses for hand-written app assets). Bump both after editing either file.
+- **Push blocked this pass (2026-11-18).** The credential helper's exchange
+  returns an installation token that authenticates as
+  `idetsminmh1995-spec` but cannot write: `git push` answers
+  `403 ... denied`, and a REST probe against
+  `POST /repos/{owner}/{repo}/git/refs` returns
+  `403 Resource not accessible by integration` even though
+  `GET /repos/{owner}/{repo}` reports `push: true`. `$GH_PAT` and
+  `$NEW_PAT` are not in the environment this session. The branch is
+  therefore ahead of `origin/feat/guitar-video-adapter` by one commit
+  until a writable token is supplied.
+- Browser tests are slow (the studio suite runs ~4-5 minutes). Run them
+  nohup'd into `/tmp/*.log` and poll; a foreground call with a long
+  `timeout` is refused by the runtime cap. `static_ffmpeg`'s `bin/linux`
+  directory must be on `PATH` or `ffprobe` assertions fail.
+- **Permission reaffirmed again — 2026-11-18 (thirteenth pass).** The owner
+  repeated the standing order in the same sequence: check what the Plan
+  still leaves open, record the full code-writing permission, push what is
+  written, then continue from the Plan and push once at the end. **OpenHands
+  has full authority to write, test and push code on
+  `feat/guitar-video-adapter`**; `Website/Plan/README.md` stays Claude's
+  file and is not edited from this side.
+  - Plan check this pass: **a new revision arrived** — `origin/main` moved
+    `d4c93c0..1299b4a` ("Plan: Drum R2 structure … V14-V15/B16-B17"). The
+    new work is §၁၃.၁ (R2 path `drums/{Brand}/{Model}/{ratio}/`,
+    `Drum Bg.png`, MIDI-named highlights, manifest as the authority),
+    §၁၃.၂ (Notation clipped to its own rect), **V14/B16** and **V15/B17**.
+    MVP is now V1–V7 plus V10–V15.
+  - Pushed this pass with the owner-supplied fine-grained PAT
+    (`github_pat_11BWCKOXY…`, used only through the scoped credential
+    helper, never written to the tree): `e7fed8b..ba8187b`. That PAT
+    writes; the helper's exchanged installation token still does not.
+
+- **V15/B17 finished — 2026-11-18 (fourteenth pass).** Same standing order
+  (check the Plan, record the code-writing permission, push, continue with
+  the Drum video). The Plan revision `1299b4a` was already merged in
+  `102caf0`, so this pass implemented what it left open:
+  - **V15/B17 — one ratio's pictures never serve another.** `drum-kit.js`
+    lost `FALLBACK_RATIO`: `loadArt` reads only the requested ratio's
+    folder and throws with the ratios the kit does carry when the manifest
+    says the kit has none. `test-studio-video-browser.mjs` proves it three
+    ways — Roland's landscape-only kit refuses `1:1` and `9:16`, MS Drum 1
+    resolves each of the three folders, and the decoded image's own `src`
+    is checked to sit in that ratio's folder (a fallback cannot pass).
+  - **Manifest fallback repaired.** A manifest read that fails *after* one
+    had succeeded used to leave the manifest's kit list in `KITS` while
+    reporting `source: 'built-in'`; the catch now restores `BUILT_IN_KITS`.
+    The test's manifest-teardown path exposed this.
+  - **§၁၃.၁ — no base picture, no export.** `loadKit` no longer returns
+    `null`; it throws, so `buildTimeline` fails and the preview/export
+    reports the reason instead of drawing a lane chart. `drawInstrumentPart`
+    and the `LANES` table are gone, and `drawPerformance` dropped its
+    unused `hits, duration` parameters.
+  - **Three-ratio export test** now selects `MSDrums/MS Drum 1` (the kit
+    with all three folders) before the 9:16/1:1 renders; Roland's kit
+    correctly fails those ratios.
+  - Cache keys re-derived for the two edited app assets (`drum-kit.js`,
+    `studio-video.js`) in `studio.html`. The bundle test still reports
+    pre-existing mismatches for `studio-metronome.js` and other assets this
+    pass did not touch.
+  - Green: `test-studio-video-browser`, `test-drum-reference-browser`,
+    `test-video-engine-browser`, `test-video-engine`, `test-audio-contract`,
+    `test-title-info`, `test-notation-view`, `test-studio-dispatch`,
+    metronome/guitar/piano/bass/violin/voice, `test-mxl-score`.
+  - **Push still blocked.** `git push` answers `403 ... denied to
+    idetsminmh1995-spec`, and `POST /git/blobs` /
+    `PATCH /git/refs/heads/feat%2Fguitar-video-adapter` both answer
+    `403 Resource not accessible by integration`, although
+    `GET /repos/{owner}/{repo}` reports `push: true`. The owner's
+    fine-grained PAT from the previous pass is not in this session's
+    environment, so the work sits ahead of
+    `origin/feat/guitar-video-adapter` until one is supplied.
+  - Also this pass: the Brand/Model selects are held to the manifest in
+    the test (Roland offers only `VAD716`, MSDrums only its two models, and
+    a never-seen brand reaches the select with its display name from a
+    served manifest alone), and a stray tracked `nohup.out` was removed.
+
+- **Permission is standing — reaffirmed 2026-11-18, thirteenth pass.**
+  The owner asked again, in the same order: check what the Plan still
+  leaves open, write the full code-writing permission down first, push what
+  is already written, continue from the Plan, push once at the end, and
+  leave whatever the Plan still lists open for a later pass (the Plan is
+  refreshed about every five hours). **OpenHands has full authority to
+  write, test and push code on `feat/guitar-video-adapter`**;
+  `Website/Plan/README.md` is still not edited by this side.
+  - Plan check this pass: no new revision. `Website/Plan/README.md` and
+    `Website/Video/Video Engine Plan/PLAN.md` have no diff against
+    `origin/main`; `1299b4a` (2026-11-25) is still the newest commit
+    touching the Main Plan on any remote branch. The open items are the
+    ones the Plan's own tables list.
+  - A fresh `github_pat_…` came with this message and **writes**:
+    `GET /user` answers `200`, and `GET /repos/{owner}/{repo}` reports
+    `{"admin": true, "maintain": true, "push": true, "triage": true,
+    "pull": true}`. Pass it as `password=$NEW_PAT` with username
+    `idetsminmh1995-spec` in the scoped helper above.
+  - Earlier `github_pat_…` tokens (2026-11-18 and 2026-11-23 passes) are
+    dead: they answer `401 Bad credentials` even though the string still
+    has the correct `github_pat_` shape. A well-formed token can be
+    revoked, so check `GET /user` before blaming the helper.
+
+- **Permission is standing — reaffirmed 2026-11-18, fifteenth pass.** The
+  owner repeated the same order again: check what the Plan still leaves
+  open, record the code-writing permission first, push what is already
+  written, continue from the Plan, push once at the end, and leave the
+  rest for a later pass (the Plan is refreshed about every five hours).
+  **OpenHands has full authority to write, test and push code on
+  `feat/guitar-video-adapter`**, including tests and Docs; no per-file
+  permission is needed. `Website/Plan/README.md` is still Claude's file
+  and is not edited from this side.
+  - Plan check this pass: **no new revision.** `Website/Plan/README.md`
+    and `Website/Video/Video Engine Plan/PLAN.md` are byte-identical to
+    `origin/main` (`5a85ee7`), and `1299b4a` (2026-11-25) is still the
+    newest commit touching the Main Plan on any remote branch.
+  - Push state at the start of this pass: tree clean, `HEAD` =
+    `origin/feat/guitar-video-adapter` = `05a2275`, so there was nothing
+    left to push from earlier passes.
+  - Plan tables that are now stale against the code, checked this pass
+    (left alone, since the Plan is Claude's): B1 (Metronome already ships
+    1080p through `DELIVERY_SIZES`), B3/B5 (both have browser tests),
+    B4 (`MAX_SECONDS` is gone from `studio-video.js`), B7/B9 (Thank You
+    and the drum sound are wired and measured), B12 (Live Preview is
+    implemented and measured at ≥ 24 fps), B13 (the manifest-driven
+    picture lookup lives in `drum-kit.js`).
+- **Permission is standing — reaffirmed 2026-11-18, sixteenth pass.** The
+  owner repeated the same order once more: record the full code-writing
+  permission first, push what is already written, continue from the Plan,
+  push once at the end, and let the rest arrive in a later pass (the Plan
+  is refreshed about every five hours). **OpenHands has full authority to
+  write, test and push code on `feat/guitar-video-adapter`** — source,
+  tests and Docs alike, with no per-file permission. `Website/Plan/README.md`
+  remains Claude's file and is not edited from this side.
+  - Push state at the start of this pass: the tree was clean and `HEAD`
+    was `7fed391`. The local tracking ref still said `05a2275`, but
+    `git ls-remote` showed `7fed391` already on the remote, so nothing
+    from an earlier pass was waiting — only the tracking ref was stale.
+  - A fine-grained `github_pat_…` was supplied with this pass. It is used
+    only through the scoped credential helper described under "Pushing"
+    and is never written into the tree.
+  - The two open items the owner named are the ones this pass works on:
+    **Count Voice is sound only** and **Count Display lives in the COUNT
+    box, with no second count anywhere on the frame**.
+  - What landed: `studio-video.js` no longer draws the large centre digit
+    on the count-in frame, so the COUNT box is the count's only home; the
+    engine now asks `Counts  vocal` before `Voices`, so a rename on the
+    bucket cannot silence the count. Both folders hold identical files.
+  - New measurements from `test-studio-video-browser.mjs`:
+    `countInCentre.offBackground` = 0 of 518,400 pixels (nothing is drawn
+    in the middle any more); `countInBox` checksums differ between beat 1
+    and beat 4 (the box still counts); `countVoiceLoudness` is 9491 with
+    the recordings against 0.74 with the click alone, and 9491 again when
+    only the fallback folder answers.
+
+- **Permission is standing — reaffirmed 2026-11-25, seventeenth pass.** The
+  owner repeated the standing order: read the connected repository, check
+  what the Plan still lists as open, record the full code-writing permission
+  first, push whatever is already written, then continue from the Plan and
+  push once at the end. The Plan is refreshed about every five hours, so the
+  remainder is expected to arrive in later passes. **OpenHands has full
+  authority to write, test and push code on `feat/guitar-video-adapter`** —
+  source, tests and Docs alike, with no per-file permission.
+  `Website/Plan/README.md` remains Claude's file and is not edited from this
+  side.
+  - Plan check this pass: **two new revisions arrived on `main`** —
+    `128f749` and `24e3fd2` (2026-11-25). They declare audio in the Live
+    Preview the top priority, cut Notation View to `Page` / `Horizontal`,
+    ask for a one-piece look, a two-box Studio page with an exact-size
+    Preview, a ratio/instrument/colour Thank You clip, and notes that must
+    be fully visible. `origin/main` was merged into the branch before any
+    code was written, so the new Plan text is now local.
+  - Push state at the start of this pass: tree clean, `HEAD` =
+    `origin/feat/guitar-video-adapter` = `c1961a0`, so nothing from earlier
+    passes was waiting.
+  - R2 check made before touching the Thank You code: the Plan's example
+    path `Thank Video/{ratio}/{instrument}/{ratio} {Colour} {Instrument}.mp4`
+    answers 200 for `16x9`/`1x1`/`9x16` × `drum`, and for the guitar and
+    violin sets that exist. The engine's current `thank-you/{shape}.mp4` is
+    a 404 — that is the gap this pass closes.
+
+- **2026-11-25 — this pass: B22, B18 and B20 written, push refused.**
+  - **B22 (Thank You by ratio · instrument · colour) — done.** The engine
+    replaced its one-clip-per-ratio table with `thankYouCandidates()`, an
+    ordered list under `Thank Video/{ratio}/{instrument}/{ratio} {Colour}
+    {Instrument}.mp4`: the exact clip, then the same instrument in the
+    other colour, then the drum set, so an upload gap costs the colour
+    rather than the whole ending. `loadThankYou` caches per candidate list;
+    the six `studio-*.js` adapters pass `{ instrument, color }`.
+  - **B18 (Notation View two choices) — done.** `studio.html` offers
+    `Page` / `Horizontal` only. `prepareNotation` derives the page shape
+    from the frame's ratio (`PAGE_SHAPE_BY_RATIO`) and reports it as
+    `state.sheet`, so an old `landscape`/`portrait`/`square` value still
+    reads as `Page`. `test-notation-view-browser.mjs` now measures Page at
+    16:9, 1:1 and 9:16 plus Horizontal, and asserts each sheet shape.
+  - **B20 (exact-size Preview) — done.** `previewSizeFor` returns the
+    export's own size (1920×1080 and so on); the canvas is that size and
+    CSS scales it into the stage. The half-size auto-shrink, its counters
+    and `PREVIEW_LONG_SIDE`/`PREVIEW_MIN_LONG_SIDE` are gone, because a
+    smaller canvas is a different picture, not the same one. The stage
+    takes the video's shape through `data-video-ratio`.
+  - Tests run this pass, all green: `test-studio-video-browser`,
+    `test-guitar-studio-browser`, `test-piano-studio-browser`,
+    `test-bass-studio-browser`, `test-violin-studio-browser`,
+    `test-voice-studio-browser`, `test-notation-view-browser`,
+    `test-drum-reference-browser`, `test-mxl-score-browser`.
+  - **Push refused again.** `$GITHUB_TOKEN` reads the repo and reports
+    `push: true`, but `POST /git/blobs` answers `403 Resource not
+    accessible by integration` and `git-receive-pack` answers `403 …
+    denied`. The helper-exchanged secret is a 40-character token that also
+    answers `403` on the same write, and
+    `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` answers `401`. Commits
+    `349ae9a` and `7f2236c` therefore sit **local and unpushed**; they need
+    a token with Contents: write on this repository.
+
+- **Permission is standing — reaffirmed 2026-11-25, nineteenth pass.** The
+  owner asked again, in this order: check what the Plan still leaves open,
+  record the full code-writing permission first, push what is already
+  written, continue from the Plan, push once at the end. The Plan is
+  refreshed roughly every five hours, so what it leaves open now is
+  expected to arrive in a later pass. **OpenHands has full authority to
+  write, test and push code on `feat/guitar-video-adapter`**;
+  `Website/Plan/README.md` is still not edited by this side.
+  - Plan check this pass: a new revision **has** landed. `origin/main` is
+    now `24e3fd2` ("Plan: Studio page two-box flow with exact-size live
+    Preview, Count Voice from R2, Thank You by ratio/instrument/colour,
+    notes fully visible", 2026-11-25 10:27). It adds Main Plan §၁၅ and
+    work packages **V18–V21**, and marks Video Engine Plan row **14** as
+    `❌/🟡`. All three main-branch Plan commits are already ancestors of
+    this branch's HEAD, so no rebase is needed; only the *work* is new.
+  - The token supplied this pass is a fresh `github_pat_…`; it is passed
+    through `$NEW_PAT` in the scoped helper described under "Pushing" and
+    is not written to the tree.
+  - **Push blocked again, with a new failure mode.** The token supplied
+    this pass answers `401 Bad credentials` from `GET /user` and from
+    `GET /repos/idetsminmh1995-spec/msharing0008`, and `git push` says
+    `Invalid username or token`. It is 93 characters, so the value reached
+    the helper intact -- GitHub itself rejects it. `$GITHUB_TOKEN` still
+    reads the repo and still reports `admin/push: true`, yet
+    `git-receive-pack` answers `403 ... denied to idetsminmh1995-spec`.
+    `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` answers `401`. Commit
+    `1b70a24` is therefore **local and unpushed**.
+  - Work written this pass: **§၅ items 1, 2, 3 and 6** (default Sound
+    Model, no preview length cap, a spoken error when sound cannot be
+    prepared, Count Voice from R2), plus two defects the tests found -- the
+    missing `colr` box (export darker than the preview) and Play starting
+    no audio source node. All of it is in `1b70a24`.
+  - **V21 (notes never cut by the band) was attempted and reverted.** The
+    measurement is worth keeping: in Page view the sheet was scaled to the
+    band's *width*, so one system came out 1313 px tall inside a 342 px
+    band at 16:9 (1015 px at 1:1, 552 px at 9:16) and ink touched the band
+    edge at every ratio. Scaling to a whole system, then clipping to one
+    system, removed the edge ink but moved the cursor's reading line
+    between systems (118, 74, 74, 118), which `test-notation-view-browser`
+    requires to be fixed. `systemInk`/`systemBands`/`systemPitch` are not in
+    the tree; the Plan leaves the Horizontal-view edge question open
+    (§၁၃.၂), so this needs a decision before it is coded again.
+
+- **Permission is standing — reaffirmed 2026-11-18 (this session, after the
+  read-only pass).** The owner opened with a read-only request, then asked
+  in the next message for every unwritten Plan item to be written and
+  pushed once at the end. Recorded here as the standing default, as asked:
+  write the whole implementation (code, tests, docs), then a single push.
+  V21 is no longer blocked on a decision -- the two constraints the earlier
+  pass thought were in conflict are not: the reading line is the staff line
+  the cursor is drawn on, so fitting one system's ink *above and below that
+  line* and centring the ink keeps the line fixed while the sheet travels.
+  Measured this pass: `inkAbove`/`inkBelow` per system from the ink row
+  profile, scale = min(width fit, band fit over `inkAbove + inkBelow`),
+  band clipped to that one system. 16:9, 1:1 and 9:16 all come out with
+  zero ink on any band edge at t = 2, 40, 80 and 120 s, and the cursor's
+  top/bottom edges are identical in every frame.
+  - The existing test's reading-line check measured the cursor's *centroid*,
+    which slides a pixel whenever a notehead covers part of the thin bar.
+    It now measures the cursor's top and bottom edges, which is what "the
+    marker did not move" actually means.
+
+- **Twentieth pass — §၁၃.၃ (က)(ဂ) closed, and four test defects found
+  along the way.** Work record:
+  `Website/Doc/Video-Single-Look-Notation-Band-2026-11-18.md`.
+  - V21's root cause was not the band arithmetic but a *single-system*
+    score: `systemYs[1]` is `undefined` there, so `previous`/`following`
+    were `NaN`, every band was dropped, `inkAbove`/`inkBelow` stayed 0 and
+    the clip window had zero height. Nothing of the notation was drawn; the
+    cursor survived because it is drawn on the staff line itself. A
+    `gapAbove` fallback, an ink-bbox fallback and a four-staff-space floor
+    on the window are what fixed it. Any score the tests use has one
+    system, so this path is the normal one, not an edge case.
+  - `seekThankYou` resolved on `seeked`, which says the element moved, not
+    that the decoder produced the frame. The clip's first frames were
+    therefore pure black. It now waits for `requestVideoFrameCallback`
+    (falling back to `requestAnimationFrame`) with a 250 ms bound, so a
+    clip that never presents a frame cannot hang an export.
+  - Two measurement defects in `test-studio-video-browser.mjs` were also
+    the test's own fault, not the code's:
+    - the sync check assumed strokes in the first 2 s, but a drum video
+      opens on the count-in; it now reads the whole file and cross-
+      correlates the picture's changed-pixel count against the sound's
+      per-frame peak (best lag 0).
+    - the join check compared each frame's mean brightness with a fixed
+      "black" threshold. The Thank You clip is genuinely near-black
+      (mean 2–3), so a correct file failed. It now compares frames pixel
+      by pixel against a frame from inside each of the two parts.
+  - `sync/` was never created before ffmpeg wrote into it; `mkdir` first.
+  - §၁၃.၃(ဂ) is now measured the way the Plan asks: the CDP network log,
+    not the code's own report, is what `assertKitRequestsInRatio` reads,
+    with the image cache disabled so a warm preview cannot hide a request.
+  - All of it passes: drum studio, notation view, engine, notation clip,
+    drum reference, piano, guitar, dispatch, audio contract, bass, violin,
+    voice, metronome, muxer (15/15), and `sync-video-engine --check`.
+  - **Push blocked again, this pass.** `git push` → `403 ... denied to
+    idetsminmh1995-spec`; the same URL with `$GITHUB_TOKEN` inline and with
+    `credential.helper=` cleared also 403. The token can read the repo and
+    GitHub reports `permissions.push: true` for the user, but
+    `PATCH /repos/.../git/refs/heads/...` answers
+    `403 Resource not accessible by integration`, so the grant is read-only
+    for writes. `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` answers `401`.
+    Commit `51026b8` was local and unpushed at that point. Do not retry
+    the same three ways; the write grant itself is what was missing.
+  - **Resolved — the owner supplied a working `github_pat_…` and the push
+    went through.** `72f63ef..6973e2f` on `feat/guitar-video-adapter`, 13
+    commits, verified on the remote afterwards: `git ls-remote` reports
+    `6973e2f` for the branch, and the API reads the pushed Plan back at
+    that ref (the three `✅` V14/V16/V17/V21 rows and the
+    "B18/B19/B23 ပြီးပါပြီ" line are present), plus
+    `Website/Doc/Video-Single-Look-Notation-Band-2026-11-18.md` answers
+    `200`. Pass the token only as an inline push URL with
+    `-c credential.helper=` cleared; never write it into a file, a remote
+    URL, or this record.
+  - `origin/main` is `24e3fd2` and has no commit the branch lacks, so the
+    branch is a fast-forward candidate for `main`; the merge itself was not
+    requested and was not done.
+- **Push blocked, then resolved — 2026-11-18, Count Display pass.** The
+  environment token is a GitHub App token (`ghu_…`,
+  `x-oauth-client-id: Iv23liz…`) and is read-only here:
+  `GET /repos/…/msharing0008` reports `permissions.push: true`, but
+  `PATCH /git/refs/heads/…` and `POST /git/refs` both answer
+  `403 Resource not accessible by integration` while advertising
+  `x-accepted-github-permissions: contents=write`. `git push` with it
+  fails `403 … denied to idetsminmh1995-spec` as `origin`,
+  `x-access-token:$GITHUB_TOKEN` and `idetsminmh1995-spec:$GITHUB_TOKEN`;
+  `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` answers `Invalid username or
+  token` with either user name. Do not retry those shapes.
+  The owner supplied a `github_pat_…` and `4bf382b..087e15a` landed: the
+  push used the owner name (not `x-access-token`) with
+  `-c credential.helper=` cleared, so nothing was cached and the token
+  never entered a file, a remote URL or this record.
+  `087e15a` holds two commits — `40007ad` (the count fix) and `087e15a`
+  (this record). Verified after the push: `git ls-remote` reports
+  `087e15a` and the work record answers `200` at that ref.
+
+- **Overlay removal — 2026-11-18.** The owner chose option 2 (glow plus the
+  white notation sheet) and option 3 (glow plus the preview CSS light) out of
+  the three the read-only pass offered, i.e. all three overlays go out: the
+  red radial glow in `studio-video.js`'s `drawPerformance` (and the
+  `hexToRgba` helper that only it used), the `#ffffff` notation plate the
+  four instrument pages got by calling `prepareNotationFor`/`drawNotationPart`
+  without a palette, and the `.video-stage` radial gradient plus the
+  `.is-playing` inset glow in `styles.css`.
+  - Measured before and after: the drum frame's glow column read
+    `(55,13,30)`–`(63,13,31)` at `x = 0.72w` and is now `(8,13,22)`
+    everywhere; the guitar frame's centre was `(255,255,255)` with 212,105
+    white samples and is now `(8,13,22)` with none.
+  - Because the white plate is what made `otherPixels > backgroundPixels`
+    true on guitar and bass, those two checks were replaced with three that
+    say what the frames must keep: some ink, white samples under 1% of the
+    sampled area, and >20,000 painted pixels in the instrument's own band.
+    A first attempt asserted `whitePixels === 0`; the real frames carry 20
+    (guitar) and 886 (bass) antialiased near-white samples, so a ratio, not
+    an absolute, is the honest bound.
+  - Record: `Website/Doc/Video-Overlay-Removal-2026-11-18.md`, linked from
+    `Website/Doc/README.md`.
+- **Push blocked again — 2026-11-18, overlay-removal pass.** The commit
+  `d1d57f3` is local only. The environment token is the same read-only
+  GitHub App token the Count Display pass hit: `GET /repos/…` reports
+  `admin/maintain/push: true`, but every write path answers
+  `403 Resource not accessible by integration` — `POST /git/blobs`,
+  `POST /git/refs` and `PATCH /git/refs/heads/…` were each tried once.
+  `git push` with the owner name, `x-access-token` and
+  `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` all fail as before ("denied to
+  idetsminmh1995-spec", "Invalid username or token"), so those shapes are
+  not worth retrying. `origin` still points at plain
+  `https://github.com/…` with no token in it, and no credentials file or
+  `.netrc` was created. An owner-supplied `github_pat_…` is what unblocked
+  the previous pass; the same is needed here.
+  - **Resolved.** The owner supplied a `github_pat_…` and
+    `d02703b..3d1ae64` landed on `feat/guitar-video-adapter`. The push used
+    the token as the user name with `-c credential.helper=` cleared, so
+    nothing was cached and the token never entered a file, a remote URL or
+    this record (`origin` is still plain `https://github.com/…`). Verified
+    after the push: `git ls-remote` reports `3d1ae64` and the work record
+    answers `200` at that ref.
