@@ -168,6 +168,35 @@ Run every command from `Website/Notation/Notation Engine/`.
   it. The owner reaffirmed it again on 2026-11-18 and asked for it to be
   recorded at the start of the session: full permission, write the whole
   implementation, and push what is written before continuing.
+- **Permission is standing — reaffirmed at the start of the 2026-11-18
+  session that found Plan revisions `1695126` and `7f63b0e`.** The owner
+  asked for a read-only pass first ("ချိတ်ဆက်ထားတဲ့ repo ကိုဖတ်ကြည့်ပါပြီးရင် ၊ Code
+  မရေးပါနဲ့အုန်း"), then said the video-export part of the Plan had been
+  updated. That second message is the work instruction, so writing resumes
+  under the standing permission recorded above. Recorded first, as asked:
+  full code-writing permission on `feat/guitar-video-adapter`; push what is
+  already written before starting, then push once at the end.
+  - Plan check this pass: **two new revisions arrived** —
+    `1695126` ("Plan: record decisions - drum sound from Sound Engine, count
+    voice follows meter (4/4 -> 1,2,3,4), no half-cut notes at Horizontal
+    edges, Thank You naming confirmed") and `7f63b0e` ("Plan: Count Voice
+    files M1-M7 in R2, 6/8 counts 1-6 confirmed, open question for meters
+    above 7"). Both are ancestors of no local commit yet; `origin/main` is
+    `7f63b0e` and this branch is based on `24e3fd2`.
+  - What the new revisions decide, and therefore what is now work:
+    **§၅ item 5 / V9** — drum sound comes from the Sound Engine (MuseScore
+    General's GM percussion) instead of the hand-written synthesizer;
+    **V19** — Count Voice is one R2 recording per beat number, `M1`–`M7`,
+    counted to the score's own metre (`4/4` → `1,2,3,4`, `6/8` → `1…6`),
+    with meters above 7 still open;
+    **V21** — a note must not be shown half-cut at a Horizontal edge;
+    **§၁၅ item 14** — the Thank You naming scheme is confirmed.
+  - Verified against the bucket: `Counts  vocal/M1.wav` … `M7.wav` answer
+    `200` and are byte-identical to the older `1.wav` … `7.wav` names;
+    `M8` and `8` answer `404`, which is exactly the "meters above 7" hole
+    the Plan leaves open. The engine currently asks for `1.wav`, so the
+    `M`-prefixed name is the gap this pass closes.
+
 - **Permission is standing — reaffirmed again at the start of the
   2026-11-18 02:05 session.** The owner said, in the same message that
   asked for a read-only pass over the repository, that the code permission
