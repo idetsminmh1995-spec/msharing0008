@@ -378,15 +378,32 @@ width, height = image.size
 pixels = image.load()
 background = 0
 other = 0
+white = 0
 for y in range(0, height, 2):
     for x in range(0, width, 2):
         r, g, b = pixels[x, y]
+        if r > 250 and g > 250 and b > 250: white += 1
         if abs(r - 11) + abs(g - 16) + abs(b - 24) <= 24: background += 1
         else: other += 1
-print(background, other)
+top = int(height * 0.02)
+bottom = int(height * 0.46)
+left = int(width * 0.10)
+right = int(width * 0.90)
+neck = 0
+for y in range(top, bottom):
+    for x in range(left, right):
+        r, g, b = pixels[x, y]
+        if abs(r - 11) + abs(g - 16) + abs(b - 24) > 30: neck += 1
+print(background, other, white, neck)
 `]);
-  const [backgroundPixels, otherPixels] = ink.trim().split(/\s+/).map(Number);
-  assert.ok(otherPixels > backgroundPixels, `The guitar frame is mostly empty: ${otherPixels} painted of ${backgroundPixels + otherPixels}`);
+  const [backgroundPixels, otherPixels, whitePixels, neckPixels] = ink.trim().split(/\s+/).map(Number);
+  assert.ok(otherPixels > 0, `The guitar frame has nothing drawn on it: ${otherPixels} painted of ${backgroundPixels + otherPixels}`);
+  // The sheet is the frame's own background (§၁၃.၃(က)), so a white notation
+  // panel would be an overlay the frame no longer carries.
+  assert.ok(whitePixels < (backgroundPixels + otherPixels) * 0.01,
+    `The guitar frame still carries a white notation panel: ${whitePixels} white samples`);
+  // The neck is the first band of the stack and must carry the drawing.
+  assert.ok(neckPixels > 20000, `The guitar neck band is empty: only ${neckPixels} pixels painted`);
 
   // The Plan's last part of the length: the Thank You clip closes the video
   // and is counted in it. The clip is two seconds, so four becomes six.

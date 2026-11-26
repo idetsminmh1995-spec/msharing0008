@@ -810,3 +810,25 @@ commits stay local and must be reported as unpushed.
   `087e15a` holds two commits — `40007ad` (the count fix) and `087e15a`
   (this record). Verified after the push: `git ls-remote` reports
   `087e15a` and the work record answers `200` at that ref.
+
+- **Overlay removal — 2026-11-18.** The owner chose option 2 (glow plus the
+  white notation sheet) and option 3 (glow plus the preview CSS light) out of
+  the three the read-only pass offered, i.e. all three overlays go out: the
+  red radial glow in `studio-video.js`'s `drawPerformance` (and the
+  `hexToRgba` helper that only it used), the `#ffffff` notation plate the
+  four instrument pages got by calling `prepareNotationFor`/`drawNotationPart`
+  without a palette, and the `.video-stage` radial gradient plus the
+  `.is-playing` inset glow in `styles.css`.
+  - Measured before and after: the drum frame's glow column read
+    `(55,13,30)`–`(63,13,31)` at `x = 0.72w` and is now `(8,13,22)`
+    everywhere; the guitar frame's centre was `(255,255,255)` with 212,105
+    white samples and is now `(8,13,22)` with none.
+  - Because the white plate is what made `otherPixels > backgroundPixels`
+    true on guitar and bass, those two checks were replaced with three that
+    say what the frames must keep: some ink, white samples under 1% of the
+    sampled area, and >20,000 painted pixels in the instrument's own band.
+    A first attempt asserted `whitePixels === 0`; the real frames carry 20
+    (guitar) and 886 (bass) antialiased near-white samples, so a ratio, not
+    an absolute, is the honest bound.
+  - Record: `Website/Doc/Video-Overlay-Removal-2026-11-18.md`, linked from
+    `Website/Doc/README.md`.

@@ -121,15 +121,6 @@
     musicXmlName: musicXmlInput?.files?.[0]?.name || '',
   });
 
-  const hexToRgba = (hex, alpha) => {
-    const clean = String(hex).replace('#', '');
-    const value = clean.length === 3 ? clean.split('').map((part) => part + part).join('') : clean;
-    const red = Number.parseInt(value.slice(0, 2), 16) || 242;
-    const green = Number.parseInt(value.slice(2, 4), 16) || 13;
-    const blue = Number.parseInt(value.slice(4, 6), 16) || 61;
-    return `rgba(${red}, ${green}, ${blue}, ${alpha})`;
-  };
-
   const getPalette = (color) => engine.paletteFor(color);
 
   const syncControlState = () => {
@@ -370,11 +361,6 @@
 
     ctx.fillStyle = palette.background;
     ctx.fillRect(0, 0, width, height);
-    const glow = ctx.createRadialGradient(width * 0.72, height * 0.12, 4, width * 0.72, height * 0.12, Math.max(180, width * 0.4));
-    glow.addColorStop(0, hexToRgba('#f20d3d', settings.color === 'white' ? 0.1 : 0.24));
-    glow.addColorStop(1, hexToRgba('#f20d3d', 0));
-    ctx.fillStyle = glow;
-    ctx.fillRect(0, 0, width, height * 0.55);
 
     await engine.composeFrame(ctx, {
       instrument: selectedTool,
