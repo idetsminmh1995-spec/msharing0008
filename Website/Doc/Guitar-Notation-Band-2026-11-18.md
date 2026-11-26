@@ -75,4 +75,4 @@ AssertionError: The landscape frame gave the notation band no room:
 - Bass စာမျက်နှာတွင်လည်း တူညီသော pin ပုံစံ ရှိသည် (`studio-bass.js`)။ ယခု တိုင်းတာမှုတွင် bass ၏ share သည် 0.182–0.678 ဖြစ်သဖြင့် notation band သည် 334–1534 px ကျန်နေသည် — ပြဿနာ မပေါ်ပါ။ သို့သော် တူညီသော ကန့်သတ်ချက်ကို bass တွင် မထည့်ရသေးပါ (ဤတောင်းဆိုချင်း၏ ပြင်ပ)။
 - 16:9 တွင် notation band 601 px ဖြစ်လာသဖြင့် ဂစ်တာ band သည် 435 px သာ ကျန်သည် — ပုံကျယ်သော ဂစ်တာများ အနည်းငယ် ချုံ့ခံရမည်။ Plan §၁၃ ၏ band အချိုးများကို မပြောင်းပါ။
 - Workers Builds (msharing0008) deploy-side fail ကို ဤ pass တွင် မထိပါ။
-- **Push မဖြစ်နိုင်သေးပါ** — `git push origin feat/guitar-video-adapter` သည် `403 Permission to idetsminmh1995-spec/msharing0008.git denied` ဖြင့် ငြင်းပယ်ခံရသည်။ API တွင်လည်း `Resource not accessible by integration` ဖြစ်သည် (repo permissions တွင် `push: true` ဟု ပြသော်လည်း token ၏ အာဏာ မလုံလောက်ပါ)။ ယခင် pass များတွင်လည်း တူညီသော အခြေအနေ ကြုံခဲ့ရသည်။ Commit `e8e8484` သည် local တွင် ရှိပြီး push မရသေးပါ။
+- **Push** — `8659af1` ကို `feat/guitar-video-adapter` သို့ push ပြီး (`5968133..8659af1`)။ `main` (`5968133`) ကို မထိပါ။
