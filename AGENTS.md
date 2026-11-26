@@ -852,3 +852,22 @@ commits stay local and must be reported as unpushed.
     this record (`origin` is still plain `https://github.com/…`). Verified
     after the push: `git ls-remote` reports `3d1ae64` and the work record
     answers `200` at that ref.
+- **Merged to `main` on the owner's instruction — 2026-11-18.** The owner
+  said not to stop at the pull-request stage and to land the work fully.
+  The shape that worked, because the GitHub App token cannot write:
+  - `gh pr merge 21 --merge --match-head-commit …` failed twice with
+    `GraphQL: Head branch was modified` even though
+    `gh pr view 21 --json headRefOid` matched the local head exactly. The
+    local `refs/remotes/origin/feat/guitar-video-adapter` was stale
+    (`6973e2f` in the reflog, `9c372aa` on the remote); refreshing that ref
+    did not help, so the GraphQL path is not worth retrying for this repo.
+  - `PUT /repos/…/pulls/21/merge` with `{"sha": <head>, "merge_method":
+    "merge"}` and the owner's `github_pat_…` returned
+    `{"merged": true, "sha": "14d0a76"}`, i.e. the REST endpoint works where
+    GraphQL does not.
+  - Verified after the merge: `origin/main` is `14d0a76`, a merge commit of
+    `9c372aa`; `git rev-list --count origin/main..origin/feat/guitar-video-adapter`
+    is 0 and `git branch -r --contains d1d57f3` lists `origin/main`. On
+    `main`, `studio-video.js` has no `f20d3d` and `styles.css` has no
+    `.video-stage` radial gradient, while `.is-playing` keeps only its 1px
+    inset ring. No pull request is open.
