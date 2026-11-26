@@ -845,3 +845,10 @@ commits stay local and must be reported as unpushed.
   `https://github.com/…` with no token in it, and no credentials file or
   `.netrc` was created. An owner-supplied `github_pat_…` is what unblocked
   the previous pass; the same is needed here.
+  - **Resolved.** The owner supplied a `github_pat_…` and
+    `d02703b..3d1ae64` landed on `feat/guitar-video-adapter`. The push used
+    the token as the user name with `-c credential.helper=` cleared, so
+    nothing was cached and the token never entered a file, a remote URL or
+    this record (`origin` is still plain `https://github.com/…`). Verified
+    after the push: `git ls-remote` reports `3d1ae64` and the work record
+    answers `200` at that ref.
