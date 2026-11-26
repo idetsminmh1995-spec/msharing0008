@@ -2336,16 +2336,14 @@
     if (footer.length > 0) {
       ctx.fillText(fitText(ctx, footer.join(' \u00b7 '), rightEdge - leftEdge), leftEdge, statsY + Math.round(20 * scale));
     }
-
-    if (settings.countEnabled) {
-      drawCountRow(ctx, { at, meta, settings, palette, scale, pad: leftEdge, y: statsY + Math.round(40 * scale), rightEdge });
-    }
   }
 
   /**
    * The count as the video prints it: `1, 2, 3, 4` or its eighth/sixteenth
    * subdivision. The Plan keeps this display separate from the Count Voice
-   * SOUND, so this only ever changes what is written on the frame.
+   * SOUND, so this only ever changes what is written on the frame. The
+   * printed count has a single home, the COUNT box; the count-in itself is
+   * heard, never printed.
    */
   const countTokens = (display, beats) => {
     const subdivisions = display === 'sixteenths' ? ['e', '&', 'a'] : display === 'eighths' ? ['&'] : [];
@@ -2366,26 +2364,6 @@
     const within = position - Math.floor(position);
     return beatIndex * perBeat + Math.min(perBeat - 1, Math.floor(within * perBeat));
   };
-
-  function drawCountRow(ctx, { at, meta, settings, palette, scale, pad, y, rightEdge = Infinity }) {
-    const tokens = countTokens(settings.countDisplay, meta.beats);
-    const active = currentCountToken(tokens, settings.countDisplay, meta, at);
-    const size = Math.max(9, Math.round(10 * scale));
-    ctx.font = `600 ${size}px Inter, system-ui, sans-serif`;
-    ctx.textBaseline = 'alphabetic';
-    let x = pad;
-    const gap = Math.round(5 * scale);
-    for (let index = 0; index < tokens.length; index += 1) {
-      const token = tokens[index];
-      const width = ctx.measureText(token).width;
-      // A count that would run off the frame stops at the last token that
-      // fits rather than drawing a partial row past the edge.
-      if (x + width > rightEdge) break;
-      ctx.fillStyle = index === active ? palette.accent : palette.muted;
-      ctx.fillText(token, x, y);
-      x += width + gap;
-    }
-  }
 
   const LAYOUT_TEMPLATES = {
     // The Drum reference picture (Main Plan §၁၃) measures the three bands at
@@ -2616,33 +2594,54 @@
   // beat number; a beat with no recording leaves the click alone rather
   // than failing the export.
   //
-  // The recordings live under two names. `Counts  vocal` is the folder the
-  // owner keeps them in (the name carries two spaces); `Voices` is the
-  // older copy, byte for byte the same files. Both are tried, in that
-  // order, so renaming either one does not silence the count.
+  // The bucket keeps two recordings of every beat, and they are different
+  // sounds, not two names for one: `{n}.wav` speaks the number while
+  // `M{n}.wav` is the metronome's own short marker. The owner chooses which
+  // one the count uses, so the choice is a parameter here rather than a
+  // fixed name -- a video counting a band in wants the voice, a video
+  // showing tempo wants the marker.
+  //
+  // The recordings also live under two folder names. `Counts  vocal` is the
+  // folder the owner keeps them in (the name carries two spaces); `Voices`
+  // is the older copy, byte for byte the same files. Both are tried, in
+  // that order, so renaming either one does not silence the count.
   // ---------------------------------------------------------------
   const COUNT_VOICE_ROOT = 'https://pub-0b3068d26b824f80ad0e157d133e1f6c.r2.dev';
-  // The Studio offers two ways of counting; each has its own folder, and
-  // both fall back to the spoken set the bucket actually holds, so a style
-  // whose recordings are not uploaded yet still counts rather than falling
-  // silent.
-  const COUNT_VOICE_STYLES = {
-    'one-two': ['Counts%20%20vocal', 'Voices'],
-    numeric: ['Counts%20%20numeric', 'Counts%20%20vocal', 'Voices'],
+  // Every folder the recordings are known by, newest name first.
+  const COUNT_VOICE_FOLDERS = ['Counts%20%20vocal', 'Voices'];
+  // The two sets of files the bucket holds. `spoken` is the number said
+  // aloud, `marker` is the metronome's short tick.
+  const COUNT_VOICE_SETS = {
+    spoken: (beat) => `${beat}.wav`,
+    marker: (beat) => `M${beat}.wav`,
   };
   const countVoiceCache = new Map();
 
-  /** Every R2 address that may hold the recording for a beat number. */
-  function countVoiceUrls(beat, style = 'one-two') {
+  /**
+   * Every R2 address that may hold the recording for a beat number.
+   *
+   * The chosen set is asked for first. The other set follows it, so a beat
+   * whose chosen recording is not uploaded still counts in the owner's
+   * other voice rather than falling silent; the order is what makes the
+   * choice audible rather than merely nominal.
+   */
+  function countVoiceUrls(beat, setName = 'spoken') {
     const number = Math.round(beat);
     if (!(number >= 1)) return [];
-    const folders = COUNT_VOICE_STYLES[style] || COUNT_VOICE_STYLES['one-two'];
-    return folders.map((folder) => `${COUNT_VOICE_ROOT}/${folder}/${number}.wav`);
+    const chosenName = COUNT_VOICE_SETS[setName] ? setName : 'spoken';
+    const names = [chosenName, ...Object.keys(COUNT_VOICE_SETS).filter((name) => name !== chosenName)];
+    const urls = [];
+    for (const name of names) {
+      for (const folder of COUNT_VOICE_FOLDERS) {
+        urls.push(`${COUNT_VOICE_ROOT}/${folder}/${COUNT_VOICE_SETS[name](number)}`);
+      }
+    }
+    return urls;
   }
 
   /** One beat's recording, decoded once. A missing one resolves to null. */
-  async function loadCountVoice(beat, style = 'one-two') {
-    const urls = countVoiceUrls(beat, style);
+  async function loadCountVoice(beat, setName = 'spoken') {
+    const urls = countVoiceUrls(beat, setName);
     if (urls.length === 0) return null;
     const key = urls[0];
     if (countVoiceCache.has(key)) return countVoiceCache.get(key);
@@ -2668,10 +2667,10 @@
   }
 
   /** One recording per beat, in beat order; a beat with none is null. */
-  async function countVoiceSamples(beats, style = 'one-two') {
+  async function countVoiceSamples(beats, setName = 'spoken') {
     const wanted = [];
     for (let beat = 1; beat <= Math.max(0, Math.round(beats)); beat += 1) {
-      wanted.push(loadCountVoice(beat, style));
+      wanted.push(loadCountVoice(beat, setName));
     }
     return await Promise.all(wanted);
   }

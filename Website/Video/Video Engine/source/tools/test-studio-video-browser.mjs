@@ -120,6 +120,8 @@ let thankYouClip = null;
 let countVoice = null;
 /** When true the newer folder answers 404 and only `Voices` has the file. */
 let countVoicePrimaryMissing = false;
+/** Every count-recording address the page asked for, in order. */
+let countVoiceRequests = [];
 /** The bucket's kit manifest, or null for a 404 -- the two states §၁၀ names. */
 let drumManifest = null;
 /** Every Thank You address the page asked for, in order. */
@@ -148,6 +150,7 @@ async function serveThankYou() {
     const isKitPicture = !isManifest && url.includes('/drums/') && /\.(png|webp|jpe?g)(\?|$)/i.test(url);
     if (isThankYou) thankYouRequests.push(url);
     if (isKitPicture) kitRequests.push(url);
+    if (isCountVoice) countVoiceRequests.push(url);
     if (!isThankYou && !isCountVoice && !isManifest) {
       await cdp.call('Fetch.continueRequest', { requestId: event.requestId });
       return;
@@ -1143,6 +1146,7 @@ print(json.dumps({ 'ink': ink, 'pixels': len(pixels), 'checksum': checksum }))
     '-f', 'lavfi', '-i', 'sine=frequency=880:duration=0.3',
     '-af', 'volume=8', '-ac', '2', '-ar', '44100', '-c:a', 'pcm_s16le', voicePath]);
   countVoice = await readFile(voicePath);
+  countVoiceRequests = [];
   const spoken = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-voice.musicxml', counted.href);
   // The click is over within 50 ms of the beat, so the second half of each
   // beat is the window where only the spoken count can be heard.
@@ -1181,6 +1185,22 @@ print(json.dumps(math.sqrt(sum(v * v for v in window) / max(1, len(window)))))
   assert.ok(fallbackVoice > Math.max(clickOnly * 4, 300),
     `The count fell silent when only the Voices folder answered: ${fallbackVoice} against ${clickOnly}`);
   countVoicePrimaryMissing = false;
+
+  // The bucket's two sets are different sounds, so the page's choice has to
+  // reach the request: with `marker` chosen, the M-files are asked for
+  // before the spoken ones.
+  assert.ok(countVoiceRequests.length > 0 && /\/Counts%20%20vocal\/1\.wav$/.test(countVoiceRequests[0]),
+    `The spoken set was not the default: ${JSON.stringify(countVoiceRequests.slice(0, 3))}`);
+  await evaluate("(() => { const voice = document.querySelector('[data-count-voice]'); voice.value = 'marker'; voice.dispatchEvent(new Event('change', { bubbles: true })); })()");
+  countVoiceRequests = [];
+  const marked = await renderScore(drumScore({ tempo: 120, bars: 2 }), 'count-voice-marker.musicxml', spoken.href);
+  assert.ok(countVoiceRequests.length > 0 && /\/Counts%20%20vocal\/M1\.wav$/.test(countVoiceRequests[0]),
+    `The marker set was not asked for first: ${JSON.stringify(countVoiceRequests.slice(0, 3))}`);
+  const markerVoice = await loudnessOf(marked.path, 0.15, 0.4);
+  assert.ok(markerVoice > Math.max(clickOnly * 4, 300),
+    `The marker count was not played: ${markerVoice} against ${clickOnly}`);
+  // Put the page back on the default so the checks below see the spoken set.
+  await evaluate("(() => { const voice = document.querySelector('[data-count-voice]'); voice.value = 'spoken'; voice.dispatchEvent(new Event('change', { bubbles: true })); })()");
   countVoice = null;
 
   // The Plan's last part: the Thank You clip closes the video and is

@@ -104,7 +104,7 @@
     soundModel: soundModel?.value || 'natural',
     soundVolume: Number(soundVolume?.value) || 0,
     countEnabled: countVoiceEnabled?.value === 'on',
-    countVoice: countVoice?.value || 'one-two',
+    countVoice: countVoice?.value || 'spoken',
     countVolume: Number(countVolume?.value) || 0,
     countDisplay: countDisplay?.value || 'beats',
     // The Drum reference picture puts TIME / BPM / COUNT boxes in the Title
