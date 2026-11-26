@@ -792,3 +792,18 @@ commits stay local and must be reported as unpushed.
   - `origin/main` is `24e3fd2` and has no commit the branch lacks, so the
     branch is a fast-forward candidate for `main`; the merge itself was not
     requested and was not done.
+- **Push blocked again, 2026-11-18 — Count Display pass.** `40007ad` is
+  local and unpushed. The token in this environment is a GitHub App token
+  (`ghu_…`, `x-oauth-client-id: Iv23liz…`), and app tokens are read-only
+  here: `GET /repos/…/msharing0008` reports
+  `permissions.push: true`, but `PATCH /git/refs/heads/…` and
+  `POST /git/refs` both answer `403 Resource not accessible by
+  integration` while advertising `x-accepted-github-permissions:
+  contents=write`. `git push` therefore fails with
+  `403 … denied to idetsminmh1995-spec` in all three shapes tried:
+  `origin`, `https://x-access-token:$GITHUB_TOKEN@…`, and
+  `https://idetsminmh1995-spec:$GITHUB_TOKEN@…`. The
+  `OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` variable answers
+  `Invalid username or token` with either user name. As before, the fix is
+  a `github_pat_…` from the owner; a retry of these same shapes will not
+  help.
