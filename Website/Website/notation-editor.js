@@ -88,8 +88,10 @@
     marginRight: 5.7,
   };
   const ACCIDENTAL_ALTER = { 'double-sharp': 2, sharp: 1, natural: 0, flat: -1, 'double-flat': -2 };
+  // MuseScore 4's own order: the digits count up from the shortest value,
+  // so 1 is a 64th and 7 is a whole note.
   const SHORTCUT_DURATION = {
-    '1': 'whole', '2': 'half', '3': 'quarter', '4': 'eighth', '5': '16th', '6': '32nd', '7': '64th',
+    '1': '64th', '2': '32nd', '3': '16th', '4': 'eighth', '5': 'quarter', '6': 'half', '7': 'whole',
   };
 
   const state = {

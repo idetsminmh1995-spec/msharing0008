@@ -2793,45 +2793,65 @@
    *
    * `seeked` says the element has moved, not that the decoder has produced
    * the frame: drawing straight away paints the old picture, which for a
-   * fresh element is black. Waiting for the next painted frame is what
-   * makes the clip's first frames the clip rather than a black rectangle.
-   * The wait is bounded -- a clip that never presents a frame must not stop
-   * an export, and the seek itself already put the right time in place.
+   * fresh element is black. Waiting for the painted frame is what makes the
+   * clip's first frames the clip rather than a black rectangle.
+   *
+   * `requestVideoFrameCallback` is asked for *before* the seek, because it
+   * answers the next frame the element presents and a seek on a paused
+   * element is the only thing that presents one. Asked for after `seeked`
+   * it never arrives, so every frame of the clip used to sit out the 250 ms
+   * bound below -- that wait, once per frame of the clip, is where the
+   * export spent most of its time.
    */
   const seekThankYou = (video, at) => new Promise((resolve, reject) => {
     let settled = false;
+    let seeked = false;
     const finish = () => {
       if (settled) return;
       settled = true;
       resolve();
-    };
-    const painted = () => {
-      if (typeof video.requestVideoFrameCallback === 'function') {
-        video.requestVideoFrameCallback(() => finish());
-      } else {
-        requestAnimationFrame(() => finish());
-      }
-      // Bounded: a paused element does not always present a frame after a
-      // seek, and an export that waits forever is worse than one frame of
-      // the clip drawn a moment early.
-      setTimeout(finish, 250);
     };
     const timer = setTimeout(() => {
       if (settled) return;
       settled = true;
       reject(new Error('Thank You clip did not reach the requested frame'));
     }, 8000);
+    // Bounded: a paused element does not always present a frame after a
+    // seek, and an export that waits forever is worse than one frame of
+    // the clip drawn a moment early.
+    const bound = () => setTimeout(finish, 250);
+    const canWaitForFrame = typeof video.requestVideoFrameCallback === 'function';
+    // A callback registered ahead of the seek can be answered by the frame
+    // still on screen, so a frame only counts once the element has said it
+    // moved; until then the request is renewed for the next one.
+    const awaitFrame = () => video.requestVideoFrameCallback(() => {
+      if (settled) return;
+      if (!seeked) {
+        awaitFrame();
+        return;
+      }
+      clearTimeout(timer);
+      finish();
+    });
     const done = () => {
       video.removeEventListener('seeked', done);
+      seeked = true;
       clearTimeout(timer);
-      painted();
+      // Without rVFC there is nothing to register ahead of the seek, so the
+      // frame has to be waited for here, after the element has moved.
+      if (!canWaitForFrame) requestAnimationFrame(() => finish());
+      bound();
     };
     if (Math.abs(video.currentTime - at) < 1e-3 && video.readyState >= 2) {
+      seeked = true;
       clearTimeout(timer);
-      painted();
+      if (canWaitForFrame) awaitFrame();
+      else requestAnimationFrame(() => finish());
+      bound();
       return;
     }
     video.addEventListener('seeked', done);
+    if (canWaitForFrame) awaitFrame();
     video.currentTime = at;
   });
 

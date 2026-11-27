@@ -4029,5 +4029,17 @@ describe('the editor and the engine agree, end to end', () => {
       page.press('ArrowDown');
       assert.deepEqual(page.bar(), ['B3'], 'and down twice crosses into the octave below');
     });
+
+    test('the duration digits count up from a 64th, the way MuseScore numbers them', () => {
+      const page = openKeys();
+      const values = [['1', '64th'], ['3', '16th'], ['5', 'quarter'], ['7', 'whole']];
+      for (const [key, name] of values) {
+        page.press(key);
+        assert.equal(page.status(), `Note value: ${name}.`, `${key} is a ${name}`);
+      }
+      // And the value reaches the written note, not just the status line.
+      page.press('C');
+      assert.match(page.saved(), /<type>whole<\/type>/, 'the whole note is what was written');
+    });
   });
 });

@@ -27,7 +27,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 | MuseScore လုပ်ဆောင်ချက် | MuseScore key | Editor (လက်ရှိ) | အခြေအနေ |
 |---|---|---|---|
 | Note input mode ဖွင့်/ပိတ် | `N`၊ ထွက်ရန် `N` / `Esc` | `N` ဖွင့်/ပိတ်ရ၊ `Esc` က input ကိုပိတ်ပြီး selection ရှင်း | ✅ |
-| Duration ရွေး | `1`–`9` (`1`=64th … `5`=quarter … `7`=whole `8`=breve `9`=longa) | `SHORTCUT_DURATION` map ရှိ | 🟡 map ကို MuseScore နှင့် တိုက်စစ်ရန် |
+| Duration ရွေး | `1`–`9` (`1`=64th … `5`=quarter … `7`=whole `8`=breve `9`=longa) | `SHORTCUT_DURATION` map ရှိ၊ W2b တွင် MuseScore အတိုင်း ပြောင်းပြီး | ✅ |
 | Dot | `.` | `.` က dot ၀–၃ လည် | 🟡 |
 | Rest ရေး | `0` | `0` သာ rest | ✅ |
 | Repeat last note / selection | `R` | ရှိ (selection မရှိလျှင် နောက်ဆုံးရေးသော note ကို ပြန်) | ✅ |
@@ -131,7 +131,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 
 1. (ဖြေပြီး) **Key map ကို MuseScore နှင့် အတိအကျ တူအောင် ပြင်မည်** (user, 2026-11-27) — W2 တွင် ပြီးစီး။
 
-   **ကျန် (user ဆုံးဖြတ်ရန်):** `1`–`7` duration နံပါတ်များသည် MuseScore 4 နှင့် **ပြောင်းပြန်** ဖြစ်နေသည် — Editor တွင် `1`=whole … `7`=64th၊ MuseScore 4 တွင် `1`=64th၊ `5`=quarter၊ `7`=whole။ ပြောင်းလျှင် ယခု သုံးနေသူများ၏ လက်ကျင့်ကို ပြင်းထန်စွာ ထိမည်ဖြစ်၍ W2 တွင် မပြောင်းရသေးပါ။
+   (ဖြေပြီး) **`1`–`7` duration နံပါတ်များ** — W2b တွင် MuseScore 4 အတိုင်း (`1`=64th … `5`=quarter … `7`=whole) ပြောင်းပြီး။ ယခင် သုံးနေသူများ၏ လက်ကျင့်ကို ပြင်းထန်စွာ ထိမည်ဖြစ်၍ release note တွင် ဖော်ပြရမည်။
 2. **Tuplet** ကို Notation Engine က render လုပ်နိုင်ပြီလား (Editor တွင် 0 ဖြစ်သဖြင့် စစ်ရန်)။ မလုပ်နိုင်လျှင် Notation Engine ဘက်က အရင်လုပ်ရမည်။
 3. **MuseScore source ကို မကူးဘဲ handbook အပြုအမူကိုသာ ရည်ညွှန်း** ဟူသော စည်းမျဉ်း (`AGENTS.md`) ကို လိုက်မလား၊ ဒါမှမဟုတ် အစောပိုင်းပြောသလို MuseScore code ကို ထည့်သုံးမလား (license / legal ပါ)။
 4. **ပထမ release တွင် Tier 1 အပြည့်** လိုမလား၊ Tier 1 ၏ တစ်စိတ်တစ်ပိုင်းဖြင့် ရောင်းချမှု/ရေးသူများအတွက် စမလား။
