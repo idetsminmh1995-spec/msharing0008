@@ -912,3 +912,31 @@ commits stay local and must be reported as unpushed.
   writes `<harmony>`, the Writer Engine keeps `doc.harmonies` only as a
   pass-through with no `setHarmony` command — and key bindings for all of
   the above.
+
+- **2026-11-18 — MusicXML preview notation: the sound was the blocker, not
+  the notation.** A MusicXML file did reach the Video preview and the score
+  did draw; the preview just built the whole drum track first, so a long
+  score left the old picture on the stage for the ~16 s the
+  `OfflineAudioContext` pass took, which reads as "no notation". Measured
+  with headless Chromium on `musescore-drum-lesson.musicxml`: the score is
+  on the canvas 829 ms after the file is chosen, against 16 s before the
+  split. `buildTimeline` now prepares only the picture; `attachAudio` is the
+  separate half and the preview calls it after the first frame is drawn.
+  Play still waits for the sound, so §၅ holds.
+  Two traps found on the way: (1) `const timeline = await buildTimeline(...)`
+  shadows the module-level `[data-video-timeline]` element, so
+  `timeline.disabled = false` silently stopped enabling the scrubber -- the
+  local is now `built`. (2) The single-system band read
+  `systemYs[index - 1]`, which is `undefined` when there is only one system,
+  so `systemBands` came back `null` and the band geometry was skipped; the
+  last system's bottom edge now comes from `viewBox.height`. The
+  `website-bundle.test.js` regression test also guards the
+  `notation-engine.js?v=` literal inside `video-engine.js`, which the build
+  now re-keys.
+- **2026-11-18 — push still refused.** `$GITHUB_TOKEN` reads the repo and
+  reports `push: true`, but `POST /git/refs` answers `403 Resource not
+  accessible by integration` and `git-receive-pack` answers `403 ...
+  denied`; `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` is `401 Bad
+  credentials`. The commit for this pass stays local (`89d59c6` on
+  `feat/guitar-video-adapter`). A token with Contents: write on this repo
+  is needed to land it.
