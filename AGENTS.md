@@ -888,3 +888,27 @@ commits stay local and must be reported as unpushed.
   Do not write the PAT into `.git/config`, a remote URL, or any committed file.
   As of `6167228` (W4) `feat/guitar-video-adapter` is fully pushed:
   `git rev-list --count origin/feat/guitar-video-adapter..HEAD` is 0.
+- **Sound preview while writing (W6, 2026-11-18).** Three facts a later pass
+  should not rediscover:
+  1. `R2SoundFontEngine.create()` resolves when the synth exists; the bank
+     is in it only when `engine.ready` resolves. A `preview()` call in that
+     gap plays silence, so any audition path must `await sound.ready`.
+  2. `ensureSound()` in `notation-editor.js` must assign its shared promise
+     before the first `await`. As an `async` function it assigned
+     `state.soundLoading` after one, and a second note written in that tick
+     saw `state.soundTried` and was refused with "Playback is unavailable".
+  3. The font download is started by `warmSound()` from `loadXml()`, not by
+     the first note. The default asset is 38 MB (`musescore-general-sf3`),
+     so the first note cannot wait for it and still feel immediate.
+  The audition counter (`wantedPreview`) is what keeps a bar typed before
+  the bank lands from sounding as one chord.
+- **W7's remaining gaps are narrower than the Plan table suggests.**
+  `flipStems()` and the `data-editor-flip` toolbar button already exist
+  (`X` has no key binding), the five articulation buttons exist as
+  palette-only (`data-editor-articulation`), and `setLyric` has a working
+  properties-panel UI (`propertyLyrics`, one field per verse) with no
+  `Ctrl+L`. Staff text is the palette's `words` entry (`Ctrl+T` unbound).
+  Genuinely absent: chord symbols (`Ctrl+K`) — the engine parses and
+  writes `<harmony>`, the Writer Engine keeps `doc.harmonies` only as a
+  pass-through with no `setHarmony` command — and key bindings for all of
+  the above.

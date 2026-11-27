@@ -1363,6 +1363,92 @@ describe('the editor and the engine agree, end to end', () => {
     );
   });
 
+  test('opening a score starts the font before the first note, so that note is not the one paying for it', async () => {
+    // The font used to start downloading on the first written note, which
+    // is exactly when it is needed: the note was written, nothing sounded,
+    // and the preview looked broken. Opening the score is the earliest
+    // point where the writer is present and has not typed yet.
+    const creates = [];
+    const previews = [];
+    const { window } = loadEditorPage({
+      globals: {
+        NotationSoundFont: {
+          R2SoundFontEngine: {
+            create: async (options) => {
+              creates.push(options);
+              return {
+                ready: Promise.resolve(),
+                play: () => {},
+                pause: () => {},
+                setTracks: () => {},
+                preview: (...args) => previews.push(args),
+              };
+            },
+          },
+        },
+      },
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    assert.equal(creates.length, 1, 'the font load starts when the score opens, not on the first note');
+
+    const doc = window.document;
+    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'C', bubbles: true }));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    assert.equal(creates.length, 1, 'the first note reuses the font already loading');
+    assert.equal(previews.length, 1, 'the first note sounds');
+  });
+
+  test('a note written before the font arrives is heard once it lands, and only the last one plays', async () => {
+    // The engine's `create` resolves when the synth exists, but its bank is
+    // still downloading then; a note sent in that gap plays silence. A
+    // writer typing at the very start of a session writes exactly in that
+    // gap, so the audition has to wait for `ready` -- and a bar typed while
+    // waiting must not all sound at once when the font lands.
+    const { window } = loadEditorPage();
+    const doc = window.document;
+
+    const previews = [];
+    let landBank;
+    const bankLanded = new Promise((resolve) => { landBank = resolve; });
+    window.NotationSoundFont = {
+      R2SoundFontEngine: {
+        create: async () => ({
+          ready: bankLanded,
+          play: () => {},
+          pause: () => {},
+          setTracks: () => {},
+          preview: (...args) => previews.push(args),
+        }),
+      },
+    };
+
+    const input = doc.querySelector('[data-editor-note-input]');
+    input.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    if (input.getAttribute('aria-pressed') !== 'true') {
+      input.dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+    }
+    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'C', bubbles: true }));
+    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'D', bubbles: true }));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    assert.equal(previews.length, 0, 'nothing sounds before the bank is in the synth');
+
+    landBank();
+    // The audition resolves through the engine's creation chain, so let the
+    // page run several turns before reading what it did.
+    for (let i = 0; i < 10; i += 1) await new Promise((resolve) => window.setTimeout(resolve, 0));
+    assert.equal(previews.length, 1, 'only the newest note is auditioned once the bank lands');
+    assert.equal(
+      previews[0][0][0],
+      window.NotationEngine.midiNoteNumber({ kind: 'pitched', step: 'D', alter: 0, octave: 4 }),
+      'the note that sounds is the one written last',
+    );
+
+    // Once the bank is in, later notes sound at once.
+    doc.dispatchEvent(new window.KeyboardEvent('keydown', { key: 'E', bubbles: true }));
+    await new Promise((resolve) => window.setTimeout(resolve, 0));
+    assert.equal(previews.length, 2, 'a note written after the bank is auditioned at once');
+  });
+
   test('a grand staff keeps a treble note and a bass note on the same beat', () => {
     const { window } = loadEditorPage({
       newScore: {
