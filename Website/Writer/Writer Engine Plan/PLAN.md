@@ -103,7 +103,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 2. **Invariant test:** ဘယ် command နောက်မဆို §၁(၄) ၏ invariant ၄ ချက် မှန်ကြောင်း (property-style — command အစီအစဉ်ကို ကျပန်းလုပ်စစ်)။
 3. **Undo/redo:** command တိုင်း undo → doc အရင်နှင့်တူ၊ redo → doc အသစ်နှင့်တူ။
 4. **MuseScore parity:** §၂ ၏ ဇယားအတိုင်း key တစ်ခုချင်းစီကို Editor-level test (ရှိပြီးသား `editor-integration.test.js` ပုံစံ) ဖြင့်စစ်။
-5. အပြုအမူ မပြောင်းသော ရွှေ့ပြောင်းမှု (W5) အတွက် — ရှိပြီးသား test အားလုံး (ယခု ၁၀၄ ခု+) pass ဆက်ဖြစ်။
+5. အပြုအမူ မပြောင်းသော ရွှေ့ပြောင်းမှု (W5) အတွက် — ရှိပြီးသား test အားလုံး (ယခု 1558 ခု) pass ဆက်ဖြစ်ပြီး၊ Writer Engine ၏ ကိုယ်ပိုင် DOM-free test ၂၂ ခု ရှိသည်။
 
 ---
 
@@ -115,7 +115,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 | **W2** | ✅ **ပြီးစီး (2026-11-27)** — `↑`/`↓` semitone (တက်=♯၊ ဆင်း=♭)၊ `Alt+Shift+↑`/`↓` diatonic၊ `Ctrl+↑`/`↓` octave၊ `R` repeat၊ `0` rest၊ `Backspace` input mode တွင် နောက်ဆုံး note ပြန်ဖျက်၊ `Esc` input mode မှ ထွက် | `editor-integration.test.js` ၏ «the MuseScore key map» suite (key တစ်ခုချင်း) pass၊ suite တစ်ခုလုံး 1536/1536 pass |
 | **W3** | ✅ **ပြီးစီး (2026-11-18)** — Tuplet (triplet၊ quintuplet … `Ctrl+2`–`9`); `Rest` တွင် tuplet endpoint ထည့်၍ Engine က rest ပါ group ကို render နိုင်၊ doc command (`insertTuplet`၊ `tupletMemberDuration`၊ `tupletMarksOf`)၊ toolbar panel | Triplet ရေး၍ render မှန်၊ MusicXML round trip၊ undo/redo၊ invariant — `npm run verify` 1544/1544 pass |
 | **W4** | ✅ **ပြီးစီး (2026-11-18)** — `Alt+1–9` interval၊ `J` enharmonic၊ `Shift+←/→` beat ရွှေ့၊ `Q`/`W` duration၊ `T` tie၊ `S` slur၊ `Ctrl+B` bar ထည့် | §၂ ဇယားတွင် 🟡/❌ → ✅ (Beam, chord symbol, flip မှလွဲ၍)၊ `editor-integration.test.js` ၏ key map suite pass၊ စုစုပေါင်း 1552/1552 pass |
-| **W5** | **Writer Engine ကို သီးခြား folder/module သို့ ခွဲထုတ်** — `notation-doc.js` + `notation-editor.js` ၏ command logic ကို pure command အဖြစ်ရွှေ့၊ Editor က import သုံး | အပြုအမူ မပြောင်း (ရှိပြီးသား test အားလုံး pass)၊ Engine ကို DOM မပါဘဲ Node ထဲ test လုပ်နိုင် |
+| **W5** | ✅ **ပြီးစီး (2026-11-18)** — `notation-doc.js` ကို `Website/Writer/Writer Engine/` package အဖြစ် ခွဲထုတ် (DOM မပါ၊ `window.WriterEngine` အဖြစ် publish)၊ Editor ၏ command logic (tie၊ slur၊ respell၊ interval၊ duration၊ transpose) ကို pure plan အဖြစ် ရွှေ့ပြီး Editor က ခေါ်သုံး | အပြုအမူ မပြောင်း — Notation Engine 1558/1558 pass၊ Writer Engine ၏ ကိုယ်ပိုင် DOM-free test ၂၂ ခု pass၊ `npm run verify` pass |
 | **W6** | ရေးစဉ် **အသံကြား** — note ထည့်သည်နှင့် Sound Engine က ဖွင့် (MuseScore ကဲ့သို့)၊ drum / pitched နှစ်မျိုးလုံး | note ရေးတိုင်း ချက်ချင်းအသံထွက်၊ အသံ delay ရည်မှန်း ~၁၀၀ ms အောက် |
 | **W7** | Tier 2 — lyrics UI (`Ctrl+L`)၊ staff / tempo text (`Ctrl+T` / `Alt+Shift+T`)၊ chord symbol (`Ctrl+K`)၊ flip (`X`)၊ articulation key များ | §၂ ဇယားအတိုင်း |
 | **W8** | Beam ထိန်း (auto beam မှန်ကန်ကြောင်း စစ် + beam properties) | meter အလိုက် auto beam မှန် |

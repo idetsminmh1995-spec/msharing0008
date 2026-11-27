@@ -1,5 +1,5 @@
 /**
- * Notation Lab — score document, edit commands, and MusicXML serialization.
+ * Writer Engine — score document, edit commands, and MusicXML serialization.
  *
  * The rendered SVG is never the source of truth. Every edit rebuilds this
  * structured document (the engine's own `ParseResult` shape) and the engine
@@ -8,9 +8,13 @@
  *
  * The MusicXML writer is the engine's own (`writeMusicXml`); this file owns
  * only the edit commands that keep that document valid.
+ *
+ * Nothing here touches the DOM: the module reads `NotationEngine` off the
+ * global object and writes `WriterEngine` back to it, so the browser page,
+ * a `vm` sandbox and plain Node all load the same code.
  */
-(() => {
-  const E = window.NotationEngine;
+(function (root) {
+  const E = root.NotationEngine;
   const STEPS = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
 
   const CLEF_BY_SIGN = {
@@ -582,6 +586,276 @@
     const position = E.staffPositionForPitch(clef, pitch.step, pitch.octave);
     const moved = pitchFromStaffPosition(clef, position - steps * 0.5);
     return { ...pitch, step: moved.step, alter: keySignatureAlters(fifths)[moved.step] ?? 0, octave: moved.octave };
+  }
+
+  // ---- selection commands -------------------------------------------------
+  //
+  // A command plans its edits from the document and hands back a plan; the
+  // editor turns the plan into one `commit`, so undo takes the whole
+  // gesture back in one step. Nothing here reads the selection, the DOM or
+  // the page's state -- a plan is a pure function of the document and the
+  // cells the caller picked.
+
+  /** The notes of a beat: a chord's members, or the note itself. */
+  const eventNotes = (event) => (event.kind === 'chord' ? event.notes : [event]);
+
+  /** The event that begins exactly where `event` ends, in the same voice. */
+  function eventAfter(doc, cell, event) {
+    const end = (event.startTick ?? 0) + event.duration.ticks;
+    const measure = partOf(doc, cell.partId).measures.find((m) => m.number === cell.measureNumber);
+    const events = measure?.voices.find((v) => v.id === cell.voiceId)?.events ?? [];
+    const next = events[events.indexOf(event) + 1];
+    return next && (next.startTick ?? 0) === end ? next : null;
+  }
+
+  const samePitchAs = (event, notes) => {
+    const others = eventNotes(event);
+    return notes.every((note) =>
+      others.some((other) => JSON.stringify(other.pitch) === JSON.stringify(note.pitch)),
+    );
+  };
+
+  /** The lowest slur number this note is not already using, so a second slur nests. */
+  function freeSlurNumber(note) {
+    const used = new Set([...(note?.slurStarts ?? []), ...(note?.slurStops ?? [])]);
+    for (let number = 1; number <= 8; number += 1) if (!used.has(number)) return number;
+    return 8;
+  }
+
+  /**
+   * The tie edits for `cells`: both halves added, or both taken away.
+   *
+   * Returns `null` when the cells hold no note at all, and an empty edit
+   * list when there is nothing to tie to, so the caller can say which.
+   */
+  function tiePlan(doc, cells) {
+    const targets = cells.flatMap((cell) => {
+      const event = eventAt(doc, cell);
+      return event && event.kind !== 'rest' ? [{ cell, event }] : [];
+    });
+    if (targets.length === 0) return null;
+    // A selection that spans both halves of a tie reads as "undo this tie",
+    // so one note starting a tie is enough to make the command a removal.
+    const removing = targets.some(({ event }) => eventNotes(event).some((note) => note.tieStart));
+    const edits = [];
+    for (const { cell, event } of targets) {
+      if (removing) {
+        if (!eventNotes(event).some((note) => note.tieStart)) continue;
+        const target = eventAfter(doc, cell, event);
+        edits.push({
+          cell,
+          patch: { tieStart: null },
+          ...(target
+            ? { next: { ...cell, eventIndex: cell.eventIndex + 1 }, nextPatch: { tieStop: null } }
+            : {}),
+        });
+        continue;
+      }
+      const target = eventAfter(doc, cell, event);
+      // A tie needs a following note of the same pitch to land on; anything
+      // else would draw into thin air and be dropped by the renderer.
+      if (!target || target.kind === 'rest' || !samePitchAs(target, eventNotes(event))) continue;
+      edits.push({
+        cell,
+        patch: { tieStart: true },
+        next: { ...cell, eventIndex: cell.eventIndex + 1 },
+        nextPatch: { tieStop: true },
+      });
+    }
+    return { edits, removing };
+  }
+
+  /**
+   * The slur edits for `cells`.
+   *
+   * A slur may join different pitches, so the only requirement is a
+   * following note in the same voice.
+   */
+  function slurPlan(doc, cells) {
+    const targets = cells.flatMap((cell) => {
+      const event = eventAt(doc, cell);
+      return event && event.kind !== 'rest' ? [{ cell, event }] : [];
+    });
+    if (targets.length === 0) return null;
+    const edits = [];
+    for (const { cell, event } of targets) {
+      const notes = eventNotes(event);
+      const target = eventAfter(doc, cell, event);
+      const startNumbers = notes.flatMap((note) => note.slurStarts ?? []);
+      if (startNumbers.length > 0) {
+        const stops = (target ? eventNotes(target) : []).flatMap((note) => note.slurStops ?? []);
+        const remaining = stops.filter((number) => !startNumbers.includes(number));
+        edits.push({
+          cell,
+          patch: { slurStarts: null },
+          ...(target
+            ? {
+                next: { ...cell, eventIndex: cell.eventIndex + 1 },
+                nextPatch: { slurStops: remaining.length > 0 ? remaining : null },
+              }
+            : {}),
+        });
+        continue;
+      }
+      if (!target || target.kind === 'rest') continue;
+      const number = freeSlurNumber(notes[0]);
+      edits.push({
+        cell,
+        patch: { slurStarts: [number] },
+        next: { ...cell, eventIndex: cell.eventIndex + 1 },
+        nextPatch: { slurStops: [number] },
+      });
+    }
+    return { edits, removing: edits.length > 0 && edits.every((edit) => edit.patch.slurStarts === null) };
+  }
+
+  /** Applies a plan's patches, returning the new document. */
+  function applyPlan(doc, edits) {
+    let next = doc;
+    for (const edit of edits) {
+      const { partId, measureNumber, voiceId, eventIndex } = edit.cell;
+      next = patchEvent(next, { partId, measureNumber, voiceId, eventIndex, patch: edit.patch });
+      if (edit.next) {
+        next = patchEvent(next, {
+          partId: edit.next.partId,
+          measureNumber: edit.next.measureNumber,
+          voiceId: edit.next.voiceId,
+          eventIndex: edit.next.eventIndex,
+          patch: edit.nextPatch,
+        });
+      }
+    }
+    return next;
+  }
+
+  /**
+   * The enharmonic respell plan for `cells`.
+   *
+   * The sounding pitch never changes, so a respelled note plays exactly what
+   * it played before.
+   */
+  function respellPlan(doc, cells) {
+    return cells.flatMap((cell) => {
+      const event = eventAt(doc, cell);
+      if (!event || event.kind === 'rest') return [];
+      if (event.kind === 'chord') {
+        return [{
+          cell,
+          event,
+          patch: { notes: event.notes.map((note) => ({ ...note, pitch: respell(note.pitch) })) },
+        }];
+      }
+      const pitch = respell(event.pitch);
+      return pitch === event.pitch ? [] : [{ cell, event, patch: { pitch } }];
+    });
+  }
+
+  /**
+   * `existing` plus `note` as one chord at `tick`, or `null` when `note` is
+   * already a notehead of that chord.
+   *
+   * The engine's `chord()` would happily accept two identical noteheads,
+   * which draws a doubled head and plays the note twice as loud.
+   */
+  function stackedChord(existing, note, tick) {
+    const members = existing.kind === 'chord' ? existing.notes : [existing];
+    const samePitch = (a, b) =>
+      a.pitch.kind === 'unpitched' || b.pitch.kind === 'unpitched'
+        ? a.instrumentId === b.instrumentId &&
+          a.pitch.displayStep === b.pitch.displayStep &&
+          a.pitch.displayOctave === b.pitch.displayOctave
+        : a.pitch.step === b.pitch.step &&
+          a.pitch.alter === b.pitch.alter &&
+          a.pitch.octave === b.pitch.octave;
+    if (members.some((member) => samePitch(member, note))) return null;
+    return E.chord([...members, note], { startTick: tick });
+  }
+
+  /**
+   * MuseScore's Alt+1-9: the beat with a note stacked `number` steps above
+   * its top note.
+   *
+   * The interval is counted from the top note of the chord, which is the
+   * note a reader hears as "the melody". The result names the reason it
+   * could not stack, so the caller can say it in the status line.
+   */
+  function intervalPlan(doc, cell, number, clef, fifths = 0) {
+    const event = eventAt(doc, cell);
+    if (!event || event.kind === 'rest') return { reason: 'no-note' };
+    const top = eventNotes(event).reduce((best, note) =>
+      (E.midiNoteNumber?.(note.pitch) ?? -1) > (E.midiNoteNumber?.(best.pitch) ?? -1) ? note : best);
+    const pitch = pitchAtInterval(top.pitch, number, clef, fifths);
+    if (pitch.kind !== 'pitched') return { reason: 'unwritable', pitch };
+    if (
+      pitch.step === top.pitch.step &&
+      (pitch.alter ?? 0) === (top.pitch.alter ?? 0) &&
+      pitch.octave === top.pitch.octave
+    ) {
+      return { reason: 'same-note', pitch };
+    }
+    // A tab note's string and fret describe the OLD pitch, so they are
+    // dropped here and re-derived by the caller's tab mirror.
+    const { stringNumber, fret, ...shape } = top;
+    const stacked = stackedChord(event, { ...shape, pitch }, event.startTick ?? 0);
+    if (stacked === null) return { reason: 'already', pitch };
+    return { pitch, event: stacked };
+  }
+
+  /**
+   * The plan that halves or doubles each selected beat's value.
+   *
+   * A value that would fall outside `minTicks`…`maxTicks` is skipped rather
+   * than clamped: a 64th cannot be halved and a whole note cannot be
+   * doubled, and silently writing a different note value would be worse
+   * than doing nothing.
+   */
+  function durationPlan(doc, cells, factor, { minTicks, maxTicks, maxDots = 3 }) {
+    return cells.flatMap((cell) => {
+      const event = eventAt(doc, cell);
+      if (!event) return [];
+      const ticks = event.duration.ticks * factor;
+      if (ticks < minTicks || ticks > maxTicks) return [];
+      const found = E.durationTypeAndDotsFromTicks(ticks, maxDots);
+      return found ? [{ cell, event, duration: E.duration(found.type, found.dots, ticks) }] : [];
+    });
+  }
+
+  /**
+   * Moves one note by whole staff steps.
+   *
+   * The diatonic move: C becomes D, never C sharp, and the accidental that
+   * was written travels with the note. That is also what makes an octave
+   * exactly seven steps in either direction, whatever the key signature.
+   */
+  function transposeNote(pitch, steps, clef) {
+    if (!pitch || pitch.kind === 'unpitched') return pitch;
+    const position = E.staffPositionForPitch(clef, pitch.step, pitch.octave);
+    const moved = pitchFromStaffPosition(clef, position - steps * 0.5);
+    return { ...pitch, step: moved.step, octave: moved.octave };
+  }
+
+  // How a semitone is spelled. MuseScore spells an upward semitone with
+  // sharps and a downward one with flats, so E up is F and C down is B, but
+  // C up is C sharp and E down is E flat -- the accidental follows the
+  // direction, not the key.
+  const SHARP_SPELLING = [
+    ['C', 0], ['C', 1], ['D', 0], ['D', 1], ['E', 0], ['F', 0],
+    ['F', 1], ['G', 0], ['G', 1], ['A', 0], ['A', 1], ['B', 0],
+  ];
+  const FLAT_SPELLING = [
+    ['C', 0], ['D', -1], ['D', 0], ['E', -1], ['E', 0], ['F', 0],
+    ['G', -1], ['G', 0], ['A', -1], ['A', 0], ['B', -1], ['B', 0],
+  ];
+
+  /** Moves one note by a semitone, spelled the way MuseScore spells it. */
+  function transposeSemitone(pitch, direction) {
+    if (!pitch || pitch.kind === 'unpitched') return pitch;
+    const midi = E.midiNoteNumber?.(pitch);
+    if (midi === undefined) return pitch;
+    const moved = midi + direction;
+    if (moved < 0 || moved > 127) return pitch;
+    const [step, alter] = (direction > 0 ? SHARP_SPELLING : FLAT_SPELLING)[((moved % 12) + 12) % 12];
+    return { ...pitch, step, alter, octave: Math.floor(moved / 12) - 1 };
   }
 
   /** Replaces a whole voice's events — used when entry rewrites one measure's line. */
@@ -1495,7 +1769,7 @@
     return 'treble';
   };
 
-  window.NotationDoc = {
+  root.WriterEngine = {
     STEPS,
     CLEF_BY_SIGN,
     partOf,
@@ -1517,6 +1791,18 @@
     enharmonicSpellings,
     respell,
     pitchAtInterval,
+    keySignatureAlters,
+    eventNotes,
+    eventAfter,
+    tiePlan,
+    slurPlan,
+    applyPlan,
+    respellPlan,
+    stackedChord,
+    intervalPlan,
+    durationPlan,
+    transposeNote,
+    transposeSemitone,
     setVoiceEvents,
     setEventDuration,
     setEventVoice,
@@ -1550,4 +1836,4 @@
     paste,
     toMusicXml,
   };
-})();
+})(typeof globalThis !== 'undefined' ? globalThis : this);

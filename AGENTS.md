@@ -24,6 +24,11 @@ Repository-specific knowledge for the M Sharing music platform.
 - Notation docs: `Website/Notation/Notation Plan/PLAN.md`,
   `Website/Notation/Notation Doc/DOC.md`, and the generated
   `Website/Notation/Notation Plan/Documentation/API.md`.
+- Writer Engine: `Website/Writer/Writer Engine/` (plain JavaScript, no build
+  step, no DOM). It owns the score document and the edit commands, published
+  as `Website/Website/assets/writer-engine.js` and read as `window.WriterEngine`.
+  Run `npm run verify` there after changing it; the notation engine's
+  `npm run build` re-derives the page's `?v=` key for the asset.
 
 ## Notation Engine
 

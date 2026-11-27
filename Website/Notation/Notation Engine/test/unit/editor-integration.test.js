@@ -15,7 +15,8 @@ const appDir = path.join(repoDir, 'Website');
  * The Notation Lab editor's own scripts, run against the built engine.
  *
  * The engine ships standalone and the editor is the one host in this
- * repo. `notation-doc.js` owns the edit commands and the MusicXML
+ * repo. The Writer Engine (`Website/Writer/Writer Engine/`, published as
+ * `assets/writer-engine.js`) owns the edit commands and the MusicXML
  * writer; `notation-editor.js` owns the toolbar and the render loop.
  * Both talk to the engine through `window.NotationEngine` and nothing
  * else, so this test loads them the way the page does -- into a browser
@@ -37,8 +38,8 @@ function loadEditor() {
     fs.readFileSync(path.join(packageDir, 'dist', 'notation-engine.js'), 'utf8'),
     context,
   );
-  vm.runInContext(fs.readFileSync(path.join(appDir, 'notation-doc.js'), 'utf8'), context);
-  return { window, engine: window.NotationEngine, doc: window.NotationDoc };
+  vm.runInContext(fs.readFileSync(path.join(appDir, 'assets', 'writer-engine.js'), 'utf8'), context);
+  return { window, engine: window.NotationEngine, doc: window.WriterEngine };
 }
 
 const STARTER_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -108,7 +109,7 @@ function loadEditorPage({ url = 'https://example.test/notation-editor.html?inten
     window.localStorage.setItem(key, value);
   }
   const context = dom.getInternalVMContext();
-  for (const rel of ['assets/notation-engine.js', 'notation-doc.js', 'notation-newscore.js', 'notation-editor.js']) {
+  for (const rel of ['assets/notation-engine.js', 'assets/writer-engine.js', 'notation-newscore.js', 'notation-editor.js']) {
     vm.runInContext(fs.readFileSync(path.join(appDir, rel), 'utf8'), context, { filename: rel });
   }
   return { window, errors };
@@ -117,7 +118,7 @@ function loadEditorPage({ url = 'https://example.test/notation-editor.html?inten
 describe('the editor and the engine agree, end to end', () => {
   test('the page scripts load and expose exactly what the editor expects', () => {
     const { engine, doc } = loadEditor();
-    // notation-doc.js reads these off the engine at load time; a missing
+    // the writer engine reads these off the notation engine at load time; a missing
     // one is a broken page, not a subtle bug.
     for (const name of ['TICKS_PER_QUARTER', 'TREBLE_CLEF', 'BASS_CLEF', 'ALTO_CLEF']) {
       assert.notEqual(engine[name], undefined, `engine is missing ${name}`);
@@ -424,7 +425,7 @@ describe('the editor and the engine agree, end to end', () => {
   test('the whole editor page starts up, loads its score, and draws it', () => {
     const { window, errors } = loadEditorPage();
     assert.deepEqual(errors, [], 'the page must start without a script error');
-    assert.ok(window.NotationEngine && window.NotationDoc);
+    assert.ok(window.NotationEngine && window.WriterEngine);
 
     const scoreHost = window.document.querySelector('[data-editor-score]');
     assert.ok(scoreHost, 'the editor has no score host');
@@ -1039,7 +1040,7 @@ describe('the editor and the engine agree, end to end', () => {
     const { window } = loadEditorPage();
     const doc = window.document;
     const E = window.NotationEngine;
-    const D = window.NotationDoc;
+    const D = window.WriterEngine;
     const domParser = testDomParser();
 
     const score = (body) =>
@@ -1097,7 +1098,7 @@ describe('the editor and the engine agree, end to end', () => {
   test('paste next to the barline drops the note rather than throwing', () => {
     const { window } = loadEditorPage();
     const E = window.NotationEngine;
-    const D = window.NotationDoc;
+    const D = window.WriterEngine;
     const domParser = testDomParser();
 
     const score = (body) =>

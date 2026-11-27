@@ -12,7 +12,7 @@
   const toolbarStack = document.querySelector('[data-editor-toolbars]');
 
   const engine = window.NotationEngine;
-  const docTools = window.NotationDoc;
+  const docTools = window.WriterEngine;
   const pick = (selector) => document.querySelector(selector);
 
   const backButton = pick('[data-editor-back]');
@@ -1560,22 +1560,6 @@
     paletteTargets().length > 0 &&
     paletteTargets().every((cell) => eventNotes(eventFor(cell)).every((note) => note.tieStart));
 
-  /** The event that begins exactly where `event` ends, in the same voice. */
-  function eventAfter(cell, event) {
-    const end = (event.startTick ?? 0) + event.duration.ticks;
-    const measure = partById(cell.partId)?.measures.find((m) => m.number === cell.measureNumber);
-    const events = measure?.voices.find((v) => v.id === cell.voiceId)?.events ?? [];
-    const next = events[events.indexOf(event) + 1];
-    return next && (next.startTick ?? 0) === end ? next : null;
-  }
-
-  const samePitchAs = (event, notes) => {
-    const others = eventNotes(event);
-    return notes.every((note) =>
-      others.some((other) => JSON.stringify(other.pitch) === JSON.stringify(note.pitch)),
-    );
-  };
-
   /**
    * Tie: joins each selected note to the next note of the same pitch in its
    * own voice. Start and stop are written as one command, so undo takes the
@@ -1592,52 +1576,13 @@
       announce('Select a note first.');
       return;
     }
-    // A selection that spans both halves of a tie reads as "undo this tie",
-    // so one note starting a tie is enough to make the press a removal.
-    const removing = cells.some((cell) => eventNotes(eventFor(cell)).some((note) => note.tieStart));
-    const edits = [];
-    for (const cell of cells) {
-      const event = eventFor(cell);
-      if (!event) continue;
-      if (removing) {
-        if (!eventNotes(event).some((note) => note.tieStart)) continue;
-        // Both halves come off together, or the next note keeps a stop tie
-        // that no longer has a start to meet.
-        const target = eventAfter(cell, event);
-        edits.push({
-          cell,
-          patch: { tieStart: null },
-          ...(target ? { next: { ...cell, eventIndex: cell.eventIndex + 1 }, nextPatch: { tieStop: null } } : {}),
-        });
-        continue;
-      }
-      const target = eventAfter(cell, event);
-      // A tie needs a following note of the same pitch to land on; anything
-      // else would draw into thin air and be dropped by the renderer.
-      if (!target || target.kind === 'rest' || !samePitchAs(target, eventNotes(event))) continue;
-      edits.push({ cell, patch: { tieStart: true }, next: { ...cell, eventIndex: cell.eventIndex + 1 }, nextPatch: { tieStop: true } });
-    }
-    if (edits.length === 0) {
-      announce(removing ? 'No tie to remove.' : 'Nothing to tie to — a tie needs the same pitch on the next beat.');
+    const plan = docTools.tiePlan(state.doc, cells);
+    if (plan === null || plan.edits.length === 0) {
+      announce(plan?.removing ? 'No tie to remove.' : 'Nothing to tie to \u2014 a tie needs the same pitch on the next beat.');
       return;
     }
-    commit((doc) => {
-      let next = doc;
-      for (const edit of edits) {
-        const { partId, measureNumber, voiceId, eventIndex } = edit.cell;
-        next = docTools.patchEvent(next, { partId, measureNumber, voiceId, eventIndex, patch: edit.patch });
-        if (edit.next) {
-          next = docTools.patchEvent(next, {
-            partId: edit.next.partId,
-            measureNumber: edit.next.measureNumber,
-            voiceId: edit.next.voiceId,
-            eventIndex: edit.next.eventIndex,
-            patch: edit.nextPatch,
-          });
-        }
-      }
-      return next;
-    }, removing ? 'Tie removed.' : `Tie added${edits.length === 1 ? '' : ` (${edits.length})`}.`);
+    commit((doc) => docTools.applyPlan(doc, plan.edits),
+      plan.removing ? 'Tie removed.' : `Tie added${plan.edits.length === 1 ? '' : ` (${plan.edits.length})`}.`);
   }
 
   /** True when every selected note already starts a slur. */
@@ -1646,13 +1591,6 @@
     paletteTargets().every((cell) =>
       eventNotes(eventFor(cell)).every((note) => (note.slurStarts ?? []).length > 0),
     );
-
-  /** The lowest slur number this note is not already using, so a second slur nests. */
-  function freeSlurNumber(note) {
-    const used = new Set([...(note?.slurStarts ?? []), ...(note?.slurStops ?? [])]);
-    for (let number = 1; number <= 8; number += 1) if (!used.has(number)) return number;
-    return 8;
-  }
 
   /**
    * Slur: joins each selected note to the next note in its own voice. Unlike
@@ -1671,59 +1609,13 @@
       announce('Select a note first.');
       return;
     }
-    const edits = [];
-    for (const cell of cells) {
-      const event = eventFor(cell);
-      if (!event) continue;
-      const notes = eventNotes(event);
-      const target = eventAfter(cell, event);
-      const startNumbers = notes.flatMap((note) => note.slurStarts ?? []);
-      if (startNumbers.length > 0) {
-        const stops = (target ? eventNotes(target) : []).flatMap((note) => note.slurStops ?? []);
-        const remaining = stops.filter((number) => !startNumbers.includes(number));
-        edits.push({
-          cell,
-          patch: { slurStarts: null },
-          ...(target
-            ? {
-                next: { ...cell, eventIndex: cell.eventIndex + 1 },
-                nextPatch: { slurStops: remaining.length > 0 ? remaining : null },
-              }
-            : {}),
-        });
-        continue;
-      }
-      if (!target || target.kind === 'rest') continue;
-      const number = freeSlurNumber(notes[0]);
-      edits.push({
-        cell,
-        patch: { slurStarts: [number] },
-        next: { ...cell, eventIndex: cell.eventIndex + 1 },
-        nextPatch: { slurStops: [number] },
-      });
-    }
-    if (edits.length === 0) {
-      announce('Nothing to slur to — a slur needs a following note in the same voice.');
+    const plan = docTools.slurPlan(state.doc, cells);
+    if (plan === null || plan.edits.length === 0) {
+      announce('Nothing to slur to \u2014 a slur needs a following note in the same voice.');
       return;
     }
-    const removing = edits.every((edit) => edit.patch.slurStarts === null);
-    commit((doc) => {
-      let next = doc;
-      for (const edit of edits) {
-        const { partId, measureNumber, voiceId, eventIndex } = edit.cell;
-        next = docTools.patchEvent(next, { partId, measureNumber, voiceId, eventIndex, patch: edit.patch });
-        if (edit.next) {
-          next = docTools.patchEvent(next, {
-            partId: edit.next.partId,
-            measureNumber: edit.next.measureNumber,
-            voiceId: edit.next.voiceId,
-            eventIndex: edit.next.eventIndex,
-            patch: edit.nextPatch,
-          });
-        }
-      }
-      return next;
-    }, removing ? 'Slur removed.' : `Slur added${edits.length === 1 ? '' : ` (${edits.length})`}.`);
+    commit((doc) => docTools.applyPlan(doc, plan.edits),
+      plan.removing ? 'Slur removed.' : `Slur added${plan.edits.length === 1 ? '' : ` (${plan.edits.length})`}.`);
   }
 
   /**
@@ -1946,47 +1838,6 @@
   }
 
   /**
-   * Moves one note by whole staff steps.
-   *
-   * The diatonic move: C becomes D, never C sharp, and the accidental that
-   * was written travels with the note. So this walks the staff's own
-   * diatonic ladder rather than adding semitones -- which is also what makes
-   * an octave exactly seven steps in both directions, whatever the key
-   * signature. MuseScore puts it on Alt+Shift+Up/Down and on Ctrl for the
-   * octave.
-   */
-  function transposeNote(pitch, steps, clef) {
-    if (!pitch || pitch.kind === 'unpitched') return pitch;
-    const position = engine.staffPositionForPitch(clef, pitch.step, pitch.octave);
-    const moved = docTools.pitchFromStaffPosition(clef, position - steps * 0.5);
-    return { ...pitch, step: moved.step, octave: moved.octave };
-  }
-
-  // How a semitone is spelled. MuseScore spells an upward semitone with
-  // sharps and a downward one with flats, so E up is F and C down is B, but
-  // C up is C sharp and E down is E flat -- the accidental follows the
-  // direction, not the key.
-  const SHARP_SPELLING = [
-    ['C', 0], ['C', 1], ['D', 0], ['D', 1], ['E', 0], ['F', 0],
-    ['F', 1], ['G', 0], ['G', 1], ['A', 0], ['A', 1], ['B', 0],
-  ];
-  const FLAT_SPELLING = [
-    ['C', 0], ['D', -1], ['D', 0], ['E', -1], ['E', 0], ['F', 0],
-    ['G', -1], ['G', 0], ['A', -1], ['A', 0], ['B', -1], ['B', 0],
-  ];
-
-  /** Moves one note by a semitone, spelled the way MuseScore spells it. */
-  function transposeSemitone(pitch, direction) {
-    if (!pitch || pitch.kind === 'unpitched') return pitch;
-    const midi = engine.midiNoteNumber?.(pitch);
-    if (midi === undefined) return pitch;
-    const moved = midi + direction;
-    if (moved < 0 || moved > 127) return pitch;
-    const [step, alter] = (direction > 0 ? SHARP_SPELLING : FLAT_SPELLING)[((moved % 12) + 12) % 12];
-    return { ...pitch, step, alter, octave: Math.floor(moved / 12) - 1 };
-  }
-
-  /**
    * Moves every note in the selection by one command, so a Shift-click range
    * and a single note behave the same and undo once.
    *
@@ -2039,7 +1890,7 @@
   /** Transposes the selection by whole staff steps (Alt+Shift, Ctrl = octave). */
   function transposeSelection(steps) {
     moveSelectedPitch(
-      (pitch, clef) => transposeNote(pitch, steps, clef),
+      (pitch, clef) => docTools.transposeNote(pitch, steps, clef),
       (count) => describeTranspose(steps, count),
     );
   }
@@ -2047,7 +1898,7 @@
   /** Transposes the selection by a semitone (Up/Down). */
   function transposeSemitones(direction) {
     moveSelectedPitch(
-      (pitch) => transposeSemitone(pitch, direction),
+      (pitch) => docTools.transposeSemitone(pitch, direction),
       (count) => describeSemitones(direction, count),
     );
   }
@@ -2099,27 +1950,30 @@
       return;
     }
     const clef = clefAt(cell.measureNumber, event.staff ?? 1);
-    const members = eventNotes(event);
-    const top = members.reduce((best, note) =>
-      (engine.midiNoteNumber?.(note.pitch) ?? -1) > (engine.midiNoteNumber?.(best.pitch) ?? -1) ? note : best);
-    const pitch = docTools.pitchAtInterval(top.pitch, number, clef, attributeAt(cell.measureNumber)?.fifths ?? 0);
-    if (pitch.kind !== 'pitched') {
+    const plan = docTools.intervalPlan(
+      state.doc,
+      cell,
+      number,
+      clef,
+      attributeAt(cell.measureNumber)?.fifths ?? 0,
+    );
+    if (plan.reason === 'no-note') {
+      announce('Select a note first.');
+      return;
+    }
+    if (plan.reason === 'unwritable') {
       announce('That interval cannot be written there.');
       return;
     }
-    if (pitch.step === top.pitch.step && (pitch.alter ?? 0) === (top.pitch.alter ?? 0)
-      && pitch.octave === top.pitch.octave) {
+    if (plan.reason === 'same-note') {
       announce('That note is already in the chord.');
       return;
     }
-    // A tab note's string and fret describe the OLD pitch, so they are
-    // dropped here and re-derived by the mirror below.
-    const { stringNumber, fret, ...shape } = top;
-    const stacked = stackedWith(event, { ...shape, pitch }, event.startTick ?? 0);
-    if (stacked === null) {
-      announce(`${pitchLabel(pitch.step, pitch.alter, pitch.octave)} is already in the chord.`);
+    if (plan.reason === 'already') {
+      announce(`${pitchLabel(plan.pitch.step, plan.pitch.alter, plan.pitch.octave)} is already in the chord.`);
       return;
     }
+    const stacked = plan.event;
     commit(
       (doc) =>
         mirrorCounterpart(
@@ -2141,7 +1995,7 @@
         ),
       `Added ${INTERVAL_NAMES[number] ?? 'interval'} above.`,
     );
-    previewPitch(pitch, null, cell.measureNumber);
+    previewPitch(plan.pitch, null, cell.measureNumber);
     render();
   }
 
@@ -2154,15 +2008,7 @@
     }
     // The plan is read from the current document, because the status line
     // is written before `commit` runs its mutation.
-    const plan = cells.flatMap((cell) => {
-      const event = eventFor(cell);
-      if (!event || event.kind === 'rest') return [];
-      if (event.kind === 'chord') {
-        return [{ cell, event, patch: { notes: event.notes.map((note) => ({ ...note, pitch: docTools.respell(note.pitch) })) } }];
-      }
-      const pitch = docTools.respell(event.pitch);
-      return pitch === event.pitch ? [] : [{ cell, event, patch: { pitch } }];
-    });
+    const plan = docTools.respellPlan(state.doc, cells);
     if (plan.length === 0) {
       announce('Nothing to respell.');
       return;
@@ -2241,13 +2087,9 @@
       announce(`Note value: ${state.tool.duration}.`);
       return;
     }
-    const plan = cells.flatMap((cell) => {
-      const event = eventFor(cell);
-      if (!event) return [];
-      const ticks = event.duration.ticks * factor;
-      if (ticks < MIN_TICKS || ticks > MAX_TICKS) return [];
-      const found = engine.durationTypeAndDotsFromTicks(ticks, 3);
-      return found ? [{ cell, event, duration: engine.duration(found.type, found.dots, ticks) }] : [];
+    const plan = docTools.durationPlan(state.doc, cells, factor, {
+      minTicks: MIN_TICKS,
+      maxTicks: MAX_TICKS,
     });
     if (plan.length === 0) {
       announce('That value cannot be halved or doubled.');
@@ -2819,7 +2661,7 @@
         // hi-hat land on the same beat, so a Shift-click on the second
         // line stacks it instead of replacing the first.
         if (stacking) {
-          const stacked = stackedWith(existing, note, state.entry.tick);
+          const stacked = docTools.stackedChord(existing, note, state.entry.tick);
           if (stacked === null) {
             announce(`${chosen.name} is already in the chord.`);
             return;
@@ -2870,7 +2712,7 @@
       // one and plays from the other.
       const to = pairedStaffFor(staff, measureNumber);
       if (stacking) {
-        const stacked = stackedWith(existing, note, state.entry.tick);
+        const stacked = docTools.stackedChord(existing, note, state.entry.tick);
         if (stacked === null) {
           announce(`${pitchLabel(step, pitch.alter, octave)} is already in the chord.`);
           return;
@@ -2894,29 +2736,6 @@
     commit((doc) => writePaired(doc, { partId: activePartId(), measureNumber, voiceId, event, replaceIndex, to: pairedStaffFor(staff, measureNumber) }), `Inserted ${pitchLabel(step, pitch.alter, octave)}.`);
     previewPitch(pitch, null, measureNumber);
     advanceEntry(memberDuration.ticks, measureNumber, voiceId);
-  }
-
-  /**
-   * `existing` plus `note` as one chord at `tick`, or `null` when `note` is
-   * already a notehead of that chord.
-   *
-   * Writing a chord is a repeated gesture -- click the beat, Shift-click
-   * each further line -- so the same line clicked twice has to be a no-op.
-   * The engine's `chord()` would happily accept two identical noteheads,
-   * which draws a doubled head and plays the note twice as loud.
-   */
-  function stackedWith(existing, note, tick) {
-    const members = existing.kind === 'chord' ? existing.notes : [existing];
-    const samePitch = (a, b) =>
-      a.pitch.kind === 'unpitched' || b.pitch.kind === 'unpitched'
-        ? a.instrumentId === b.instrumentId &&
-          a.pitch.displayStep === b.pitch.displayStep &&
-          a.pitch.displayOctave === b.pitch.displayOctave
-        : a.pitch.step === b.pitch.step &&
-          a.pitch.alter === b.pitch.alter &&
-          a.pitch.octave === b.pitch.octave;
-    if (members.some((member) => samePitch(member, note))) return null;
-    return engine.chord([...members, note], { startTick: tick });
   }
 
   /**
@@ -3239,8 +3058,8 @@
     }
     const clef = clefAt(anchor.measureNumber);
     const patch = baseEvent.kind === 'chord'
-      ? { notes: baseEvent.notes.map((note) => ({ ...note, pitch: transposeNote(note.pitch, steps, clef) })) }
-      : { pitch: transposeNote(baseEvent.pitch, steps, clef) };
+      ? { notes: baseEvent.notes.map((note) => ({ ...note, pitch: docTools.transposeNote(note.pitch, steps, clef) })) }
+      : { pitch: docTools.transposeNote(baseEvent.pitch, steps, clef) };
     state.doc = mirrorCounterpart(
       docTools.patchEvent(drag.baseDoc, {
         partId: anchor.partId,
