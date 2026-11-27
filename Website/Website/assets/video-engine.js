@@ -1677,7 +1677,7 @@
   // The notation engine is a 2 MB bundle that only a score needs, so it is
   // fetched when a MusicXML file is first rendered rather than on every
   // Studio visit. The version key must track notation-editor.html's own.
-  const NOTATION_ENGINE_SRC = 'assets/notation-engine.js?v=de5f363a73f7';
+  const NOTATION_ENGINE_SRC = 'assets/notation-engine.js?v=1cebb3aa609d';
   const BRAVURA_SRC = 'assets/fonts/Bravura.woff2?v=1.482';
   const NOTATION_PX_PER_SPACE = 20;
   // A cursor one staff tall plus its ledger room -- the engine's own
@@ -1822,13 +1822,20 @@
     // band is the whole sheet. Reading the second system there would be
     // `undefined` and every band would come out NaN.
     const gapAbove = systemYs.length > 1 ? (systemYs[1] - systemYs[0]) / 2 : systemYs[0];
+    // The last system has no successor to halve the gap to, so it takes the
+    // same half-gap as every other system rather than doubling the one
+    // behind it. A single-system score has no neighbour at all: its band is
+    // the whole sheet, which is why its two edges come from the page itself.
+    const gapBelow = systemYs.length > 1
+      ? (systemYs[systemYs.length - 1] - systemYs[systemYs.length - 2]) / 2
+      : Math.max(0, viewBox.height - systemYs[0]);
     const systemBands = systemYs.map((start, index) => {
       // Each system owns half the gap to its neighbours, so a tall tempo mark
       // above one staff is not mistaken for part of the system above it.
       const previous = index > 0 ? (systemYs[index - 1] + start) / 2 : start - gapAbove;
       const following = index + 1 < systemYs.length
         ? (start + systemYs[index + 1]) / 2
-        : start + (start - systemYs[index - 1]);
+        : start + gapBelow;
       let top = Infinity;
       let bottom = -Infinity;
       const first = Math.max(0, Math.floor(previous * imagePerSpace));
