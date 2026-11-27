@@ -467,7 +467,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 | MIDI keyboard ဖြင့်ရေး | — | ရှိ (chord = ကိုင်ထားသော key များ၊ key signature အလိုက် spell) | ✅ |
 | Drum kit MIDI map | — | ရှိ | ✅ |
 
-**တွေ့ရှိချက် (အရေးကြီး):** `↑`/`↓` (semitone ↔ diatonic)၊ `R` (repeat ↔ rest)၊ `Backspace` (undo last note ↔ delete)၊ `Esc` (input မှထွက်) တို့သည် MuseScore နှင့် **ဆန့်ကျင်**နေသည်။ MuseScore နှင့် တူညီစေရန် ပြင်ရမည် (အောက်ပါ W2)။ ၎င်းတို့သည် MuseScore သုံးဖူးသူများ၏ လက်ကျွမ်းကျင်မှုကို ထိခိုက်သောအရာများ ဖြစ်သည်။
+**တွေ့ရှိချက် (အရေးကြီး):** `↑`/`↓` (semitone ↔ diatonic)၊ `R` (repeat ↔ rest)၊ `Backspace` (undo last note ↔ delete)၊ `Esc` (input မှထွက်) တို့သည် MuseScore နှင့် **ဆန့်ကျင်**နေသည်။ **ဆုံးဖြတ်ချက် (user, 2026-11-27): Key map ကို MuseScore နှင့် အတိအကျ တူအောင် ပြင်မည်။** (အောက်ပါ W2)။ ပြင်လျှင် ယခု Editor ကို သုံးနေသူများ၏ လက်ကျင့်ကို ထိခိုက်မည်ဖြစ်၍ Doc တွင် shortcut ပြောင်းလဲမှုကို မှတ်ရမည်။
 
 ### ၃။ Scope အဆင့်များ (အဆိုပြု)
 
@@ -508,8 +508,8 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 
 | WP | အလုပ် | ပြီးစီးမှု စံနှုန်း |
 |---|---|---|
-| **W1** | MuseScore နှင့် ဆန့်ကျင်နေသော key များကို အတည်ပြု — `↑↓` (semitone)၊ `R` (repeat)၊ `0` (rest)၊ `Backspace`၊ `Esc` | §၂ ဇယားတွင် ❌ ကွာ ဟူသော အတန်းများ အတည်ပြုပြီး user ပြန်ကြည့် (key ပြောင်းလျှင် user ၏ လက်ကျင့်ပုံ ထိသဖြင့်) |
-| **W2** | W1 အတည်ပြုချက်အတိုင်း key map ကို MuseScore နှင့် ညီစေ၊ `Esc` က input mode မှထွက် | Editor test ဖြင့် key တစ်ခုချင်းစီ pass |
+| **W1** | ✅ **ဆုံးဖြတ်ပြီး (user, 2026-11-27)** — Key map ကို MuseScore နှင့် အတိအကျ တူအောင်ပြင်မည်။ ဆန့်ကျင်သော key များ (`↑↓`၊ `R`/`0`၊ `Backspace`၊ `Esc`) | — (ဆုံးဖြတ်ချက်ပြီး၊ W2 သို့) |
+| **W2** | **Key map ကို MuseScore နှင့် အတိအကျ တူအောင်ပြင်** — `↑`/`↓` = semitone (♯/♭)၊ `Alt+Shift+↑`/`↓` = diatonic step၊ `R` = repeat (rest မဟုတ်တော့)၊ `0` = rest၊ `Backspace` = input mode တွင် နောက်ဆုံးရေးသော note ပြန်ဖျက်၊ `Esc` = input mode မှ ထွက်၊ `Ctrl+↑`/`↓` octave ဆက်ရှိ။ ရည်ညွှန်း = **MuseScore 4 ၏ default shortcut** (ကျွန်တော်အတည်ပြုထားသည်မှာ MuseScore 3 handbook ဖြစ်၍ MuseScore 4 နှင့် တိုက်စစ်ပြီးမှ အတည်ပြု) | §၂ ဇယားတွင် ❌ ကွာ ဟူသော အတန်းအားလုံး ✅၊ key တစ်ခုချင်း Editor test pass၊ Doc တွင် shortcut ပြောင်းလဲမှု မှတ် |
 | **W3** | **Tuplet** (triplet၊ quintuplet … `Ctrl+2`–`9`) — doc model၊ command၊ Notation Engine render အထောက်အပံ့ စစ် | Triplet ရေး၍ render မှန်၊ MusicXML round trip၊ undo/redo၊ invariant |
 | **W4** | Tier 1 ၏ ကျန်များ — `T` (tie)၊ `S` (slur)၊ `Ctrl+B` (insert measure)၊ `Shift+←/→`၊ `Q`/`W`၊ `J`၊ `Alt+1–9`၊ `R` (repeat) | §၂ ဇယားတွင် 🟡/❌ → ✅ |
 | **W5** | **Writer Engine ကို သီးခြား folder/module သို့ ခွဲထုတ်** — `notation-doc.js` + `notation-editor.js` ၏ command logic ကို pure command အဖြစ်ရွှေ့၊ Editor က import သုံး | အပြုအမူ မပြောင်း (ရှိပြီးသား test အားလုံး pass)၊ Engine ကို DOM မပါဘဲ Node ထဲ test လုပ်နိုင် |
@@ -524,7 +524,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 
 ### ၇။ မဖြေရှင်းရသေးသော အချက်များ (user ဆုံးဖြတ်ရန်)
 
-1. **Key map ကို MuseScore နှင့် ဘယ်လောက်အထိ တူစေမလဲ** — အထူးသဖြင့် `↑`/`↓` (MuseScore = semitone၊ ယခု Editor = staff step)၊ `R`၊ `Backspace`။ ကျွန်တော်အကြံပြုချက် — **MuseScore နှင့် အတိအကျတူစေ** (သုံးဖူးသူများအတွက်)။
+1. (ဖြေပြီး) **Key map ကို MuseScore နှင့် အတိအကျ တူအောင် ပြင်မည်** (user, 2026-11-27)။ ကျန်သည်မှာ ရည်ညွှန်း version — MuseScore 4 ကို ရည်ညွှန်းမည်ဟု ယူထားသည် (user ပေးသော MuseScore ပုံသည် MuseScore 4 UI) — W2 တွင် MuseScore 4 ၏ default shortcut နှင့် တိုက်စစ်။
 2. **Tuplet** ကို Notation Engine က render လုပ်နိုင်ပြီလား (Editor တွင် 0 ဖြစ်သဖြင့် စစ်ရန်)။ မလုပ်နိုင်လျှင် Notation Engine ဘက်က အရင်လုပ်ရမည်။
 3. **MuseScore source ကို မကူးဘဲ handbook အပြုအမူကိုသာ ရည်ညွှန်း** ဟူသော စည်းမျဉ်း (`AGENTS.md`) ကို လိုက်မလား၊ ဒါမှမဟုတ် အစောပိုင်းပြောသလို MuseScore code ကို ထည့်သုံးမလား (license / legal ပါ)။
 4. **ပထမ release တွင် Tier 1 အပြည့်** လိုမလား၊ Tier 1 ၏ တစ်စိတ်တစ်ပိုင်းဖြင့် ရောင်းချမှု/ရေးသူများအတွက် စမလား။
