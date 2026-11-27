@@ -275,4 +275,32 @@ describe('tuplet wiring (Integration I, §9.17)', () => {
     );
     assert.ok([...diagnostics].some((d) => d.code === 'UNMATCHED_TUPLET'));
   });
+
+  test('a rest may OPEN a tuplet -- the group is a run of beats, not of pitches', () => {
+    const restTuplet = (notations) =>
+      '<note><rest/><duration>2</duration><voice>1</voice><type>eighth</type>' +
+      '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>' +
+      `<notations>${notations}</notations></note>`;
+    const { svg, diagnostics } = render(
+      restTuplet('<tuplet type="start"/>') +
+        tupletNote('C', 5, '') +
+        tupletNote('D', 5, '<tuplet type="stop"/>'),
+    );
+    assert.equal(glyphCount(svg, 'tuplet3'), 1, 'the number is drawn');
+    assert.ok(![...diagnostics].some((d) => d.code === 'UNMATCHED_TUPLET'));
+  });
+
+  test('a rest may CLOSE a tuplet as well', () => {
+    const restTuplet = (notations) =>
+      '<note><rest/><duration>2</duration><voice>1</voice><type>eighth</type>' +
+      '<time-modification><actual-notes>3</actual-notes><normal-notes>2</normal-notes></time-modification>' +
+      `<notations>${notations}</notations></note>`;
+    const { svg, diagnostics } = render(
+      tupletNote('C', 5, '<tuplet type="start"/>') +
+        tupletNote('D', 5, '') +
+        restTuplet('<tuplet type="stop"/>'),
+    );
+    assert.equal(glyphCount(svg, 'tuplet3'), 1);
+    assert.ok(![...diagnostics].some((d) => d.code === 'UNMATCHED_TUPLET'));
+  });
 });

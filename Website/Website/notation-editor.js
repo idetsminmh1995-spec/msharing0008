@@ -46,6 +46,8 @@
   const dotButtons = [...document.querySelectorAll('[data-editor-dots]')];
   const tieButton = pick('[data-editor-tie]');
   const slurButton = pick('[data-editor-slur]');
+  const tupletButton = pick('[data-editor-tuplet-button]');
+  const tupletPanel = pick('[data-editor-popover-panel="tuplet"]');
   const articulationButtons = [...document.querySelectorAll('[data-editor-articulation]')];
   const dynamicButtons = [...document.querySelectorAll('[data-editor-dynamic]')];
   const flipButton = pick('[data-editor-flip]');
@@ -377,14 +379,18 @@
     const voiceId = voiceForStaff(toStaff);
     const startTick = event.startTick ?? 0;
     const init = { duration: event.duration, voice: voiceId, staff: toStaff, startTick };
+    // A tuplet's endpoints belong to the beat, not to a pitch, so the copy
+    // keeps them -- on the first member only, which is where MusicXML
+    // writes them for a chord.
+    const marks = tupletEndpointMarks(event);
     // A rest carries no pitch, so it needs no string: it is the same rest on
     // either staff, and a beat the writer cleared has to clear both.
-    if (event.kind === 'rest') return engine.rest(init);
+    if (event.kind === 'rest') return engine.rest({ ...init, ...marks });
     const taken = new Set();
     const members = [];
     for (const note of eventNotes(event)) {
       if (!tab) {
-        members.push(engine.note({ ...init, pitch: note.pitch }));
+        members.push(engine.note({ ...init, pitch: note.pitch, ...(members.length === 0 ? marks : {}) }));
         continue;
       }
       // A note written from the fretboard already states its string; honour
@@ -398,7 +404,14 @@
       const position = stated ?? tabPositionFor(note.pitch, taken);
       if (position === null) return null;
       taken.add(position.stringNumber);
-      members.push(engine.note({ ...init, pitch: note.pitch, ...position }));
+      members.push(
+        engine.note({
+          ...init,
+          pitch: note.pitch,
+          ...position,
+          ...(members.length === 0 ? marks : {}),
+        }),
+      );
     }
     if (members.length === 0) return null;
     return members.length === 1 ? members[0] : engine.chord(members, { startTick });
@@ -436,6 +449,16 @@
           voiceId: pairVoice,
           event: counterpart,
         });
+  }
+
+  /**
+   * The `<tuplet>` endpoints of a beat, whether it is a note, a rest, or a
+   * chord -- MusicXML writes them on a chord's first note, so that is where
+   * a copy has to read them from.
+   */
+  function tupletEndpointMarks(event) {
+    const source = event?.kind === 'chord' ? event.notes[0] : event;
+    return docTools.tupletMarksOf(source);
   }
 
   /**
@@ -1401,6 +1424,94 @@
   // applies it to the selection and the button stays lit while every
   // selected note already carries it. Clicking again removes it, which is
   // how MuseScore's palette toggles work and saves a separate eraser.
+
+  /**
+   * A tuplet whose members are rests is how the group is shown before any
+   * pitch is written into it, so a note typed on one of those beats takes
+   * that rest's place -- its ratio and its `<tuplet>` endpoint marks
+   * included. Carving the rest instead would leave a member without a
+   * ratio, and the bar would no longer add up.
+   */
+  function tupletRestAt(tick, staff, voiceId) {
+    const events = eventsIn(state.entry?.measureNumber ?? 1, voiceId);
+    const index = indexAtTickOnStaff(events, tick, staff);
+    if (index < 0) return null;
+    const event = events[index];
+    if (event.kind !== 'rest' || event.duration.tuplet === undefined) return null;
+    return { index, event };
+  }
+
+  /**
+   * MuseScore's Ctrl+2 … Ctrl+9: writes a `count`-note tuplet over the
+   * current note value and leaves the cursor after it.
+   *
+   * The value selected when the shortcut is pressed is the length of the
+   * WHOLE group, which is why a quarter with Ctrl+3 is three eighth notes.
+   * The group is written as rests so the measure stays complete and the
+   * writer types the pitches straight into it.
+   */
+  function insertTupletCommand(count) {
+    if (!state.doc) return;
+    if (!state.entry) {
+      state.entry = {
+        partId: activePartId(),
+        measureNumber: 1,
+        voiceId: voiceForStaff(1),
+        tick: 0,
+        staffNumber: 1,
+      };
+    }
+    const { measureNumber, voiceId } = state.entry;
+    const staff = state.entry.staffNumber ?? 1;
+    const totalTicks = durationForTool().ticks;
+    const remaining = capacityOf(measureNumber) - state.entry.tick;
+    if (totalTicks > remaining) {
+      announce(`A ${count}-tuplet needs a ${totalTicks}-tick span; only ${remaining} is left in this bar.`);
+      return;
+    }
+    const member = docTools.tupletMemberDuration(totalTicks, count);
+    if (member === null) {
+      announce(`A ${count}-tuplet does not fit the current note value. Choose a different note value.`);
+      return;
+    }
+    const partId = activePartId();
+    const startTick = state.entry.tick;
+    const to = pairedStaffFor(staff, measureNumber);
+    commit((doc) => {
+      const written = docTools.insertTuplet(doc, { partId, measureNumber, voiceId, staff, startTick, count, totalTicks });
+      if (to === null) return written;
+      const pairVoice = voiceForStaff(to, partId);
+      return docTools.insertTuplet(written, {
+        partId,
+        measureNumber,
+        voiceId: pairVoice,
+        staff: to,
+        startTick,
+        count,
+        totalTicks,
+      });
+    }, `Inserted a ${count}-tuplet.`);
+    // The cursor stays on the group's first member, which is what lets the
+    // writer type the pitches straight into it.
+    state.entry = { ...state.entry, written: undefined };
+    clearSelection();
+    render();
+  }
+
+  /** Fills the tuplet menu from the counts the doc layer can write. */
+  function buildTupletMenu() {
+    if (!tupletPanel) return;
+    for (let count = 2; count <= 9; count += 1) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'editor-tool';
+      button.dataset.editorTuplet = String(count);
+      button.setAttribute('aria-label', `${count}-tuplet`);
+      button.title = `${count} in the time of ${docTools.TUPLET_NORMAL_NOTES[count]} (Ctrl+${count})`;
+      button.textContent = String(count);
+      tupletPanel.append(button);
+    }
+  }
 
   /** Fills the toolbar's bare glyph buttons from the engine's own font. */
   function paintToolGlyphs() {
@@ -2385,9 +2496,15 @@
     const fitted = ticks === duration.ticks
       ? duration
       : engine.duration(engine.durationTypeAndDotsFromTicks(ticks).type, engine.durationTypeAndDotsFromTicks(ticks).dots, ticks);
+    // A beat that already belongs to a tuplet keeps that tuplet's own
+    // value: the writer is filling a member of the group, not the note
+    // value the toolbar happens to show.
+    const tupletMember = tupletRestAt(state.entry.tick, staff, voiceId);
+    const memberDuration = tupletMember?.event.duration ?? fitted;
+    const memberMarks = docTools.tupletMarksOf(tupletMember?.event);
 
     if (rest) {
-      const event = engine.rest({ duration: fitted, voice: voiceId, staff, startTick: state.entry.tick });
+      const event = engine.rest({ duration: memberDuration, voice: voiceId, staff, startTick: state.entry.tick, ...memberMarks });
       // A guitar part that prints notation and tab is one part on two
       // staves, so a rest clears both -- otherwise the tab staff keeps
       // sounding a note the notation staff has just been cleared of.
@@ -2398,11 +2515,12 @@
             measureNumber,
             voiceId,
             event,
+            ...(tupletMember ? { replaceIndex: tupletMember.index } : {}),
             to: pairedStaffFor(staff, measureNumber),
           }),
         'Rest inserted.',
       );
-      advanceEntry(ticks, measureNumber, voiceId);
+      advanceEntry(memberDuration.ticks, measureNumber, voiceId);
       return;
     }
 
@@ -2434,6 +2552,9 @@
       const events = eventsIn(measureNumber, voiceId);
       const existingIndex = indexAtTickOnStaff(events, state.entry.tick, staff);
       const existing = existingIndex >= 0 ? events[existingIndex] : null;
+      // A tuplet rest on this beat is replaced rather than carved, so the
+      // group keeps its member value and its endpoint marks.
+      const tupletMember = tupletRestAt(state.entry.tick, staff, voiceId);
       const chosen = drum ?? pickDrumForLine(line, existing);
       if (chosen === null) {
         const names = drums.map((entry) => entry.name).join(' and ');
@@ -2443,10 +2564,13 @@
       const drumPitch = engine.unpitchedPitch(chosen.displayStep, chosen.displayOctave);
       const note = engine.note({
         pitch: drumPitch,
-        duration: existing && existing.kind !== 'rest' ? existing.duration : fitted,
+        duration: existing && existing.kind !== 'rest' ? existing.duration : memberDuration,
         voice: voiceId,
         staff,
         instrumentId: chosen.instrumentId,
+        // A beat already on the staff keeps its own `<tuplet>` endpoint;
+        // a tuplet rest being filled takes the group's.
+        ...(existing ? tupletEndpointMarks(existing) : memberMarks),
       });
       if (existing && existing.kind !== 'rest') {
         // A drum chord is written the same way a pitched one is: kick and
@@ -2467,9 +2591,15 @@
         render();
         return;
       }
-      commit((doc) => docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event: note }), `Inserted ${chosen.name}.`);
+      commit(
+        (doc) =>
+          tupletMember
+            ? docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: tupletMember.index, event: note })
+            : docTools.insertEvent(doc, { partId: activePartId(), measureNumber, voiceId, event: note }),
+        `Inserted ${chosen.name}.`,
+      );
       previewPitch(drumPitch, chosen);
-      advanceEntry(ticks, measureNumber, voiceId);
+      advanceEntry(memberDuration.ticks, measureNumber, voiceId);
       return;
     }
 
@@ -2485,7 +2615,14 @@
     const existing = existingIndex >= 0 ? events[existingIndex] : null;
 
     if (existing && existing.kind !== 'rest') {
-      const note = engine.note({ pitch, duration: existing.duration, voice: voiceId, staff, ...tab });
+      const note = engine.note({
+        pitch,
+        duration: existing.duration,
+        voice: voiceId,
+        staff,
+        ...tupletEndpointMarks(existing),
+        ...tab,
+      });
       // The tab staff is the same music as the notation staff above it, so
       // a note written on either has to appear on both -- a guitarist reads
       // one and plays from the other.
@@ -2508,10 +2645,13 @@
       return;
     }
 
-    const event = engine.note({ pitch, duration: fitted, voice: voiceId, staff, startTick: state.entry.tick, ...tab });
-    commit((doc) => writePaired(doc, { partId: activePartId(), measureNumber, voiceId, event, to: pairedStaffFor(staff, measureNumber) }), `Inserted ${pitchLabel(step, pitch.alter, octave)}.`);
+    const event = engine.note({ pitch, duration: memberDuration, voice: voiceId, staff, startTick: state.entry.tick, ...memberMarks, ...tab });
+    // A tuplet member's rest is replaced, not carved: the beat already has
+    // the group's own value and its `<tuplet>` endpoint.
+    const replaceIndex = tupletMember ? tupletMember.index : -1;
+    commit((doc) => writePaired(doc, { partId: activePartId(), measureNumber, voiceId, event, replaceIndex, to: pairedStaffFor(staff, measureNumber) }), `Inserted ${pitchLabel(step, pitch.alter, octave)}.`);
     previewPitch(pitch, null, measureNumber);
-    advanceEntry(ticks, measureNumber, voiceId);
+    advanceEntry(memberDuration.ticks, measureNumber, voiceId);
   }
 
   /**
@@ -5567,6 +5707,13 @@
       if (event.target.closest('[data-editor-popover-panel] .editor-tool')) closePopovers();
     });
   });
+  if (tupletPanel) {
+    buildTupletMenu();
+    tupletPanel.addEventListener('click', (event) => {
+      const button = event.target.closest('[data-editor-tuplet]');
+      if (button) insertTupletCommand(Number(button.dataset.editorTuplet));
+    });
+  }
   document.addEventListener('keydown', (event) => {
     if (event.key !== 'Escape') return;
     closePopovers();
@@ -5660,6 +5807,13 @@
     if (modifier && event.altKey && ['1', '2', '3', '4'].includes(event.key)) {
       event.preventDefault();
       setVoice(event.key);
+      return;
+    }
+    // MuseScore's Ctrl+2 … Ctrl+9 writes a tuplet over the current note
+    // value. Checked after the voice shortcut above, which owns Ctrl+Alt.
+    if (modifier && !event.altKey && !event.shiftKey && /^[2-9]$/.test(event.key)) {
+      event.preventDefault();
+      insertTupletCommand(Number(event.key));
       return;
     }
     if (event.code === 'Space') { event.preventDefault(); void togglePlay(); return; }

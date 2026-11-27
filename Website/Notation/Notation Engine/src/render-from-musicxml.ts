@@ -1,5 +1,5 @@
 import type { Chord, Measure, MeasureEvent, Note, Rest, SlideKind } from './core/index.js';
-import type { DurationType } from './core/duration.js';
+import type { Duration, DurationType } from './core/duration.js';
 import { getEngravingDefault, getFontInfo, getGlyph } from './glyphs/index.js';
 import {
   ALTO_CLEF,
@@ -2093,6 +2093,13 @@ function renderNoteOrRest(
   newAccidentalState: AccidentalState;
   /** The resolved direction and notehead width -- undefined for a rest, since a rest has neither. Exposed so a caller can anchor a tie to/from this note without recomputing this note's own geometry. */
   tieAnchor?: { direction: StemDirection; position: number; noteheadGlyph: string };
+  /**
+   * Where a span can attach to this event. A note's is its own `tieAnchor`;
+   * a rest has no stem, so its anchor is the rest glyph's own position with
+   * the direction a tuplet bracket takes over silence -- above the staff,
+   * the side a tuplet number sits on when nothing is beamed.
+   */
+  spanAnchor?: EventAnchor;
 } {
   if (ev.kind === 'rest') {
     const restPosition =
@@ -2129,7 +2136,17 @@ function renderNoteOrRest(
     ]
       .filter((part) => part !== '')
       .join('\n');
-    return { svg, newAccidentalState: accidentalState };
+    return {
+      svg,
+      newAccidentalState: accidentalState,
+      spanAnchor: {
+        x,
+        topPosition: restPosition,
+        bottomPosition: restPosition,
+        direction: 'up',
+        noteheadGlyph: restGlyph,
+      },
+    };
   }
 
   if (ev.isGrace) {
@@ -2288,6 +2305,13 @@ function renderNoteOrRest(
     svg: parts.join('\n'),
     newAccidentalState: head.newAccidentalState,
     tieAnchor: { direction, position: head.position, noteheadGlyph: head.noteheadGlyph },
+    spanAnchor: {
+      x,
+      topPosition: head.position,
+      bottomPosition: head.position,
+      direction,
+      noteheadGlyph: head.noteheadGlyph,
+    },
   };
 }
 
@@ -3080,6 +3104,24 @@ function spanSourceNote(event: MeasureEvent): Note | undefined {
 }
 
 /**
+ * The tuplet endpoint marks on an event, whichever kind it is.
+ *
+ * `spanSourceNote` answers "where does a pitch-based span attach", which is
+ * why it skips rests. A tuplet is not pitch-based: its group is a run of
+ * beats and either end may be silent, so this reads the mark and the ratio
+ * from a rest as well.
+ */
+function tupletMarksOf(
+  event: MeasureEvent,
+): { tupletStart?: boolean; tupletStop?: boolean; duration: Duration } | undefined {
+  if (event.kind === 'note') return event;
+  if (event.kind === 'rest') return event;
+  const first = event.notes[0];
+  if (first === undefined) return undefined;
+  return { ...first, duration: event.duration };
+}
+
+/**
  * A slur whose start note was seen but whose stop note lies in a LATER
  * measure. Both endpoints are drawn together, in the measure that holds
  * the stop, because only then is the whole span's geometry known.
@@ -3254,14 +3296,17 @@ function renderSpans(
   for (const [number, open] of openSlurs) pendingSlurs.set(number, open.start);
 
   // ---- §9.17 tuplets --------------------------------------------------
+  // A tuplet is a grouping of BEATS, not of pitches: its first or last
+  // member may perfectly well be a rest, so unlike a slur it reads the
+  // endpoint marks from a rest too.
   let openTuplet: number | undefined;
   events.forEach((event, idx) => {
-    const note = spanSourceNote(event);
-    if (note === undefined) return;
+    const marks = tupletMarksOf(event);
+    if (marks === undefined) return;
 
-    if (note.tupletStart === true) openTuplet = idx;
+    if (marks.tupletStart === true) openTuplet = idx;
 
-    if (note.tupletStop !== true) return;
+    if (marks.tupletStop !== true) return;
     const startIdx = openTuplet;
     openTuplet = undefined;
     if (startIdx === undefined) {
@@ -3275,7 +3320,7 @@ function renderSpans(
     const anchors = spanAnchors(startIdx, idx);
     if (anchors.length < 2) return;
 
-    const actualNotes = note.duration.tuplet?.actualNotes;
+    const actualNotes = marks.duration.tuplet?.actualNotes;
     if (actualNotes === undefined) {
       onDiagnostic(
         'TUPLET_WITHOUT_RATIO',
@@ -6391,7 +6436,7 @@ export function renderParsedMusicXml(
                 );
                 accidentalState = newAccidentalState;
               } else {
-                const { svg, newAccidentalState, tieAnchor } = renderNoteOrRest(
+                const { svg, newAccidentalState, tieAnchor, spanAnchor } = renderNoteOrRest(
                   event,
                   eventX,
                   eventCtx,
@@ -6399,6 +6444,10 @@ export function renderParsedMusicXml(
                   forcedDirection,
                   restOffset,
                 );
+                // A rest holds a tuplet's endpoint as readily as a note
+                // does, so it needs an anchor for the span pass; a tie
+                // still needs a pitch and stays note-only.
+                if (spanAnchor !== undefined) anchorByIndex.set(idx, spanAnchor);
 
                 if (
                   event.kind === 'note' &&
@@ -6497,16 +6546,6 @@ export function renderParsedMusicXml(
                     pitch: event.pitch,
                     measureNumber: measure.number,
                     systemIndex: layout.systemIndex,
-                  });
-                }
-
-                if (event.kind === 'note' && tieAnchor !== undefined) {
-                  anchorByIndex.set(idx, {
-                    x: eventX,
-                    topPosition: tieAnchor.position,
-                    bottomPosition: tieAnchor.position,
-                    direction: tieAnchor.direction,
-                    noteheadGlyph: tieAnchor.noteheadGlyph,
                   });
                 }
 

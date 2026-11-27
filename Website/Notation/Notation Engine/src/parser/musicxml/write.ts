@@ -424,11 +424,13 @@ function restXml(rest: Rest, divisions: number): string {
       ? `<display-step>${rest.displayStep}</display-step><display-octave>${rest.displayOctave}</display-octave>`
       : '';
   // A rest carries a fermata as readily as a note does -- it is what holds
-  // a whole bar while the conductor waits.
-  const notations =
-    rest.hasFermata === true
-      ? `<notations>${fermataXml(rest.fermataPlacement, rest.fermataShape)}</notations>`
-      : '';
+  // a whole bar while the conductor waits -- and a tuplet's own endpoints
+  // as readily, since a group may open or close on silence.
+  const inner =
+    (rest.hasFermata === true ? fermataXml(rest.fermataPlacement, rest.fermataShape) : '') +
+    (rest.tupletStart === true ? '<tuplet type="start"/>' : '') +
+    (rest.tupletStop === true ? '<tuplet type="stop"/>' : '');
+  const notations = inner === '' ? '' : `<notations>${inner}</notations>`;
   return (
     '<note>' +
     `<rest>${positioned}</rest>` +

@@ -84,6 +84,11 @@
         <button class="editor-tool" type="button" data-editor-slur aria-label="Slur" title="Slur to the next note" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9c1.4 6 5 9 8 9s6.6-3 8-9" /></svg></button>
       </div>
       <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
+      <div class="editor-toolbar__group" data-editor-slot="tuplets" role="group" aria-label="Tuplets">
+        <button class="editor-tool" type="button" data-editor-popover="tuplet" data-editor-tuplet-button aria-label="Tuplet" title="Tuplet — a triplet is Ctrl+3" aria-haspopup="true" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18" /><path d="M6 7v4M18 7v4" /><text x="12" y="19" text-anchor="middle" font-size="9" fill="currentColor" stroke="none">3</text></svg></button>
+        <div class="editor-popover" data-editor-popover-panel="tuplet" role="group" aria-label="Tuplet" hidden></div>
+      </div>
+      <span class="editor-toolbar__divider" data-editor-divider aria-hidden="true"></span>
       <div class="editor-toolbar__group" data-editor-slot="articulations" role="group" aria-label="Articulations">
         <button class="editor-tool" type="button" data-editor-articulation="marcato" aria-label="Marcato" title="Marcato" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articMarcatoAbove"></span></button>
         <button class="editor-tool" type="button" data-editor-articulation="sforzato" aria-label="Sforzato" title="Sforzato (soft accent)" aria-pressed="false"><span class="editor-tool__glyph" data-editor-glyph="articSoftAccentAbove"></span></button>
@@ -197,12 +202,12 @@
         </div>
       </div>
     </div>
-    <script src="assets/notation-engine.js?v=de5f363a73f7"></script>
+    <script src="assets/notation-engine.js?v=1cebb3aa609d"></script>
     <script src="assets/sound-engine.js?v=bf60ebeed9a3"></script>
     <script src="script.js?v=dab936727b1f"></script>
     <script src="soundfonts-config.js?v=11199e76d024"></script>
-    <script src="notation-doc.js?v=8dd4dc896cba"></script>
+    <script src="notation-doc.js?v=d5e5bfce3b2b"></script>
     <script src="notation-newscore.js?v=99c9bb4cc6d4"></script>
-    <script src="notation-editor.js?v=5ebe93c4a9e0"></script>
+    <script src="notation-editor.js?v=90ac8aeb2f28"></script>
   </body>
 </html>
