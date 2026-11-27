@@ -12,7 +12,7 @@
   const toolbarStack = document.querySelector('[data-editor-toolbars]');
 
   const engine = window.NotationEngine;
-  const docTools = window.NotationDoc;
+  const docTools = window.WriterEngine;
   const pick = (selector) => document.querySelector(selector);
 
   const backButton = pick('[data-editor-back]');
@@ -94,6 +94,15 @@
   // so 1 is a 64th and 7 is a whole note.
   const SHORTCUT_DURATION = {
     '1': '64th', '2': '32nd', '3': '16th', '4': 'eighth', '5': 'quarter', '6': 'half', '7': 'whole',
+  };
+  /** The note values shortest first, which is the order Q and W walk. */
+  const DURATION_ORDER = ['64th', '32nd', '16th', 'eighth', 'quarter', 'half', 'whole'];
+  const MIN_TICKS = engine.TICKS_PER_QUARTER / 16;
+  const MAX_TICKS = engine.TICKS_PER_QUARTER * 4;
+  /** MuseScore's own names for Alt+1 … Alt+9. */
+  const INTERVAL_NAMES = {
+    1: 'unison', 2: 'second', 3: 'third', 4: 'fourth', 5: 'fifth',
+    6: 'sixth', 7: 'seventh', 8: 'octave', 9: 'ninth',
   };
 
   const state = {
@@ -1551,76 +1560,29 @@
     paletteTargets().length > 0 &&
     paletteTargets().every((cell) => eventNotes(eventFor(cell)).every((note) => note.tieStart));
 
-  /** The event that begins exactly where `event` ends, in the same voice. */
-  function eventAfter(cell, event) {
-    const end = (event.startTick ?? 0) + event.duration.ticks;
-    const measure = partById(cell.partId)?.measures.find((m) => m.number === cell.measureNumber);
-    const events = measure?.voices.find((v) => v.id === cell.voiceId)?.events ?? [];
-    const next = events[events.indexOf(event) + 1];
-    return next && (next.startTick ?? 0) === end ? next : null;
-  }
-
-  const samePitchAs = (event, notes) => {
-    const others = eventNotes(event);
-    return notes.every((note) =>
-      others.some((other) => JSON.stringify(other.pitch) === JSON.stringify(note.pitch)),
-    );
-  };
-
   /**
    * Tie: joins each selected note to the next note of the same pitch in its
    * own voice. Start and stop are written as one command, so undo takes the
    * whole tie away instead of leaving half of it behind.
    */
   function toggleTie() {
-    const cells = paletteTargets();
+    // The note the cursor just left is the one a writer means, so T works
+    // straight after a letter without reaching for the mouse first.
+    const cells = targetCells().filter((cell) => {
+      const event = eventFor(cell);
+      return event && event.kind !== 'rest';
+    });
     if (cells.length === 0) {
       announce('Select a note first.');
       return;
     }
-    const removing = selectionTied();
-    const edits = [];
-    for (const cell of cells) {
-      const event = eventFor(cell);
-      if (!event) continue;
-      if (removing) {
-        // Both halves come off together, or the next note keeps a stop tie
-        // that no longer has a start to meet.
-        const target = eventAfter(cell, event);
-        edits.push({
-          cell,
-          patch: { tieStart: null },
-          ...(target ? { next: { ...cell, eventIndex: cell.eventIndex + 1 }, nextPatch: { tieStop: null } } : {}),
-        });
-        continue;
-      }
-      const target = eventAfter(cell, event);
-      // A tie needs a following note of the same pitch to land on; anything
-      // else would draw into thin air and be dropped by the renderer.
-      if (!target || target.kind === 'rest' || !samePitchAs(target, eventNotes(event))) continue;
-      edits.push({ cell, patch: { tieStart: true }, next: { ...cell, eventIndex: cell.eventIndex + 1 }, nextPatch: { tieStop: true } });
-    }
-    if (edits.length === 0) {
-      announce(removing ? 'No tie to remove.' : 'Nothing to tie to — a tie needs the same pitch on the next beat.');
+    const plan = docTools.tiePlan(state.doc, cells);
+    if (plan === null || plan.edits.length === 0) {
+      announce(plan?.removing ? 'No tie to remove.' : 'Nothing to tie to \u2014 a tie needs the same pitch on the next beat.');
       return;
     }
-    commit((doc) => {
-      let next = doc;
-      for (const edit of edits) {
-        const { partId, measureNumber, voiceId, eventIndex } = edit.cell;
-        next = docTools.patchEvent(next, { partId, measureNumber, voiceId, eventIndex, patch: edit.patch });
-        if (edit.next) {
-          next = docTools.patchEvent(next, {
-            partId: edit.next.partId,
-            measureNumber: edit.next.measureNumber,
-            voiceId: edit.next.voiceId,
-            eventIndex: edit.next.eventIndex,
-            patch: edit.nextPatch,
-          });
-        }
-      }
-      return next;
-    }, removing ? 'Tie removed.' : `Tie added${edits.length === 1 ? '' : ` (${edits.length})`}.`);
+    commit((doc) => docTools.applyPlan(doc, plan.edits),
+      plan.removing ? 'Tie removed.' : `Tie added${plan.edits.length === 1 ? '' : ` (${plan.edits.length})`}.`);
   }
 
   /** True when every selected note already starts a slur. */
@@ -1630,13 +1592,6 @@
       eventNotes(eventFor(cell)).every((note) => (note.slurStarts ?? []).length > 0),
     );
 
-  /** The lowest slur number this note is not already using, so a second slur nests. */
-  function freeSlurNumber(note) {
-    const used = new Set([...(note?.slurStarts ?? []), ...(note?.slurStops ?? [])]);
-    for (let number = 1; number <= 8; number += 1) if (!used.has(number)) return number;
-    return 8;
-  }
-
   /**
    * Slur: joins each selected note to the next note in its own voice. Unlike
    * a tie, a slur may join different pitches, so the only requirement is
@@ -1644,64 +1599,23 @@
    * takes the whole curve away.
    */
   function toggleSlur() {
-    const cells = paletteTargets();
+    // Like T, S acts on the note the cursor just left when nothing is
+    // selected, so a slur follows a letter without a click.
+    const cells = targetCells().filter((cell) => {
+      const event = eventFor(cell);
+      return event && event.kind !== 'rest';
+    });
     if (cells.length === 0) {
       announce('Select a note first.');
       return;
     }
-    const edits = [];
-    for (const cell of cells) {
-      const event = eventFor(cell);
-      if (!event) continue;
-      const notes = eventNotes(event);
-      const target = eventAfter(cell, event);
-      const startNumbers = notes.flatMap((note) => note.slurStarts ?? []);
-      if (startNumbers.length > 0) {
-        const stops = (target ? eventNotes(target) : []).flatMap((note) => note.slurStops ?? []);
-        const remaining = stops.filter((number) => !startNumbers.includes(number));
-        edits.push({
-          cell,
-          patch: { slurStarts: null },
-          ...(target
-            ? {
-                next: { ...cell, eventIndex: cell.eventIndex + 1 },
-                nextPatch: { slurStops: remaining.length > 0 ? remaining : null },
-              }
-            : {}),
-        });
-        continue;
-      }
-      if (!target || target.kind === 'rest') continue;
-      const number = freeSlurNumber(notes[0]);
-      edits.push({
-        cell,
-        patch: { slurStarts: [number] },
-        next: { ...cell, eventIndex: cell.eventIndex + 1 },
-        nextPatch: { slurStops: [number] },
-      });
-    }
-    if (edits.length === 0) {
-      announce('Nothing to slur to — a slur needs a following note in the same voice.');
+    const plan = docTools.slurPlan(state.doc, cells);
+    if (plan === null || plan.edits.length === 0) {
+      announce('Nothing to slur to \u2014 a slur needs a following note in the same voice.');
       return;
     }
-    const removing = edits.every((edit) => edit.patch.slurStarts === null);
-    commit((doc) => {
-      let next = doc;
-      for (const edit of edits) {
-        const { partId, measureNumber, voiceId, eventIndex } = edit.cell;
-        next = docTools.patchEvent(next, { partId, measureNumber, voiceId, eventIndex, patch: edit.patch });
-        if (edit.next) {
-          next = docTools.patchEvent(next, {
-            partId: edit.next.partId,
-            measureNumber: edit.next.measureNumber,
-            voiceId: edit.next.voiceId,
-            eventIndex: edit.next.eventIndex,
-            patch: edit.nextPatch,
-          });
-        }
-      }
-      return next;
-    }, removing ? 'Slur removed.' : `Slur added${edits.length === 1 ? '' : ` (${edits.length})`}.`);
+    commit((doc) => docTools.applyPlan(doc, plan.edits),
+      plan.removing ? 'Slur removed.' : `Slur added${plan.edits.length === 1 ? '' : ` (${plan.edits.length})`}.`);
   }
 
   /**
@@ -1924,47 +1838,6 @@
   }
 
   /**
-   * Moves one note by whole staff steps.
-   *
-   * The diatonic move: C becomes D, never C sharp, and the accidental that
-   * was written travels with the note. So this walks the staff's own
-   * diatonic ladder rather than adding semitones -- which is also what makes
-   * an octave exactly seven steps in both directions, whatever the key
-   * signature. MuseScore puts it on Alt+Shift+Up/Down and on Ctrl for the
-   * octave.
-   */
-  function transposeNote(pitch, steps, clef) {
-    if (!pitch || pitch.kind === 'unpitched') return pitch;
-    const position = engine.staffPositionForPitch(clef, pitch.step, pitch.octave);
-    const moved = docTools.pitchFromStaffPosition(clef, position - steps * 0.5);
-    return { ...pitch, step: moved.step, octave: moved.octave };
-  }
-
-  // How a semitone is spelled. MuseScore spells an upward semitone with
-  // sharps and a downward one with flats, so E up is F and C down is B, but
-  // C up is C sharp and E down is E flat -- the accidental follows the
-  // direction, not the key.
-  const SHARP_SPELLING = [
-    ['C', 0], ['C', 1], ['D', 0], ['D', 1], ['E', 0], ['F', 0],
-    ['F', 1], ['G', 0], ['G', 1], ['A', 0], ['A', 1], ['B', 0],
-  ];
-  const FLAT_SPELLING = [
-    ['C', 0], ['D', -1], ['D', 0], ['E', -1], ['E', 0], ['F', 0],
-    ['G', -1], ['G', 0], ['A', -1], ['A', 0], ['B', -1], ['B', 0],
-  ];
-
-  /** Moves one note by a semitone, spelled the way MuseScore spells it. */
-  function transposeSemitone(pitch, direction) {
-    if (!pitch || pitch.kind === 'unpitched') return pitch;
-    const midi = engine.midiNoteNumber?.(pitch);
-    if (midi === undefined) return pitch;
-    const moved = midi + direction;
-    if (moved < 0 || moved > 127) return pitch;
-    const [step, alter] = (direction > 0 ? SHARP_SPELLING : FLAT_SPELLING)[((moved % 12) + 12) % 12];
-    return { ...pitch, step, alter, octave: Math.floor(moved / 12) - 1 };
-  }
-
-  /**
    * Moves every note in the selection by one command, so a Shift-click range
    * and a single note behave the same and undo once.
    *
@@ -2017,7 +1890,7 @@
   /** Transposes the selection by whole staff steps (Alt+Shift, Ctrl = octave). */
   function transposeSelection(steps) {
     moveSelectedPitch(
-      (pitch, clef) => transposeNote(pitch, steps, clef),
+      (pitch, clef) => docTools.transposeNote(pitch, steps, clef),
       (count) => describeTranspose(steps, count),
     );
   }
@@ -2025,7 +1898,7 @@
   /** Transposes the selection by a semitone (Up/Down). */
   function transposeSemitones(direction) {
     moveSelectedPitch(
-      (pitch) => transposeSemitone(pitch, direction),
+      (pitch) => docTools.transposeSemitone(pitch, direction),
       (count) => describeSemitones(direction, count),
     );
   }
@@ -2043,6 +1916,217 @@
     const way = direction > 0 ? 'up' : 'down';
     if (count > 1) return `Moved ${count} notes ${way} a semitone.`;
     return `Moved ${way} a semitone.`;
+  }
+
+  /**
+   * The cells a command acts on: the selection, or the note just written.
+   *
+   * MuseScore keeps acting on the note under the cursor while the writer is
+   * still in note input, so a command pressed right after a letter needs no
+   * selection to exist.
+   */
+  function targetCells() {
+    const selected = selectedCells();
+    return selected.length > 0 ? selected : lastWrittenCells();
+  }
+
+  /**
+   * MuseScore's Alt+1-9: stacks a note the given interval above the beat.
+   *
+   * The interval is counted from the top note of the chord, which is the
+   * note a reader hears as "the melody" -- a third above a triad adds the
+   * third above its highest note, not above its lowest.
+   */
+  function addInterval(number) {
+    const cells = targetCells();
+    if (cells.length === 0) {
+      announce('Select a note first.');
+      return;
+    }
+    const cell = cells[cells.length - 1];
+    const event = eventFor(cell);
+    if (!event || event.kind === 'rest') {
+      announce('Select a note first.');
+      return;
+    }
+    const clef = clefAt(cell.measureNumber, event.staff ?? 1);
+    const plan = docTools.intervalPlan(
+      state.doc,
+      cell,
+      number,
+      clef,
+      attributeAt(cell.measureNumber)?.fifths ?? 0,
+    );
+    if (plan.reason === 'no-note') {
+      announce('Select a note first.');
+      return;
+    }
+    if (plan.reason === 'unwritable') {
+      announce('That interval cannot be written there.');
+      return;
+    }
+    if (plan.reason === 'same-note') {
+      announce('That note is already in the chord.');
+      return;
+    }
+    if (plan.reason === 'already') {
+      announce(`${pitchLabel(plan.pitch.step, plan.pitch.alter, plan.pitch.octave)} is already in the chord.`);
+      return;
+    }
+    const stacked = plan.event;
+    commit(
+      (doc) =>
+        mirrorCounterpart(
+          docTools.replaceEvent(doc, {
+            partId: cell.partId,
+            measureNumber: cell.measureNumber,
+            voiceId: cell.voiceId,
+            eventIndex: cell.eventIndex,
+            event: stacked,
+          }),
+          {
+            partId: cell.partId,
+            measureNumber: cell.measureNumber,
+            voiceId: cell.voiceId,
+            staffNumber: event.staff ?? 1,
+            tick: event.startTick ?? 0,
+            rederiveTab: true,
+          },
+        ),
+      `Added ${INTERVAL_NAMES[number] ?? 'interval'} above.`,
+    );
+    previewPitch(plan.pitch, null, cell.measureNumber);
+    render();
+  }
+
+  /** MuseScore's J: writes the same sounding pitch with its other spelling. */
+  function respellSelection() {
+    const cells = targetCells();
+    if (cells.length === 0) {
+      announce('Select a note first.');
+      return;
+    }
+    // The plan is read from the current document, because the status line
+    // is written before `commit` runs its mutation.
+    const plan = docTools.respellPlan(state.doc, cells);
+    if (plan.length === 0) {
+      announce('Nothing to respell.');
+      return;
+    }
+    commit((doc) => {
+      let next = doc;
+      for (const { cell, event, patch } of plan) {
+        next = mirrorCounterpart(
+          docTools.patchEvent(next, {
+            partId: cell.partId,
+            measureNumber: cell.measureNumber,
+            voiceId: cell.voiceId,
+            eventIndex: cell.eventIndex,
+            patch,
+          }),
+          {
+            partId: cell.partId,
+            measureNumber: cell.measureNumber,
+            voiceId: cell.voiceId,
+            staffNumber: event.staff ?? 1,
+            tick: event.startTick ?? 0,
+            rederiveTab: true,
+          },
+        );
+      }
+      return next;
+    }, `Respelled ${plan.length} note${plan.length === 1 ? '' : 's'}.`);
+  }
+
+  /**
+   * MuseScore's Shift+Left/Right: moves the selected beats one beat over.
+   *
+   * A run of selected beats moves as a block, which is what MuseScore does
+   * and what a writer expects after Shift-clicking a passage.
+   */
+  function moveBeats(direction) {
+    const cells = selectedCells();
+    if (cells.length === 0) {
+      announce('Select a note to move.');
+      return;
+    }
+    const { measureNumber, voiceId } = cells[0];
+    if (cells.some((cell) => cell.measureNumber !== measureNumber || cell.voiceId !== voiceId)) {
+      announce('Select beats in one bar to move them.');
+      return;
+    }
+    const events = eventsIn(measureNumber, voiceId);
+    const indices = cells.map((cell) => cell.eventIndex);
+    const edge = direction > 0 ? Math.max(...indices) : Math.min(...indices);
+    if (events[edge + direction] === undefined) {
+      announce(direction > 0 ? 'That is the last beat of the bar.' : 'That is the first beat of the bar.');
+      return;
+    }
+    commit(
+      (doc) => docTools.moveBeats(doc, { partId: cells[0].partId, measureNumber, voiceId }, indices, direction),
+      `Moved ${indices.length} beat${indices.length === 1 ? '' : 's'}.`,
+    );
+    const moved = cells.map((cell) => ({ ...cell, eventIndex: cell.eventIndex + direction }));
+    setSelection(moved, moved[0]);
+    render();
+  }
+
+  /**
+   * MuseScore's Q and W: halves or doubles the selected note's value.
+   *
+   * With nothing selected it changes the note value the cursor writes with,
+   * which is what the writer means while still filling a bar.
+   */
+  function scaleSelectionDuration(factor) {
+    const cells = selectedCells();
+    if (cells.length === 0) {
+      const index = DURATION_ORDER.indexOf(state.tool.duration);
+      const nextIndex = Math.max(0, Math.min(DURATION_ORDER.length - 1, index + (factor > 1 ? -1 : 1)));
+      state.tool.duration = DURATION_ORDER[nextIndex];
+      syncTools();
+      announce(`Note value: ${state.tool.duration}.`);
+      return;
+    }
+    const plan = docTools.durationPlan(state.doc, cells, factor, {
+      minTicks: MIN_TICKS,
+      maxTicks: MAX_TICKS,
+    });
+    if (plan.length === 0) {
+      announce('That value cannot be halved or doubled.');
+      return;
+    }
+    commit((doc) => {
+      let next = doc;
+      for (const { cell, event, duration } of plan) {
+        next = mirrorCounterpart(docTools.setEventDuration(next, cell, duration), {
+          partId: cell.partId,
+          measureNumber: cell.measureNumber,
+          voiceId: cell.voiceId,
+          staffNumber: event.staff ?? 1,
+          tick: event.startTick ?? 0,
+        });
+      }
+      return next;
+    }, factor > 1 ? 'Duration doubled.' : 'Duration halved.');
+  }
+
+  /** MuseScore's Ctrl+B: one more empty bar at the end of the score. */
+  function appendMeasureCommand() {
+    const measures = partById(activePartId())?.measures ?? [];
+    const last = measures[measures.length - 1]?.number ?? 0;
+    if (last === 0) return;
+    commit((doc) => docTools.appendMeasure(doc, activePartId()), `Measure ${last + 1} added.`);
+    clearSelection();
+    const staffNumber = state.entry?.staffNumber ?? 1;
+    state.entry = {
+      ...(state.entry ?? {}),
+      partId: activePartId(),
+      measureNumber: last + 1,
+      voiceId: voiceForStaff(staffNumber),
+      tick: 0,
+      staffNumber,
+    };
+    render();
   }
 
   /**
@@ -2577,7 +2661,7 @@
         // hi-hat land on the same beat, so a Shift-click on the second
         // line stacks it instead of replacing the first.
         if (stacking) {
-          const stacked = stackedWith(existing, note, state.entry.tick);
+          const stacked = docTools.stackedChord(existing, note, state.entry.tick);
           if (stacked === null) {
             announce(`${chosen.name} is already in the chord.`);
             return;
@@ -2628,7 +2712,7 @@
       // one and plays from the other.
       const to = pairedStaffFor(staff, measureNumber);
       if (stacking) {
-        const stacked = stackedWith(existing, note, state.entry.tick);
+        const stacked = docTools.stackedChord(existing, note, state.entry.tick);
         if (stacked === null) {
           announce(`${pitchLabel(step, pitch.alter, octave)} is already in the chord.`);
           return;
@@ -2652,29 +2736,6 @@
     commit((doc) => writePaired(doc, { partId: activePartId(), measureNumber, voiceId, event, replaceIndex, to: pairedStaffFor(staff, measureNumber) }), `Inserted ${pitchLabel(step, pitch.alter, octave)}.`);
     previewPitch(pitch, null, measureNumber);
     advanceEntry(memberDuration.ticks, measureNumber, voiceId);
-  }
-
-  /**
-   * `existing` plus `note` as one chord at `tick`, or `null` when `note` is
-   * already a notehead of that chord.
-   *
-   * Writing a chord is a repeated gesture -- click the beat, Shift-click
-   * each further line -- so the same line clicked twice has to be a no-op.
-   * The engine's `chord()` would happily accept two identical noteheads,
-   * which draws a doubled head and plays the note twice as loud.
-   */
-  function stackedWith(existing, note, tick) {
-    const members = existing.kind === 'chord' ? existing.notes : [existing];
-    const samePitch = (a, b) =>
-      a.pitch.kind === 'unpitched' || b.pitch.kind === 'unpitched'
-        ? a.instrumentId === b.instrumentId &&
-          a.pitch.displayStep === b.pitch.displayStep &&
-          a.pitch.displayOctave === b.pitch.displayOctave
-        : a.pitch.step === b.pitch.step &&
-          a.pitch.alter === b.pitch.alter &&
-          a.pitch.octave === b.pitch.octave;
-    if (members.some((member) => samePitch(member, note))) return null;
-    return engine.chord([...members, note], { startTick: tick });
   }
 
   /**
@@ -2997,8 +3058,8 @@
     }
     const clef = clefAt(anchor.measureNumber);
     const patch = baseEvent.kind === 'chord'
-      ? { notes: baseEvent.notes.map((note) => ({ ...note, pitch: transposeNote(note.pitch, steps, clef) })) }
-      : { pitch: transposeNote(baseEvent.pitch, steps, clef) };
+      ? { notes: baseEvent.notes.map((note) => ({ ...note, pitch: docTools.transposeNote(note.pitch, steps, clef) })) }
+      : { pitch: docTools.transposeNote(baseEvent.pitch, steps, clef) };
     state.doc = mirrorCounterpart(
       docTools.patchEvent(drag.baseDoc, {
         partId: anchor.partId,
@@ -5816,6 +5877,25 @@
       insertTupletCommand(Number(event.key));
       return;
     }
+    // Alt+1 … Alt+9 stacks an interval above the selected note. The voice
+    // shortcut above owns Ctrl+Alt, so a plain Alt is free for this.
+    if (event.altKey && !modifier && /^[1-9]$/.test(event.key)) {
+      event.preventDefault();
+      addInterval(Number(event.key));
+      return;
+    }
+    // MuseScore's Ctrl+B appends a bar; Ctrl+Shift+B inserts one before the
+    // bar the cursor is in.
+    if (modifier && event.key.toLowerCase() === 'b') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        const at = currentMeasureNumber();
+        commit((doc) => docTools.insertMeasureAfter(doc, activePartId(), at - 1), `Measure added before bar ${at}.`);
+      } else {
+        appendMeasureCommand();
+      }
+      return;
+    }
     if (event.code === 'Space') { event.preventDefault(); void togglePlay(); return; }
 
     if (event.key === 'Escape') {
@@ -5830,6 +5910,18 @@
       return;
     }
     if (modifier && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(); return; }
+    // Shift+Left/Right trades the selected beat with its neighbour; the
+    // plain arrows below walk the selection instead.
+    if (event.shiftKey && !modifier && event.key === 'ArrowRight') {
+      event.preventDefault();
+      moveBeats(1);
+      return;
+    }
+    if (event.shiftKey && !modifier && event.key === 'ArrowLeft') {
+      event.preventDefault();
+      moveBeats(-1);
+      return;
+    }
     if (event.key === 'ArrowRight') { event.preventDefault(); moveSelection(1); return; }
     if (event.key === 'ArrowLeft') { event.preventDefault(); moveSelection(-1); return; }
     // MuseScore's Up/Down move a semitone (spelled sharp going up, flat
@@ -5877,6 +5969,34 @@
       return;
     }
     if (!modifier && event.key.toLowerCase() === 'r') { event.preventDefault(); repeatSelection(); return; }
+    // MuseScore's T, S, J, Q and W. Q and W halve and double the selected
+    // note's value; with nothing selected they change the value the cursor
+    // writes with, which is the same key doing the same thing one beat on.
+    if (!modifier && !event.altKey && event.key.toLowerCase() === 't') {
+      event.preventDefault();
+      toggleTie();
+      return;
+    }
+    if (!modifier && !event.altKey && event.key.toLowerCase() === 's') {
+      event.preventDefault();
+      toggleSlur();
+      return;
+    }
+    if (!modifier && !event.altKey && event.key.toLowerCase() === 'j') {
+      event.preventDefault();
+      respellSelection();
+      return;
+    }
+    if (!modifier && !event.altKey && event.key.toLowerCase() === 'q') {
+      event.preventDefault();
+      scaleSelectionDuration(0.5);
+      return;
+    }
+    if (!modifier && !event.altKey && event.key.toLowerCase() === 'w') {
+      event.preventDefault();
+      scaleSelectionDuration(2);
+      return;
+    }
 
     const letter = event.key.toUpperCase();
     if (state.noteInput && docTools.STEPS.includes(letter)) {

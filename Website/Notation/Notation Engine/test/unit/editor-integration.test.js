@@ -15,7 +15,8 @@ const appDir = path.join(repoDir, 'Website');
  * The Notation Lab editor's own scripts, run against the built engine.
  *
  * The engine ships standalone and the editor is the one host in this
- * repo. `notation-doc.js` owns the edit commands and the MusicXML
+ * repo. The Writer Engine (`Website/Writer/Writer Engine/`, published as
+ * `assets/writer-engine.js`) owns the edit commands and the MusicXML
  * writer; `notation-editor.js` owns the toolbar and the render loop.
  * Both talk to the engine through `window.NotationEngine` and nothing
  * else, so this test loads them the way the page does -- into a browser
@@ -37,8 +38,8 @@ function loadEditor() {
     fs.readFileSync(path.join(packageDir, 'dist', 'notation-engine.js'), 'utf8'),
     context,
   );
-  vm.runInContext(fs.readFileSync(path.join(appDir, 'notation-doc.js'), 'utf8'), context);
-  return { window, engine: window.NotationEngine, doc: window.NotationDoc };
+  vm.runInContext(fs.readFileSync(path.join(appDir, 'assets', 'writer-engine.js'), 'utf8'), context);
+  return { window, engine: window.NotationEngine, doc: window.WriterEngine };
 }
 
 const STARTER_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -108,7 +109,7 @@ function loadEditorPage({ url = 'https://example.test/notation-editor.html?inten
     window.localStorage.setItem(key, value);
   }
   const context = dom.getInternalVMContext();
-  for (const rel of ['assets/notation-engine.js', 'notation-doc.js', 'notation-newscore.js', 'notation-editor.js']) {
+  for (const rel of ['assets/notation-engine.js', 'assets/writer-engine.js', 'notation-newscore.js', 'notation-editor.js']) {
     vm.runInContext(fs.readFileSync(path.join(appDir, rel), 'utf8'), context, { filename: rel });
   }
   return { window, errors };
@@ -117,7 +118,7 @@ function loadEditorPage({ url = 'https://example.test/notation-editor.html?inten
 describe('the editor and the engine agree, end to end', () => {
   test('the page scripts load and expose exactly what the editor expects', () => {
     const { engine, doc } = loadEditor();
-    // notation-doc.js reads these off the engine at load time; a missing
+    // the writer engine reads these off the notation engine at load time; a missing
     // one is a broken page, not a subtle bug.
     for (const name of ['TICKS_PER_QUARTER', 'TREBLE_CLEF', 'BASS_CLEF', 'ALTO_CLEF']) {
       assert.notEqual(engine[name], undefined, `engine is missing ${name}`);
@@ -424,7 +425,7 @@ describe('the editor and the engine agree, end to end', () => {
   test('the whole editor page starts up, loads its score, and draws it', () => {
     const { window, errors } = loadEditorPage();
     assert.deepEqual(errors, [], 'the page must start without a script error');
-    assert.ok(window.NotationEngine && window.NotationDoc);
+    assert.ok(window.NotationEngine && window.WriterEngine);
 
     const scoreHost = window.document.querySelector('[data-editor-score]');
     assert.ok(scoreHost, 'the editor has no score host');
@@ -1039,7 +1040,7 @@ describe('the editor and the engine agree, end to end', () => {
     const { window } = loadEditorPage();
     const doc = window.document;
     const E = window.NotationEngine;
-    const D = window.NotationDoc;
+    const D = window.WriterEngine;
     const domParser = testDomParser();
 
     const score = (body) =>
@@ -1097,7 +1098,7 @@ describe('the editor and the engine agree, end to end', () => {
   test('paste next to the barline drops the note rather than throwing', () => {
     const { window } = loadEditorPage();
     const E = window.NotationEngine;
-    const D = window.NotationDoc;
+    const D = window.WriterEngine;
     const domParser = testDomParser();
 
     const score = (body) =>
@@ -4094,5 +4095,220 @@ describe('the editor and the engine agree, end to end', () => {
       page.press('z', { ctrlKey: true });
       assert.equal((page.saved().match(/<time-modification>/g) ?? []).length, 0);
     });
+
+    test('T ties the selected note to the next one of the same pitch', () => {
+      const page = openKeys();
+      page.press('D');
+      page.press('r');
+      page.press('a', { ctrlKey: true });
+      page.press('t');
+      assert.equal(page.status(), 'Tie added.');
+      const xml = page.saved();
+      assert.match(xml, /<tie type="start"\/>/, 'the first note starts the tie');
+      assert.match(xml, /<tie type="stop"\/>/, 'and the second one ends it');
+
+      // Pressing T again takes both halves away, so no stop tie is left
+      // without a start to meet.
+      page.press('t');
+      assert.equal(page.status(), 'Tie removed.');
+      assert.doesNotMatch(page.saved(), /<tie type="start"\/>/);
+      assert.doesNotMatch(page.saved(), /<tie type="stop"\/>/);
+    });
+
+    test('S slurs the selected note to the next one, whatever its pitch', () => {
+      const page = openKeys();
+      page.press('D');
+      page.press('E');
+      page.press('a', { ctrlKey: true });
+      page.press('s');
+      assert.match(page.status(), /Slur added/);
+      const xml = page.saved();
+      assert.match(xml, /<slur type="start" number="1"\/>/);
+      assert.match(xml, /<slur type="stop" number="1"\/>/);
+    });
+
+    test('J respells the selected note without changing what it sounds', () => {
+      const page = openKeys();
+      page.press('C');
+      page.press('ArrowUp');
+      assert.deepEqual(page.bar(), ['C14'], 'C sharp 4 to start with');
+      page.press('j');
+      assert.match(page.status(), /Respelled 1 note/);
+      // D flat 4 sounds the same as C sharp 4 and is written that way.
+      assert.deepEqual(page.bar(), ['D-14']);
+    });
+
+    test('Alt+1-9 stacks an interval above the selected note', () => {
+      const page = openKeys();
+      page.press('C');
+      page.press('a', { ctrlKey: true });
+      page.press('3', { altKey: true });
+      assert.equal(page.status(), 'Added third above.');
+      assert.deepEqual(page.bar(), ['C4', 'E4'], 'a third above C is E');
+
+      // The interval is counted from the note the cursor sits on, which is
+      // the top of the chord now -- a fifth above E is B.
+      page.press('5', { altKey: true });
+      assert.deepEqual(page.bar(), ['C4', 'E4', 'B4']);
+
+      // And it is counted in letter names, not semitones: a fifth above C
+      // is G, never F double sharp.
+      const fresh = openKeys();
+      fresh.press('C');
+      fresh.press('a', { ctrlKey: true });
+      fresh.press('5', { altKey: true });
+      assert.deepEqual(fresh.bar(), ['C4', 'G4']);
+    });
+
+    test('Shift+Left and Shift+Right move the selected beats one beat over', () => {
+      const page = openKeys();
+      const barOne = () => page.saved().match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+      page.press('C');
+      page.press('E');
+      page.press('a', { ctrlKey: true });
+
+      // Both beats move together, so the pair now starts on beat 2 and the
+      // bar begins with a rest -- the rhythm keeps its shape.
+      page.press('ArrowRight', { shiftKey: true });
+      assert.equal(page.status(), 'Moved 2 beats.');
+      assert.match(barOne(), /<attributes>[\s\S]*<\/attributes><note><rest/, 'the bar now opens with a rest');
+
+      // And they come back with the opposite key.
+      page.press('ArrowLeft', { shiftKey: true });
+      assert.match(barOne(), /<\/attributes><note><pitch><step>C<\/step>/, 'the C is back on beat 1');
+    });
+
+    test('Alt+1 is a unison, so it adds nothing', () => {
+      const page = openKeys();
+      page.press('C');
+      page.press('a', { ctrlKey: true });
+      page.press('1', { altKey: true });
+      assert.equal(page.status(), 'That note is already in the chord.');
+      assert.deepEqual(page.bar(), ['C4']);
+    });
+
+    test('Shift+Left refuses to walk past the first beat of the bar', () => {
+      const page = openKeys();
+      page.press('C');
+      page.press('a', { ctrlKey: true });
+      page.press('ArrowLeft', { shiftKey: true });
+      assert.equal(page.status(), 'That is the first beat of the bar.');
+    });
+
+    test('Q and W halve and double the selected note value', () => {
+      const page = openKeys();
+      page.press('5'); // quarter
+      page.press('C');
+      page.press('a', { ctrlKey: true });
+      page.press('w');
+      assert.equal(page.status(), 'Duration doubled.');
+      assert.match(page.saved(), /<type>half<\/type>/, 'the quarter became a half');
+      page.press('q');
+      assert.equal(page.status(), 'Duration halved.');
+      assert.match(page.saved(), /<type>quarter<\/type>/);
+    });
+
+    test('Ctrl+B appends a bar and Ctrl+Shift+B inserts one before the cursor', () => {
+      const page = openKeys();
+      const bars = () => (page.saved().match(/<measure number=/g) ?? []).length;
+      const before = bars();
+      page.press('b', { ctrlKey: true });
+      assert.equal(page.status(), `Measure ${before + 1} added.`);
+      assert.equal(bars(), before + 1, 'one more bar at the end');
+
+      page.press('b', { ctrlKey: true, shiftKey: true });
+      assert.equal(bars(), before + 2, 'and one more before the cursor');
+    });
+  });
+});
+
+describe("the writer's own commands", () => {
+  /** A one-bar 4/4 score whose bar is filled with the given notes. */
+  function scoreOf(window, engine, steps) {
+    const body = steps
+      .map((step) => `<note><pitch><step>${step}</step><octave>4</octave></pitch>`
+        + '<duration>4</duration><voice>1</voice><type>quarter</type></note>')
+      .join('');
+    const xml = '<?xml version="1.0"?><score-partwise version="4.0"><part-list>'
+      + '<score-part id="P1"><part-name>M</part-name></score-part></part-list>'
+      + '<part id="P1"><measure number="1"><attributes><divisions>4</divisions>'
+      + '<time><beats>4</beats><beat-type>4</beat-type></time>'
+      + '<clef><sign>G</sign><line>2</line></clef></attributes>'
+      + body
+      + '</measure></part></score-partwise>';
+    return engine.parseMusicXml(xml, window.DOMParser);
+  }
+
+  const eventsOf = (document) => document.score.parts[0].measures[0].voices[0].events;
+  // The document lives in the page's realm, so its arrays are not this
+  // realm's; copying them makes the comparison about the music.
+  const readBack = (document) => JSON.parse(JSON.stringify(
+    eventsOf(document)
+      .filter((event) => event.kind !== 'rest')
+      .map((event) => `${event.pitch.step}${event.pitch.alter ?? 0}${event.pitch.octave}`),
+  ));
+
+  test('moveBeats trades a beat with its neighbour and keeps the bar full', () => {
+    const { window, engine, doc } = loadEditor();
+    const parsed = scoreOf(window, engine, ['C', 'D', 'E', 'F']);
+    const moved = doc.moveBeats(parsed, { partId: 'P1', measureNumber: 1, voiceId: 1 }, [0], 1);
+    assert.deepEqual(readBack(moved), ['D04', 'C04', 'E04', 'F04']);
+    const total = eventsOf(moved).reduce((sum, event) => sum + event.duration.ticks, 0);
+    assert.equal(total, doc.ticksPerMeasure(moved, 'P1', 1), 'the bar is still a full bar');
+    // The document it started from is untouched, so undo has the old one.
+    assert.deepEqual(readBack(parsed), ['C04', 'D04', 'E04', 'F04']);
+  });
+
+  test('moveBeats carries a whole selection one beat over', () => {
+    const { window, engine, doc } = loadEditor();
+    const parsed = scoreOf(window, engine, ['C', 'D', 'E', 'F']);
+    const moved = doc.moveBeats(parsed, { partId: 'P1', measureNumber: 1, voiceId: 1 }, [0, 1], 1);
+    assert.deepEqual(readBack(moved), ['E04', 'C04', 'D04', 'F04']);
+  });
+
+  test('moveBeats leaves the bar alone at the last beat', () => {
+    const { window, engine, doc } = loadEditor();
+    const parsed = scoreOf(window, engine, ['C', 'D']);
+    const moved = doc.moveBeats(parsed, { partId: 'P1', measureNumber: 1, voiceId: 1 }, [1], 1);
+    assert.deepEqual(readBack(moved), ['C04', 'D04']);
+  });
+
+  test('respell writes the same sounding pitch the other way round', () => {
+    const { window, engine, doc } = loadEditor();
+    const parsed = scoreOf(window, engine, ['C']);
+    const sharp = { kind: 'pitched', step: 'C', alter: 1, octave: 4 };
+    const flat = doc.respell(sharp);
+    assert.equal(flat.step, 'D');
+    assert.equal(flat.alter, -1);
+    assert.equal(flat.octave, 4);
+    assert.equal(engine.midiNoteNumber(flat), engine.midiNoteNumber(sharp), 'the sounding pitch is unchanged');
+
+    // And back again: a flat becomes the sharp below it.
+    assert.deepEqual(
+      { step: doc.respell(flat).step, alter: doc.respell(flat).alter },
+      { step: 'C', alter: 1 },
+    );
+    assert.equal(parsed.score.parts.length, 1);
+  });
+
+  test('pitchAtInterval counts letter names and takes the key signature', () => {
+    const { window, doc } = loadEditor();
+    const E = window.NotationEngine;
+    const treble = E.TREBLE_CLEF;
+    const C4 = { kind: 'pitched', step: 'C', alter: 0, octave: 4 };
+
+    const third = doc.pitchAtInterval(C4, 3, treble, 0);
+    assert.equal(`${third.step}${third.octave}`, 'E4', 'a third above C is E, not a semitone count');
+    const fifth = doc.pitchAtInterval(C4, 5, treble, 0);
+    assert.equal(`${fifth.step}${fifth.octave}`, 'G4');
+    const octave = doc.pitchAtInterval(C4, 8, treble, 0);
+    assert.equal(`${octave.step}${octave.octave}`, 'C5', 'Alt+8 is the octave');
+
+    // In D major the third above D is F sharp -- the key's own note.
+    const inD = doc.pitchAtInterval({ kind: 'pitched', step: 'D', alter: 0, octave: 4 }, 3, treble, 2);
+    assert.equal(`${inD.step}${inD.alter}${inD.octave}`, 'F14');
+    // In B flat major the third above C is E flat, the key's own flat.
+    const inBb = doc.pitchAtInterval(C4, 3, treble, -2);
+    assert.equal(`${inBb.step}${inBb.alter}${inBb.octave}`, 'E-14');
   });
 });

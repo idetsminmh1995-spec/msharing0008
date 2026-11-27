@@ -53,7 +53,6 @@ const appAssetsDir = path.join(repoDir, 'Website');
 const appAssets = [
   'script.js',
   'soundfonts-config.js',
-  'notation-doc.js',
   'notation-entry.js',
   'notation-editor.js',
   'notation-newscore.js',
@@ -65,6 +64,7 @@ const appAssets = [
   'studio-violin.js',
   'studio-voice.js',
   'styles.css',
+  'assets/writer-engine.js',
   'assets/video-engine.js',
   'assets/metronome-engine.js',
 ];

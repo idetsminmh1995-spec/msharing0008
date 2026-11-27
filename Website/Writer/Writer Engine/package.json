@@ -1,0 +1,14 @@
+{
+  "name": "writer-engine",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Notation Lab writer engine -- the score document and its edit commands, free of the DOM.",
+  "type": "module",
+  "main": "src/index.js",
+  "scripts": {
+    "sync:website": "node tools/sync-writer-engine.mjs",
+    "check:website": "node tools/sync-writer-engine.mjs --check",
+    "test": "node --test 'test/**/*.test.js'",
+    "verify": "npm run check:website && npm run test"
+  }
+}

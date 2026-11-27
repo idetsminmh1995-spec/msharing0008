@@ -24,6 +24,11 @@ Repository-specific knowledge for the M Sharing music platform.
 - Notation docs: `Website/Notation/Notation Plan/PLAN.md`,
   `Website/Notation/Notation Doc/DOC.md`, and the generated
   `Website/Notation/Notation Plan/Documentation/API.md`.
+- Writer Engine: `Website/Writer/Writer Engine/` (plain JavaScript, no build
+  step, no DOM). It owns the score document and the edit commands, published
+  as `Website/Website/assets/writer-engine.js` and read as `window.WriterEngine`.
+  Run `npm run verify` there after changing it; the notation engine's
+  `npm run build` re-derives the page's `?v=` key for the asset.
 
 ## Notation Engine
 
@@ -871,15 +876,15 @@ commits stay local and must be reported as unpushed.
     `main`, `studio-video.js` has no `f20d3d` and `styles.css` has no
     `.video-stage` radial gradient, while `.is-playing` keeps only its 1px
     inset ring. No pull request is open.
-- **Push blocked on 2026-11-18 (W3 pass): the injected token cannot write.**
-  `git push origin feat/guitar-video-adapter` is refused with
-  `403 Permission to idetsminmh1995-spec/msharing0008.git denied to
-  idetsminmh1995-spec`, and so is `git push` with `$GITHUB_TOKEN`,
-  `x-access-token:…`, the credential-helper's exchanged secret, and
-  `gh auth token` (all four are the same 40-char App token). The API agrees:
-  `GET /repos/…` reports `permissions.push: true`, yet
-  `POST /git/refs` and `PUT /contents/…` both answer
-  `403 Resource not accessible by integration`. So the read side is fine and
-  the write side needs a fresh user-supplied `github_pat_…`, exactly as the
-  fine-grained-PAT note above describes. `9c64fb7` (W3 tuplets) is committed
-  locally and waiting for that PAT; nothing else is unpushed.
+- **Push needs a user-supplied PAT (resolved 2026-11-18, W4 pass).** The
+  injected token is a 40-char GitHub App user token (`ghu_…`): `GET /repos/…`
+  reports `permissions.push: true`, yet `POST /git/refs`, `PUT /contents/…`
+  and `git push` all answer `403 Resource not accessible by integration` /
+  `Permission … denied`. The credential-helper's exchanged secret and
+  `gh auth token` are the same App token, so none of them can write. A
+  fine-grained `github_pat_…` supplied by the owner does work: pass it per
+  command and keep it out of the config —
+  `git -c credential.helper= -c 'credential.helper=!f() { echo username=x-access-token; echo password=$GH_PAT; }; f' push origin <branch>`.
+  Do not write the PAT into `.git/config`, a remote URL, or any committed file.
+  As of `6167228` (W4) `feat/guitar-video-adapter` is fully pushed:
+  `git rev-list --count origin/feat/guitar-video-adapter..HEAD` is 0.

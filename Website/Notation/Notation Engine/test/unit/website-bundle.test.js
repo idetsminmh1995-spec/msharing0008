@@ -78,7 +78,6 @@ test(
     const appAssets = [
       'script.js',
       'soundfonts-config.js',
-      'notation-doc.js',
       'notation-entry.js',
       'notation-editor.js',
       'notation-newscore.js',
@@ -90,6 +89,7 @@ test(
       'studio-violin.js',
       'studio-voice.js',
       'styles.css',
+      'assets/writer-engine.js',
       'assets/video-engine.js',
       'assets/metronome-engine.js',
     ];
