@@ -478,6 +478,112 @@
     };
   }
 
+  // ---- moving, respelling, intervals --------------------------------------
+
+  /**
+   * Trades each selected beat with its neighbour in the same voice.
+   *
+   * MuseScore's Shift+Left/Right moves the selected chords and rests one
+   * beat over, and the two trade places -- the bar keeps its rhythm, only
+   * the order of the beats changes. The whole move is one re-lay of the
+   * voice, so a run of selected beats shifts together and undo takes it
+   * back in one step.
+   */
+  function moveBeats(doc, { partId, measureNumber, voiceId }, indices, direction) {
+    const capacity = ticksPerMeasure(doc, partId, measureNumber);
+    return updateVoice(doc, partId, measureNumber, voiceId, (events) => {
+      const selected = new Set(indices.filter((index) => events[index] !== undefined));
+      if (selected.size === 0) return events;
+      const order = [...events];
+      // Move the leading edge first, or the beat that just moved would be
+      // picked up again as the neighbour of the next one.
+      const ordered = [...selected].sort((a, b) => (direction > 0 ? b - a : a - b));
+      for (const index of ordered) {
+        const other = index + direction;
+        if (other < 0 || other >= order.length || selected.has(other)) continue;
+        [order[index], order[other]] = [order[other], order[index]];
+        selected.delete(index);
+        selected.add(other);
+      }
+      const staff = events[indices[0]]?.staff ?? 1;
+      let cursor = events[0].startTick ?? 0;
+      const laid = order.map((event) => {
+        const placed = { ...event, startTick: cursor };
+        cursor += event.duration.ticks;
+        return placed;
+      });
+      return fillVoice(laid, voiceId, capacity, staff);
+    });
+  }
+
+  const NATURAL_SEMITONES = { C: 0, D: 2, E: 4, F: 5, G: 7, A: 9, B: 11 };
+
+  /**
+   * Every other way to write the same sounding pitch, best first.
+   *
+   * MuseScore's J walks a note through its enharmonic spellings, and the
+   * order matters: a sharp becomes the flat above it (C sharp -> D flat)
+   * rather than the double sharp two letters away, and a natural note takes
+   * the single accidental (C -> B sharp) rather than a double flat. The
+   * sounding pitch never changes, so a respelled note plays exactly what it
+   * played before.
+   */
+  function enharmonicSpellings(pitch) {
+    if (!pitch || pitch.kind !== 'pitched') return [];
+    const midi = E.midiNoteNumber(pitch);
+    if (midi === undefined) return [];
+    const candidates = [];
+    for (const step of STEPS) {
+      for (const alter of [-1, 1, -2, 2, 0]) {
+        if (step === pitch.step && alter === (pitch.alter ?? 0)) continue;
+        const octave = Math.floor((midi - NATURAL_SEMITONES[step] - alter) / 12) - 1;
+        if (octave < 0 || octave > 9) continue;
+        if ((octave + 1) * 12 + NATURAL_SEMITONES[step] + alter !== midi) continue;
+        candidates.push({ kind: 'pitched', step, alter, octave });
+      }
+    }
+    const current = pitch.alter ?? 0;
+    // A sharp prefers to become a flat and a flat a sharp, so J toggles the
+    // spelling a player expects instead of stepping through double
+    // accidentals first.
+    const score = (candidate) => {
+      const opposite = current === 0 ? 0 : Math.sign(candidate.alter) === -Math.sign(current) ? 0 : 1;
+      return opposite * 100 + Math.abs(candidate.alter) * 10
+        + Math.abs(STEPS.indexOf(candidate.step) - STEPS.indexOf(pitch.step));
+    };
+    return candidates.sort((a, b) => score(a) - score(b));
+  }
+
+  /** The first enharmonic spelling of `pitch`, or the pitch itself when it has none. */
+  const respell = (pitch) => enharmonicSpellings(pitch)[0] ?? pitch;
+
+  /** The alter the key signature implies for each step, as a step → alter map. */
+  function keySignatureAlters(fifths = 0) {
+    const map = { C: 0, D: 0, E: 0, F: 0, G: 0, A: 0, B: 0 };
+    if (fifths > 0) for (const step of E.sharpsForCount(Math.min(fifths, 7))) map[step] = 1;
+    else if (fifths < 0) for (const step of E.flatsForCount(Math.min(-fifths, 7))) map[step] = -1;
+    return map;
+  }
+
+  /**
+   * The pitch `number` staff steps above `pitch` (MuseScore's Alt+1-9).
+   *
+   * An interval is counted in letter names, not semitones, so a third above
+   * E is G whatever the key. The new note takes the key signature's own
+   * accidental -- adding a third above C in D major writes F sharp, the way
+   * MuseScore does -- so the interval stays inside the scale the writer is
+   * reading instead of stacking the base note's accidental onto it.
+   * Alt+1 is a unison and Alt+8 an octave, which is why the count is one
+   * more than the step count.
+   */
+  function pitchAtInterval(pitch, number, clef, fifths = 0) {
+    if (!pitch || pitch.kind !== 'pitched') return pitch;
+    const steps = Math.max(0, Math.min(8, number - 1));
+    const position = E.staffPositionForPitch(clef, pitch.step, pitch.octave);
+    const moved = pitchFromStaffPosition(clef, position - steps * 0.5);
+    return { ...pitch, step: moved.step, alter: keySignatureAlters(fifths)[moved.step] ?? 0, octave: moved.octave };
+  }
+
   /** Replaces a whole voice's events — used when entry rewrites one measure's line. */
   function setVoiceEvents(doc, { partId, measureNumber, voiceId = 1, events }) {
     return updateVoice(doc, partId, measureNumber, voiceId, () => sortEvents(events));
@@ -1407,6 +1513,10 @@
     tupletMemberDuration,
     tupletMarksOf,
     TUPLET_NORMAL_NOTES,
+    moveBeats,
+    enharmonicSpellings,
+    respell,
+    pitchAtInterval,
     setVoiceEvents,
     setEventDuration,
     setEventVoice,

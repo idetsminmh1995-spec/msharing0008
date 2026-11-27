@@ -36,14 +36,14 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 | Pitch ↑ / ↓ | `↑` `↓` = **semitone** (♯ / ♭) | `↑` `↓` = semitone (တက်=♯၊ ဆင်း=♭) | ✅ |
 | Diatonic ↑ / ↓ | `Alt+Shift+↑` / `↓` | ရှိ | ✅ |
 | Octave ↑ / ↓ | `Ctrl+↑` / `Ctrl+↓` | ရှိ (±7 step) | ✅ |
-| Interval ထည့် | `Alt+1`–`9` | မရှိ | ❌ |
-| Enharmonic ပြောင်း | `J` | မရှိ (စစ်ရန်) | ❌ |
+| Interval ထည့် | `Alt+1`–`9` | ရှိ (chord ၏ အမြင့်ဆုံးမှ စာလုံးအမည်ဖြင့် ရေတွက်) | ✅ |
+| Enharmonic ပြောင်း | `J` | ရှိ (အသံ မပြောင်း၊ sharp↔flat ဦးစား) | ✅ |
 | နောက်ဆုံးရေးသော note ကို ပြန်ဖျက် | `Backspace` (input mode) | input mode တွင် နောက်ဆုံး note ပြန်ဖျက်၊ ပြင်ပတွင် Delete | ✅ |
-| note နှစ်ခု နေရာလဲ | `Shift+←` / `→` | မရှိ | ❌ |
-| Duration ထက်ဝက် / ၂ ဆ | `Q` / `W` | မရှိ | ❌ |
+| note နေရာလဲ | `Shift+←` / `→` | ရှိ (ရွေးထားသော beat များ block အဖြစ်) | ✅ |
+| Duration ထက်ဝက် / ၂ ဆ | `Q` / `W` | ရှိ (selection မရှိလျှင် note value ကို ပြောင်း) | ✅ |
 | Voice ရွေး | `Ctrl+Alt+1`–`4` | ရှိ | ✅ |
-| Tie | `T` | button (`toggleTie`) ရှိ၊ key မရှိ | 🟡 |
-| Slur | `S` | button (`toggleSlur`) ရှိ၊ key မရှိ | 🟡 |
+| Tie | `T` | ရှိ | ✅ |
+| Slur | `S` | ရှိ | ✅ |
 | Tuplet (triplet စသည်) | `Ctrl+2`–`9` | ရှိ (`insertTuplet`၊ toolbar panel၊ `Ctrl+2`–`9`) | ✅ |
 | Beam ထိန်း | (Palette: Beam properties) | မရှိ | ❌ |
 | Grace note | `/` (acciaccatura) | palette ရှိ၊ key မရှိ | 🟡 |
@@ -53,14 +53,14 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 | Staff text / Tempo text / Rehearsal mark | `Ctrl+T` / `Alt+Shift+T` / `Ctrl+M` | `setTempo` / `setDirection` command ရှိ၊ staff text UI မရှိသလောက် | 🟡 |
 | Chord symbol | `Ctrl+K` | **မရှိ** | ❌ |
 | Flip direction | `X` | မရှိ | ❌ |
-| Insert measure | `Ctrl+B` | menu ရှိ (`insertMeasureAfter`)၊ key မရှိ | 🟡 |
+| Insert measure | `Ctrl+B` | ရှိ (`Ctrl+B` = အဆုံးတွင်၊ `Ctrl+Shift+B` = ကာတာရှေ့) | ✅ |
 | Select all / Copy / Cut / Paste | `Ctrl+A/C/X/V` | ရှိ | ✅ |
 | Undo / Redo | `Ctrl+Z` / `Ctrl+Y` | ရှိ (၁၀၀ ဆင့်) | ✅ |
 | Play / Pause | `Space` | ရှိ | ✅ |
 | MIDI keyboard ဖြင့်ရေး | — | ရှိ (chord = ကိုင်ထားသော key များ၊ key signature အလိုက် spell) | ✅ |
 | Drum kit MIDI map | — | ရှိ | ✅ |
 
-**ဆုံးဖြတ်ချက် (user, 2026-11-27):** Key map ကို MuseScore 4 နှင့် အတိအကျ တူအောင် ပြင်မည်။ **W2 ပြီးစီး (2026-11-27)** — `↑`/`↓` = semitone၊ `Alt+Shift+↑`/`↓` = diatonic၊ `R` = repeat၊ `0` = rest၊ `Backspace` = input mode တွင် နောက်ဆုံး note ပြန်ဖျက်၊ `Esc` = input mode မှ ထွက်။
+**ဆုံးဖြတ်ချက် (user, 2026-11-27):** Key map ကို MuseScore 4 နှင့် အတိအကျ တူအောင် ပြင်မည်။ **W2 ပြီးစီး (2026-11-27)** — `↑`/`↓` = semitone၊ `Alt+Shift+↑`/`↓` = diatonic၊ `R` = repeat၊ `0` = rest၊ `Backspace` = input mode တွင် နောက်ဆုံး note ပြန်ဖျက်၊ `Esc` = input mode မှ ထွက်။ **W4 ပြီးစီး (2026-11-18)** — `Alt+1`–`9` interval၊ `J` enharmonic၊ `Shift+←`/`→` beat ရွှေ့၊ `Q`/`W` duration၊ `T` tie၊ `S` slur၊ `Ctrl+B` bar ထည့်။
 
 **မှတ်တမ်း — shortcut ပြောင်းလဲမှု (အသုံးပြုသူ သိရန်):** ယခင် Editor တွင် `↑`/`↓` သည် diatonic step ဖြစ်ခဲ့သည်၊ ယခု semitone ဖြစ်သည် (diatonic ကို `Alt+Shift+↑`/`↓` သို့ ရွှေ့)။ `R` သည် ယခင် rest ဖြစ်ခဲ့သည်၊ ယခု repeat ဖြစ်သည် (rest ကို `0` သာ)။ `Backspace` သည် ယခင် delete ဖြစ်ခဲ့သည်၊ ယခု input mode တွင် နောက်ဆုံး note ပြန်ဖျက်သည် (delete ကို `Delete` သာ၊ သို့မဟုတ် input mode ပြင်ပ `Backspace`)။ `Esc` သည် ယခင် selection သာ ရှင်းခဲ့သည်၊ ယခု input mode ကိုပါ ပိတ်သည်။
 
@@ -71,7 +71,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 | အဆင့် | ပါဝင်မည့်အရာ |
 |---|---|
 | **Tier 1 — ရေးနိုင်ရန် မဖြစ်မနေ** | Note input mode၊ duration၊ dot၊ rest၊ pitch (letter / semitone / diatonic / octave)၊ chord၊ accidental၊ **tuplet**၊ tie၊ slur၊ voice 1–4၊ select / range select၊ delete၊ copy / cut / paste၊ undo / redo၊ insert / delete measure၊ key / time / clef ပြောင်း (mid-score)၊ auto beam၊ ရေးစဉ် **အသံကြား** (note ထည့်သည်နှင့် Sound Engine က ဖွင့်) |
-| **Tier 2** | repeat last / selection (`R`)၊ interval (`Alt+1–9`)၊ enharmonic (`J`)၊ note နေရာလဲ၊ Q/W၊ flip (`X`)၊ lyrics၊ staff / tempo text၊ chord symbol၊ grace note၊ ottava၊ articulation / dynamic / hairpin key များ၊ repeat / volta၊ pickup measure |
+| **Tier 2** | repeat last / selection (`R`) ✅၊ interval (`Alt+1–9`) ✅၊ enharmonic (`J`) ✅၊ note နေရာရွှေ့ ✅၊ Q/W ✅၊ flip (`X`)၊ lyrics၊ staff / tempo text၊ chord symbol၊ grace note၊ ottava၊ articulation / dynamic / hairpin key များ၊ repeat / volta၊ pickup measure |
 | **Tier 3** | Percussion panel (MuseScore ပုံစံ)၊ Tab ပြည့်စုံစွာ ရေးခြင်း (fret နံပါတ်)၊ fingering၊ tremolo / arpeggio ပြည့်စုံ၊ beam properties၊ transpose dialog |
 
 ---
@@ -114,7 +114,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 | **W1** | ✅ **ဆုံးဖြတ်ပြီး (user, 2026-11-27)** — Key map ကို MuseScore နှင့် အတိအကျ တူအောင်ပြင်မည် | — |
 | **W2** | ✅ **ပြီးစီး (2026-11-27)** — `↑`/`↓` semitone (တက်=♯၊ ဆင်း=♭)၊ `Alt+Shift+↑`/`↓` diatonic၊ `Ctrl+↑`/`↓` octave၊ `R` repeat၊ `0` rest၊ `Backspace` input mode တွင် နောက်ဆုံး note ပြန်ဖျက်၊ `Esc` input mode မှ ထွက် | `editor-integration.test.js` ၏ «the MuseScore key map» suite (key တစ်ခုချင်း) pass၊ suite တစ်ခုလုံး 1536/1536 pass |
 | **W3** | ✅ **ပြီးစီး (2026-11-18)** — Tuplet (triplet၊ quintuplet … `Ctrl+2`–`9`); `Rest` တွင် tuplet endpoint ထည့်၍ Engine က rest ပါ group ကို render နိုင်၊ doc command (`insertTuplet`၊ `tupletMemberDuration`၊ `tupletMarksOf`)၊ toolbar panel | Triplet ရေး၍ render မှန်၊ MusicXML round trip၊ undo/redo၊ invariant — `npm run verify` 1544/1544 pass |
-| **W4** | Tier 1 ၏ ကျန်များ — `T` (tie)၊ `S` (slur)၊ `Ctrl+B` (insert measure)၊ `Shift+←/→`၊ `Q`/`W`၊ `J`၊ `Alt+1–9`၊ `R` (repeat) | §၂ ဇယားတွင် 🟡/❌ → ✅ |
+| **W4** | ✅ **ပြီးစီး (2026-11-18)** — `Alt+1–9` interval၊ `J` enharmonic၊ `Shift+←/→` beat ရွှေ့၊ `Q`/`W` duration၊ `T` tie၊ `S` slur၊ `Ctrl+B` bar ထည့် | §၂ ဇယားတွင် 🟡/❌ → ✅ (Beam, chord symbol, flip မှလွဲ၍)၊ `editor-integration.test.js` ၏ key map suite pass၊ စုစုပေါင်း 1552/1552 pass |
 | **W5** | **Writer Engine ကို သီးခြား folder/module သို့ ခွဲထုတ်** — `notation-doc.js` + `notation-editor.js` ၏ command logic ကို pure command အဖြစ်ရွှေ့၊ Editor က import သုံး | အပြုအမူ မပြောင်း (ရှိပြီးသား test အားလုံး pass)၊ Engine ကို DOM မပါဘဲ Node ထဲ test လုပ်နိုင် |
 | **W6** | ရေးစဉ် **အသံကြား** — note ထည့်သည်နှင့် Sound Engine က ဖွင့် (MuseScore ကဲ့သို့)၊ drum / pitched နှစ်မျိုးလုံး | note ရေးတိုင်း ချက်ချင်းအသံထွက်၊ အသံ delay ရည်မှန်း ~၁၀၀ ms အောက် |
 | **W7** | Tier 2 — lyrics UI (`Ctrl+L`)၊ staff / tempo text (`Ctrl+T` / `Alt+Shift+T`)၊ chord symbol (`Ctrl+K`)၊ flip (`X`)၊ articulation key များ | §၂ ဇယားအတိုင်း |
