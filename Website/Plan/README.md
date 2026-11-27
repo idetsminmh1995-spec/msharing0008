@@ -15,6 +15,7 @@
 - Create Video — Video ထုတ်လုပ်ပုံ အသေးစိတ် (pipeline၊ Studio options၊ engine တာဝန်ခွဲခြားမှု၊ ဆုံးဖြတ်ချက်များ၊ ပြီးစီးမှုအခြေအနေ)
 - Sound Engine နှင့် MuseScore SoundFont (SoundFont ရွေးချယ်ချက် ပါ)
 - Metronome Studio
+- [Writer Engine — MuseScore ကဲ့သို့ ရေးခြင်း system](#writer-engine--musescore-ကဲ့သို့-ရေးခြင်း-system-အသေးစိတ်-plan--2026-11-26) (key map နှိုင်းယှဉ်ချက်၊ command များ၊ W1–W11)
 - [Repository structure — folder rules](#repository-structure--folder-rules--2026-11-23) (Plan/Doc/SQL/Worker folder စည်းမျဉ်း)
 - [Search — အလုပ်လုပ်ပုံ](#search--အလုပ်လုပ်ပုံ--2026-11-23) (Header search၊ Notes filter၊ Postgres full-text/trigram)
 - [Handoff — Manus AI](#handoff--manus-ai-supabase-နှင့်-cloudflare-r2--2026-11-23) (Supabase data model၊ R2 layout၊ အလုပ်အစီအစဉ်)
@@ -321,6 +322,8 @@ Scan remains intentionally unavailable.
 
 ## Writer Engine — Notation Editor — 2026-11-22
 
+> **2026-11-26:** Writer Engine ၏ အသေးစိတ် (MuseScore ကဲ့သို့ ရေးခြင်း system၊ key map နှိုင်းယှဉ်ချက်၊ work package W1–W11) ကို [နောက် section](#writer-engine--musescore-ကဲ့သို့-ရေးခြင်း-system-အသေးစိတ်-plan--2026-11-26) တွင်ကြည့်ပါ။
+
 Writer Engine သည် Notation Editor ထဲတွင် လုပ်ဆောင်သမျှကို ပိုင်ဆိုင်သည် — notation ကို ရေးပုံရေးနည်းနှင့် editor operation အားလုံး (note ထည့်/ဖျက်/ရွှေ့၊ marks နှင့် dynamics၊ clef/key/time သတ်မှတ်ခြင်း၊ measure ထည့်/ဖယ်၊ copy/paste၊ selection၊ undo/redo၊ MusicXML သိမ်းခြင်း)။ [Engine architecture](#12-engine-architecture) ကို ကြည့်ပါ။
 
 **ဆုံးဖြတ်ချက်:** Writer Engine ကို `Website` အတွင်း **သီးခြား folder တစ်ခုဖြင့်** သီးခြား module အဖြစ် ခွဲထုတ်တည်ဆောက်မည် (Notation / Video / Guitar Engine များကဲ့သို့)။ Folder အမည်အတိအကျ (အဆိုပြု — `Website/Writer/Writer Engine`) ကို အတည်ပြုရန် ကျန်သည်။
@@ -411,6 +414,121 @@ Writer Engine သည် Notation Editor ထဲတွင် လုပ်ဆော
 6. Writer Engine ကို သီးခြား folder/module အဖြစ် ခွဲထုတ်ခြင်း။
 
 အဆင့်တစ်ခုချင်းစီကို သင် "ready" ဟု ပြောမှသာ စတင်မည်။
+
+## Writer Engine — MuseScore ကဲ့သို့ ရေးခြင်း system (အသေးစိတ် Plan) — 2026-11-26
+
+**ရည်ရွယ်ချက် (user):** Notation ပေါ်တွင် **တကယ် ရေးနိုင်**ရမည်။ ရေးသည့် system များသည် **MuseScore ကဲ့သို့ အလုပ်လုပ်**ရမည်။ ဤ section သည် အပေါ်ပါ [Writer Engine — Notation Editor](#writer-engine--notation-editor--2026-11-22) ၏ အသေးစိတ်ဖြစ်ပြီး Writer Engine ကို သီးခြား module ခွဲရာတွင်လည်း သုံးမည်။
+
+### ၁။ အခြေခံမူ
+
+1. **Writer Engine = ရေးခြင်း၏ logic သက်သက်။** Screen မဆွဲ (Notation Engine က ဆွဲ)၊ အသံမဖွင့် (Sound Engine က ဖွင့်)၊ DOM / file / network ကို မကိုင်။ Input (key၊ click၊ MIDI) မှ command အဖြစ် ပြောင်းပေးသည်မှာ Editor UI ၏ အလုပ်။
+2. **Command အခြေခံ:** ရေးသည့်လုပ်ဆောင်ချက်တိုင်းသည် command တစ်ခု (`insertNote`, `deleteSelection`, `setDuration` …)။ Command သည် document အသစ်ကို ပြန်ပေး (အရင် document ကို မပြင်)၊ ပြောင်းမှု၊ selection အသစ်၊ announce စာသား (screen reader) ပါ ပြန်ပေးသည်။ Undo/redo သည် ဤ document အဟောင်း/အသစ်ပေါ် တည်သည်။
+3. **MuseScore ကို အပြုအမူ ရည်ညွှန်းအဖြစ်သာ သုံး** (handbook ၏ ရေးပုံ/shortcut)။ MuseScore source code ကို ကူးမထည့်ရ — `AGENTS.md` ၏ စည်းမျဉ်း (GPL ကြောင့်) နှင့် ညီ။ (user အစောပိုင်းပြောခဲ့သော "MuseScore code ကို ထည့်သုံး" နှင့် ကွာ၍ ပြန်ဆုံးဖြတ်ရန် — Repository structure section ကိုကြည့်ပါ။)
+4. **Invariant များ** (မည်သည့် command နောက်မဆို မှန်ရမည်): (က) measure တစ်ခု၏ voice တစ်ခုချင်းစီ၏ ကြာချိန်ပေါင်း = measure အရှည် (မပြည့်လျှင် rest ဖြည့်) (ခ) tie သည် pitch တူသော နောက် note တွင် ဆုံ (ဂ) overlap မရှိ (ဃ) voice 1–4 သာ။
+5. **Notation Engine က အမှန်တရားဖြစ်သော structured score document** ကို အခြေခံ — render လုပ်ထားသော SVG မဟုတ်။ Edit တိုင်း document အသစ် → Notation Engine ပြန်ဆွဲ။
+
+### ၂။ MuseScore နှင့် နှိုင်းယှဉ်ချက် (လက်ရှိ Editor — 2026-11-26 စစ်ဆေးချက်)
+
+MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏ Note input / Keyboard shortcuts စာမျက်နှာများ) မှ အတည်ပြုထားသည်။ **T၊ S၊ Ctrl+2–9 (tuplet)၊ Ctrl+B၊ Ctrl+K** တို့ကို ကျွန်တော့်သိသလောက် ဖော်ပြထားခြင်းဖြစ်၍ အတည်ပြုရန်။ Editor ၏ အခြေအနေကို `notation-editor.js` / `notation-doc.js` ကိုဖတ်၍ ပြုစုထားသည်။
+
+| MuseScore လုပ်ဆောင်ချက် | MuseScore key | Editor (လက်ရှိ) | အခြေအနေ |
+|---|---|---|---|
+| Note input mode ဖွင့်/ပိတ် | `N`၊ ထွက်ရန် `N` / `Esc` | `N` ဖွင့်/ပိတ်ရ၊ `Esc` သည် selection ကိုသာ ရှင်း (input မှ မထွက်) | 🟡 |
+| Duration ရွေး | `1`–`9` (`1`=64th … `5`=quarter … `7`=whole `8`=breve `9`=longa) | `SHORTCUT_DURATION` map ရှိ | 🟡 map ကို MuseScore နှင့် တိုက်စစ်ရန် |
+| Dot | `.` | `.` က dot ၀–၃ လည် | 🟡 |
+| Rest ရေး | `0` | `0` နှင့် `R` နှစ်ခုလုံး rest | 🟡 `R` မှာ MuseScore ၌ **repeat** |
+| Repeat last note / selection | `R` | မရှိ (`R` သည် rest) | ❌ ကွာ |
+| Pitch (A–G) | `A`–`G` | ရှိ | ✅ (အနီးဆုံး octave ရွေးပုံ စစ်ရန်) |
+| Chord ထပ်ထည့် | `Shift`+letter | ရှိ | ✅ |
+| Pitch ↑ / ↓ | `↑` `↓` = **semitone** (♯ / ♭) | `↑` `↓` = **staff step (diatonic)** | ❌ ကွာ |
+| Diatonic ↑ / ↓ | `Alt+Shift+↑` / `↓` | မရှိ | ❌ |
+| Octave ↑ / ↓ | `Ctrl+↑` / `Ctrl+↓` | ရှိ (±7 step) | ✅ |
+| Interval ထည့် | `Alt+1`–`9` | မရှိ | ❌ |
+| Enharmonic ပြောင်း | `J` | မရှိ (စစ်ရန်) | ❌ |
+| နောက်ဆုံးရေးသော note ကို ပြန်ဖျက် | `Backspace` (input mode) | `Backspace` = selection ဖျက် | ❌ ကွာ |
+| note နှစ်ခု နေရာလဲ | `Shift+←` / `→` | မရှိ | ❌ |
+| Duration ထက်ဝက် / ၂ ဆ | `Q` / `W` | မရှိ | ❌ |
+| Voice ရွေး | `Ctrl+Alt+1`–`4` | ရှိ | ✅ |
+| Tie | `T` | button (`toggleTie`) ရှိ၊ key မရှိ | 🟡 |
+| Slur | `S` | button (`toggleSlur`) ရှိ၊ key မရှိ | 🟡 |
+| Tuplet (triplet စသည်) | `Ctrl+2`–`9` | **မရှိ** | ❌ |
+| Beam ထိန်း | (Palette: Beam properties) | မရှိ | ❌ |
+| Grace note | `/` (acciaccatura) | palette ရှိ၊ key မရှိ | 🟡 |
+| Hairpin | `<` `>` | palette (lines) | 🟡 |
+| Articulation | `Shift+S` staccato၊ `Shift+N` tenuto … | palette ရှိ၊ key မရှိ | 🟡 |
+| Lyrics | `Ctrl+L` | `setLyric` doc command ရှိ၊ UI စစ်ရန် | 🟡 |
+| Staff text / Tempo text / Rehearsal mark | `Ctrl+T` / `Alt+Shift+T` / `Ctrl+M` | `setTempo` / `setDirection` command ရှိ၊ staff text UI မရှိသလောက် | 🟡 |
+| Chord symbol | `Ctrl+K` | **မရှိ** | ❌ |
+| Flip direction | `X` | မရှိ | ❌ |
+| Insert measure | `Ctrl+B` | menu ရှိ (`insertMeasureAfter`)၊ key မရှိ | 🟡 |
+| Select all / Copy / Cut / Paste | `Ctrl+A/C/X/V` | ရှိ | ✅ |
+| Undo / Redo | `Ctrl+Z` / `Ctrl+Y` | ရှိ (၁၀၀ ဆင့်) | ✅ |
+| Play / Pause | `Space` | ရှိ | ✅ |
+| MIDI keyboard ဖြင့်ရေး | — | ရှိ (chord = ကိုင်ထားသော key များ၊ key signature အလိုက် spell) | ✅ |
+| Drum kit MIDI map | — | ရှိ | ✅ |
+
+**တွေ့ရှိချက် (အရေးကြီး):** `↑`/`↓` (semitone ↔ diatonic)၊ `R` (repeat ↔ rest)၊ `Backspace` (undo last note ↔ delete)၊ `Esc` (input မှထွက်) တို့သည် MuseScore နှင့် **ဆန့်ကျင်**နေသည်။ **ဆုံးဖြတ်ချက် (user, 2026-11-27): Key map ကို MuseScore နှင့် အတိအကျ တူအောင် ပြင်မည်။** (အောက်ပါ W2)။ ပြင်လျှင် ယခု Editor ကို သုံးနေသူများ၏ လက်ကျင့်ကို ထိခိုက်မည်ဖြစ်၍ Doc တွင် shortcut ပြောင်းလဲမှုကို မှတ်ရမည်။
+
+### ၃။ Scope အဆင့်များ (အဆိုပြု)
+
+| အဆင့် | ပါဝင်မည့်အရာ |
+|---|---|
+| **Tier 1 — ရေးနိုင်ရန် မဖြစ်မနေ** | Note input mode၊ duration၊ dot၊ rest၊ pitch (letter / semitone / diatonic / octave)၊ chord၊ accidental၊ **tuplet**၊ tie၊ slur၊ voice 1–4၊ select / range select၊ delete၊ copy / cut / paste၊ undo / redo၊ insert / delete measure၊ key / time / clef ပြောင်း (mid-score)၊ auto beam၊ ရေးစဉ် **အသံကြား** (note ထည့်သည်နှင့် Sound Engine က ဖွင့်) |
+| **Tier 2** | repeat last / selection (`R`)၊ interval (`Alt+1–9`)၊ enharmonic (`J`)၊ note နေရာလဲ၊ Q/W၊ flip (`X`)၊ lyrics၊ staff / tempo text၊ chord symbol၊ grace note၊ ottava၊ articulation / dynamic / hairpin key များ၊ repeat / volta၊ pickup measure |
+| **Tier 3** | Percussion panel (MuseScore ပုံစံ)၊ Tab ပြည့်စုံစွာ ရေးခြင်း (fret နံပါတ်)၊ fingering၊ tremolo / arpeggio ပြည့်စုံ၊ beam properties၊ transpose dialog |
+
+### ၄။ Writer Engine ၏ ဖွဲ့စည်းပုံ
+
+- **Folder (အဆိုပြု):** `Website/Writer/Writer Engine/` (`src/`၊ `test/`)၊ build လုပ်၍ `Website/Website/assets/writer-engine.js` ကို publish (အခြား Engine များကဲ့သို့)။ Engine Plan/Doc folder (`Writer Engine Plan`၊ `Writer Engine Doc`) ကိုလည်း အတူထား (Repository structure စည်းမျဉ်း)။
+- **Command ၏ ပုံစံ:** `command(doc, selection, args) → { doc, selection, changed, announce }` (pure function)။ Editor က `commit()` ဖြင့် history ထဲထည့်။
+- **Command အုပ်စုများ:**
+
+| အုပ်စု | ဥပမာ command |
+|---|---|
+| ထည့်ခြင်း | `insertNote`၊ `insertRest`၊ `addToChord`၊ `insertTuplet` |
+| ပြင်ခြင်း | `setDuration`၊ `toggleDot`၊ `changePitch` (semitone / step / octave)၊ `toggleAccidental`၊ `respell` (enharmonic)၊ `setVoice`၊ `swapWithPrevious` |
+| ချိတ်ဆက်ခြင်း | `toggleTie`၊ `toggleSlur`၊ `setBeam` |
+| ဖျက်ခြင်း | `deleteSelection` (rest ဖြင့်အစားထိုး)၊ `removeMeasure` |
+| ဖွဲ့စည်းပုံ | `insertMeasure`၊ `setClef` / `setKey` / `setTimeSignature`၊ `addPart` / `removePart` |
+| စာသား/အမှတ်အသား | `setLyric`၊ `setStaffText`၊ `setTempo`၊ `setDynamic`၊ `setArticulation`၊ `setOctaveShift` |
+| Clipboard | `copy`၊ `cut`၊ `paste`၊ `repeatSelection` |
+| Selection | `moveSelection`၊ `extendRange`၊ `selectAll`၊ `selectMeasure` |
+
+- **ယခုရှိပြီးသား:** `notation-doc.js` ၏ edit command များ (`insertEvent`, `deleteEvents`, `patchEvent`, `setEventDuration`, `setEventVoice`, `moveEvent`, `setNotesPitch`, `setLyric`, `setSetup`, `setTempo`, `setDirection`, `setOctaveShift`, `insertMeasureAfter`, `removeMeasure`, `excerpt`, `paste`, `toMusicXml` …)။ `notation-editor.js` ထဲတွင် command logic နှင့် UI ရောနေသည် (`insertAtEntry`, `deleteSelection`, `transposeSelection`, `toggleTie`, `toggleSlur`, `setVoice`, `moveSelection` …) — ၎င်းတို့ကို Writer Engine သို့ ရွှေ့ရမည်။
+
+### ၅။ စစ်ဆေးရေး (test) မူ
+
+1. **Round trip:** MusicXML → doc → command များ → MusicXML → Notation Engine render — ရလဒ် မပျက်ကြောင်း (ရှိပြီးသား 58 `.musicxml` နမူနာ၊ Notation Engine ၏ test ပုံစံအတိုင်း)။
+2. **Invariant test:** ဘယ် command နောက်မဆို §၁(၄) ၏ invariant ၄ ချက် မှန်ကြောင်း (property-style — command အစီအစဉ်ကို ကျပန်းလုပ်စစ်)။
+3. **Undo/redo:** command တိုင်း undo → doc အရင်နှင့်တူ၊ redo → doc အသစ်နှင့်တူ။
+4. **MuseScore parity:** §၂ ၏ ဇယားအတိုင်း key တစ်ခုချင်းစီကို Editor-level test (ရှိပြီးသား `editor-integration.test.js` ပုံစံ) ဖြင့်စစ်။
+5. အပြုအမူ မပြောင်းသော ရွှေ့ပြောင်းမှု (W5) အတွက် — ရှိပြီးသား test အားလုံး (ယခု ၁၀၄ ခု+) pass ဆက်ဖြစ်။
+
+### ၆။ Work package များ (OpenHands အတွက်၊ အစဉ်လိုက်)
+
+| WP | အလုပ် | ပြီးစီးမှု စံနှုန်း |
+|---|---|---|
+| **W1** | ✅ **ဆုံးဖြတ်ပြီး (user, 2026-11-27)** — Key map ကို MuseScore နှင့် အတိအကျ တူအောင်ပြင်မည်။ ဆန့်ကျင်သော key များ (`↑↓`၊ `R`/`0`၊ `Backspace`၊ `Esc`) | — (ဆုံးဖြတ်ချက်ပြီး၊ W2 သို့) |
+| **W2** | **Key map ကို MuseScore နှင့် အတိအကျ တူအောင်ပြင်** — `↑`/`↓` = semitone (♯/♭)၊ `Alt+Shift+↑`/`↓` = diatonic step၊ `R` = repeat (rest မဟုတ်တော့)၊ `0` = rest၊ `Backspace` = input mode တွင် နောက်ဆုံးရေးသော note ပြန်ဖျက်၊ `Esc` = input mode မှ ထွက်၊ `Ctrl+↑`/`↓` octave ဆက်ရှိ။ ရည်ညွှန်း = **MuseScore 4 ၏ default shortcut** (ကျွန်တော်အတည်ပြုထားသည်မှာ MuseScore 3 handbook ဖြစ်၍ MuseScore 4 နှင့် တိုက်စစ်ပြီးမှ အတည်ပြု) | §၂ ဇယားတွင် ❌ ကွာ ဟူသော အတန်းအားလုံး ✅၊ key တစ်ခုချင်း Editor test pass၊ Doc တွင် shortcut ပြောင်းလဲမှု မှတ် |
+| **W3** | **Tuplet** (triplet၊ quintuplet … `Ctrl+2`–`9`) — doc model၊ command၊ Notation Engine render အထောက်အပံ့ စစ် | Triplet ရေး၍ render မှန်၊ MusicXML round trip၊ undo/redo၊ invariant |
+| **W4** | Tier 1 ၏ ကျန်များ — `T` (tie)၊ `S` (slur)၊ `Ctrl+B` (insert measure)၊ `Shift+←/→`၊ `Q`/`W`၊ `J`၊ `Alt+1–9`၊ `R` (repeat) | §၂ ဇယားတွင် 🟡/❌ → ✅ |
+| **W5** | **Writer Engine ကို သီးခြား folder/module သို့ ခွဲထုတ်** — `notation-doc.js` + `notation-editor.js` ၏ command logic ကို pure command အဖြစ်ရွှေ့၊ Editor က import သုံး | အပြုအမူ မပြောင်း (ရှိပြီးသား test အားလုံး pass)၊ Engine ကို DOM မပါဘဲ Node ထဲ test လုပ်နိုင် |
+| **W6** | ရေးစဉ် **အသံကြား** — note ထည့်သည်နှင့် Sound Engine က ဖွင့် (MuseScore ကဲ့သို့)၊ drum / pitched နှစ်မျိုးလုံး | note ရေးတိုင်း ချက်ချင်းအသံထွက်၊ အသံ delay ရည်မှန်း ~၁၀၀ ms အောက် |
+| **W7** | Tier 2 — lyrics UI (`Ctrl+L`)၊ staff / tempo text (`Ctrl+T` / `Alt+Shift+T`)၊ chord symbol (`Ctrl+K`)၊ flip (`X`)၊ articulation key များ | §၂ ဇယားအတိုင်း |
+| **W8** | Beam ထိန်း (auto beam မှန်ကန်ကြောင်း စစ် + beam properties) | meter အလိုက် auto beam မှန် |
+| **W9** | Percussion input (MuseScore ပုံစံ percussion panel)၊ Drum ရေးခြင်းအတွက် `Inst.` box နှင့် ညှိ | Drum note ကို panel / key / MIDI ဖြင့်ရေး၊ ပုံ/အသံ ဆက်ကိုက် |
+| **W10** | Tab (Guitar) ပြည့်စုံစွာ ရေး — staff နှင့် Tab တစ်ပြိုင်တည်း (A4 နှင့် ဆက်စပ်) | staff note ရေးလျှင် Tab ပါ၊ Tab fret ရေးလျှင် staff ပါ |
+| **W11** | Doc — Writer Engine Doc (API၊ invariant၊ key map) နှင့် `Writer Engine Plan` | Doc/Plan folder များရှိ၊ Doc index တွင် link |
+
+**အကြံပြုအစဉ်:** W1 → W2 → W3 (tuplet) → W4 → W5 (ခွဲထုတ်ခြင်း) → W6 (အသံ) → W7 …။ W5 ကို အလယ်တွင် ထားသည်မှာ command အသစ်များ (W3, W4) ကို Engine ထဲ မရေးမီ ပုံစံတူအောင်ထားပြီး၊ ပြီးမှ တစ်ခါတည်း ရွှေ့ရန်။ (ဖြစ်နိုင်လျှင် W3 / W4 ကိုပင် ခွဲထုတ်ပြီးသော Engine ထဲမှာ ရေးသင့်သည်ဟု ယူလျှင် W5 ကို W1–W2 ၏ နောက် ချက်ချင်း ရွှေ့ပါ။)
+
+### ၇။ မဖြေရှင်းရသေးသော အချက်များ (user ဆုံးဖြတ်ရန်)
+
+1. (ဖြေပြီး) **Key map ကို MuseScore နှင့် အတိအကျ တူအောင် ပြင်မည်** (user, 2026-11-27)။ ကျန်သည်မှာ ရည်ညွှန်း version — MuseScore 4 ကို ရည်ညွှန်းမည်ဟု ယူထားသည် (user ပေးသော MuseScore ပုံသည် MuseScore 4 UI) — W2 တွင် MuseScore 4 ၏ default shortcut နှင့် တိုက်စစ်။
+2. **Tuplet** ကို Notation Engine က render လုပ်နိုင်ပြီလား (Editor တွင် 0 ဖြစ်သဖြင့် စစ်ရန်)။ မလုပ်နိုင်လျှင် Notation Engine ဘက်က အရင်လုပ်ရမည်။
+3. **MuseScore source ကို မကူးဘဲ handbook အပြုအမူကိုသာ ရည်ညွှန်း** ဟူသော စည်းမျဉ်း (`AGENTS.md`) ကို လိုက်မလား၊ ဒါမှမဟုတ် အစောပိုင်းပြောသလို MuseScore code ကို ထည့်သုံးမလား (license / legal ပါ)။
+4. **ပထမ release တွင် Tier 1 အပြည့်** လိုမလား၊ Tier 1 ၏ တစ်စိတ်တစ်ပိုင်းဖြင့် ရောင်းချမှု/ရေးသူများအတွက် စမလား။
+5. **Phone / touch** တွင် ရေးပုံ — Inst. box (piano key / drum pad / fret) ကို အဓိကထား၍ keyboard shortcut မလိုဘဲ ရေးနိုင်ရမည်ဟု ယူဆထားသည်၊ အတည်ပြုရန်။
 
 ## Create Video — Final video layout — 2026-11-22
 
