@@ -44,7 +44,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 | Voice ရွေး | `Ctrl+Alt+1`–`4` | ရှိ | ✅ |
 | Tie | `T` | button (`toggleTie`) ရှိ၊ key မရှိ | 🟡 |
 | Slur | `S` | button (`toggleSlur`) ရှိ၊ key မရှိ | 🟡 |
-| Tuplet (triplet စသည်) | `Ctrl+2`–`9` | **မရှိ** | ❌ |
+| Tuplet (triplet စသည်) | `Ctrl+2`–`9` | ရှိ (`insertTuplet`၊ toolbar panel၊ `Ctrl+2`–`9`) | ✅ |
 | Beam ထိန်း | (Palette: Beam properties) | မရှိ | ❌ |
 | Grace note | `/` (acciaccatura) | palette ရှိ၊ key မရှိ | 🟡 |
 | Hairpin | `<` `>` | palette (lines) | 🟡 |
@@ -113,7 +113,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 |---|---|---|
 | **W1** | ✅ **ဆုံးဖြတ်ပြီး (user, 2026-11-27)** — Key map ကို MuseScore နှင့် အတိအကျ တူအောင်ပြင်မည် | — |
 | **W2** | ✅ **ပြီးစီး (2026-11-27)** — `↑`/`↓` semitone (တက်=♯၊ ဆင်း=♭)၊ `Alt+Shift+↑`/`↓` diatonic၊ `Ctrl+↑`/`↓` octave၊ `R` repeat၊ `0` rest၊ `Backspace` input mode တွင် နောက်ဆုံး note ပြန်ဖျက်၊ `Esc` input mode မှ ထွက် | `editor-integration.test.js` ၏ «the MuseScore key map» suite (key တစ်ခုချင်း) pass၊ suite တစ်ခုလုံး 1536/1536 pass |
-| **W3** | **Tuplet** (triplet၊ quintuplet … `Ctrl+2`–`9`) — doc model၊ command၊ Notation Engine render အထောက်အပံ့ စစ် | Triplet ရေး၍ render မှန်၊ MusicXML round trip၊ undo/redo၊ invariant |
+| **W3** | ✅ **ပြီးစီး (2026-11-18)** — Tuplet (triplet၊ quintuplet … `Ctrl+2`–`9`); `Rest` တွင် tuplet endpoint ထည့်၍ Engine က rest ပါ group ကို render နိုင်၊ doc command (`insertTuplet`၊ `tupletMemberDuration`၊ `tupletMarksOf`)၊ toolbar panel | Triplet ရေး၍ render မှန်၊ MusicXML round trip၊ undo/redo၊ invariant — `npm run verify` 1544/1544 pass |
 | **W4** | Tier 1 ၏ ကျန်များ — `T` (tie)၊ `S` (slur)၊ `Ctrl+B` (insert measure)၊ `Shift+←/→`၊ `Q`/`W`၊ `J`၊ `Alt+1–9`၊ `R` (repeat) | §၂ ဇယားတွင် 🟡/❌ → ✅ |
 | **W5** | **Writer Engine ကို သီးခြား folder/module သို့ ခွဲထုတ်** — `notation-doc.js` + `notation-editor.js` ၏ command logic ကို pure command အဖြစ်ရွှေ့၊ Editor က import သုံး | အပြုအမူ မပြောင်း (ရှိပြီးသား test အားလုံး pass)၊ Engine ကို DOM မပါဘဲ Node ထဲ test လုပ်နိုင် |
 | **W6** | ရေးစဉ် **အသံကြား** — note ထည့်သည်နှင့် Sound Engine က ဖွင့် (MuseScore ကဲ့သို့)၊ drum / pitched နှစ်မျိုးလုံး | note ရေးတိုင်း ချက်ချင်းအသံထွက်၊ အသံ delay ရည်မှန်း ~၁၀၀ ms အောက် |
@@ -132,7 +132,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 1. (ဖြေပြီး) **Key map ကို MuseScore နှင့် အတိအကျ တူအောင် ပြင်မည်** (user, 2026-11-27) — W2 တွင် ပြီးစီး။
 
    (ဖြေပြီး) **`1`–`7` duration နံပါတ်များ** — W2b တွင် MuseScore 4 အတိုင်း (`1`=64th … `5`=quarter … `7`=whole) ပြောင်းပြီး။ ယခင် သုံးနေသူများ၏ လက်ကျင့်ကို ပြင်းထန်စွာ ထိမည်ဖြစ်၍ release note တွင် ဖော်ပြရမည်။
-2. **Tuplet** ကို Notation Engine က render လုပ်နိုင်ပြီလား (Editor တွင် 0 ဖြစ်သဖြင့် စစ်ရန်)။ မလုပ်နိုင်လျှင် Notation Engine ဘက်က အရင်လုပ်ရမည်။
+2. (ဖြေပြီး) **Tuplet** ကို Notation Engine က render လုပ်နိုင်ပြီလား — W3 တွင် စစ်ပြီး: `Rest` တွင် endpoint မရှိသဖြင့် rest ပါ group ကို မဆွဲနိုင်ခဲ့။ `Rest` တွင် `tupletStart`/`tupletStop` ထည့်ပြီး ဖြေရှင်းခဲ့သည် (2026-11-18)။
 3. **MuseScore source ကို မကူးဘဲ handbook အပြုအမူကိုသာ ရည်ညွှန်း** ဟူသော စည်းမျဉ်း (`AGENTS.md`) ကို လိုက်မလား၊ ဒါမှမဟုတ် အစောပိုင်းပြောသလို MuseScore code ကို ထည့်သုံးမလား (license / legal ပါ)။
 4. **ပထမ release တွင် Tier 1 အပြည့်** လိုမလား၊ Tier 1 ၏ တစ်စိတ်တစ်ပိုင်းဖြင့် ရောင်းချမှု/ရေးသူများအတွက် စမလား။
 5. **Phone / touch** တွင် ရေးပုံ — Inst. box (piano key / drum pad / fret) ကို အဓိကထား၍ keyboard shortcut မလိုဘဲ ရေးနိုင်ရမည်ဟု ယူဆထားသည်၊ အတည်ပြုရန်။

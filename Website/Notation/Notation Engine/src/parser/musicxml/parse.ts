@@ -342,6 +342,8 @@ function buildSingle(ev: ParsedNoteEvent, startTick?: number): Note | Rest {
       ...(ev.notations.fermataShape !== undefined
         ? { fermataShape: ev.notations.fermataShape }
         : {}),
+      ...(ev.notations.tupletStart ? { tupletStart: true } : {}),
+      ...(ev.notations.tupletStop ? { tupletStop: true } : {}),
     });
   }
   // Percussion (<unpitched>) and pitched notes use the SAME Note type --

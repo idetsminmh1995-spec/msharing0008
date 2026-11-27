@@ -66,10 +66,10 @@
 <g data-id="P1#m2#v1#e3">
 <text x="29.3832" y="6" font-family="Bravura" font-size="4" fill="#000000"></text>
 </g>
-<line x1="23.8613" y1="7.3" x2="27.5426" y2="7.3" stroke="#000000" stroke-width="0.16" />
-<line x1="23.8613" y1="7.3" x2="23.8613" y2="6.8" stroke="#000000" stroke-width="0.16" />
-<line x1="27.5426" y1="7.3" x2="27.5426" y2="6.8" stroke="#000000" stroke-width="0.16" />
-<text x="25.7019" y="7.3" font-family="Bravura" font-size="4" fill="#000000"></text>
+<line x1="23.8613" y1="7.8" x2="27.5426" y2="7.8" stroke="#000000" stroke-width="0.16" />
+<line x1="23.8613" y1="7.8" x2="23.8613" y2="7.3" stroke="#000000" stroke-width="0.16" />
+<line x1="27.5426" y1="7.8" x2="27.5426" y2="7.3" stroke="#000000" stroke-width="0.16" />
+<text x="25.7019" y="7.8" font-family="Bravura" font-size="4" fill="#000000"></text>
 <g>
 <line x1="36.0385" y1="8" x2="36.0385" y2="4" stroke="#000000" stroke-width="0.16" />
 </g>

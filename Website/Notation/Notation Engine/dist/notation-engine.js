@@ -72530,7 +72530,9 @@ ${denominator}`;
         // A rest can carry a fermata exactly as a note can (§10.4).
         ...ev.notations.hasFermata ? { hasFermata: true } : {},
         ...ev.notations.fermataPlacement !== void 0 ? { fermataPlacement: ev.notations.fermataPlacement } : {},
-        ...ev.notations.fermataShape !== void 0 ? { fermataShape: ev.notations.fermataShape } : {}
+        ...ev.notations.fermataShape !== void 0 ? { fermataShape: ev.notations.fermataShape } : {},
+        ...ev.notations.tupletStart ? { tupletStart: true } : {},
+        ...ev.notations.tupletStop ? { tupletStop: true } : {}
       });
     }
     const pitch = ev.isUnpitched ? unpitchedPitch(ev.step, ev.octave) : pitchedPitch(ev.step, ev.alter ?? 0, ev.octave);
@@ -73441,7 +73443,8 @@ ${denominator}`;
   }
   function restXml(rest2, divisions) {
     const positioned = rest2.displayStep !== void 0 && rest2.displayOctave !== void 0 ? `<display-step>${rest2.displayStep}</display-step><display-octave>${rest2.displayOctave}</display-octave>` : "";
-    const notations = rest2.hasFermata === true ? `<notations>${fermataXml(rest2.fermataPlacement, rest2.fermataShape)}</notations>` : "";
+    const inner = (rest2.hasFermata === true ? fermataXml(rest2.fermataPlacement, rest2.fermataShape) : "") + (rest2.tupletStart === true ? '<tuplet type="start"/>' : "") + (rest2.tupletStop === true ? '<tuplet type="stop"/>' : "");
+    const notations = inner === "" ? "" : `<notations>${inner}</notations>`;
     return `<note><rest>${positioned}</rest>` + durationXml(false, false, rest2.duration, divisions) + voiceTypeXml(rest2.duration, rest2.voice) + timeModificationXml(rest2.duration) + `<staff>${rest2.staff ?? 1}</staff>` + notations + "</note>";
   }
   function chordXml(chord2, divisions) {
@@ -79498,7 +79501,17 @@ ${xrefOffset}
           fontFamily: ctx.theme.musicFont
         }) : ""
       ].filter((part2) => part2 !== "").join("\n");
-      return { svg, newAccidentalState: accidentalState };
+      return {
+        svg,
+        newAccidentalState: accidentalState,
+        spanAnchor: {
+          x: x2,
+          topPosition: restPosition,
+          bottomPosition: restPosition,
+          direction: "up",
+          noteheadGlyph: restGlyph
+        }
+      };
     }
     if (ev.isGrace) {
       const isUnpitchedGrace = ev.pitch.kind === "unpitched";
@@ -79609,7 +79622,14 @@ ${xrefOffset}
     return {
       svg: parts.join("\n"),
       newAccidentalState: head.newAccidentalState,
-      tieAnchor: { direction, position: head.position, noteheadGlyph: head.noteheadGlyph }
+      tieAnchor: { direction, position: head.position, noteheadGlyph: head.noteheadGlyph },
+      spanAnchor: {
+        x: x2,
+        topPosition: head.position,
+        bottomPosition: head.position,
+        direction,
+        noteheadGlyph: head.noteheadGlyph
+      }
     };
   }
   function explicitStemDirectionOf(event) {
@@ -80094,6 +80114,13 @@ ${xrefOffset}
     if (event.kind === "chord") return event.notes[0];
     return void 0;
   }
+  function tupletMarksOf(event) {
+    if (event.kind === "note") return event;
+    if (event.kind === "rest") return event;
+    const first = event.notes[0];
+    if (first === void 0) return void 0;
+    return { ...first, duration: event.duration };
+  }
   function renderSlurCurve(anchors, startX, endX, y, theme) {
     if (anchors.length < 2) return "";
     const side = slurSide(anchors.map((a) => a.direction));
@@ -80173,10 +80200,10 @@ ${xrefOffset}
     for (const [number, open] of openSlurs) pendingSlurs.set(number, open.start);
     let openTuplet;
     events.forEach((event, idx) => {
-      const note2 = spanSourceNote(event);
-      if (note2 === void 0) return;
-      if (note2.tupletStart === true) openTuplet = idx;
-      if (note2.tupletStop !== true) return;
+      const marks = tupletMarksOf(event);
+      if (marks === void 0) return;
+      if (marks.tupletStart === true) openTuplet = idx;
+      if (marks.tupletStop !== true) return;
       const startIdx = openTuplet;
       openTuplet = void 0;
       if (startIdx === void 0) {
@@ -80188,7 +80215,7 @@ ${xrefOffset}
       }
       const anchors = spanAnchors(startIdx, idx);
       if (anchors.length < 2) return;
-      const actualNotes = note2.duration.tuplet?.actualNotes;
+      const actualNotes = marks.duration.tuplet?.actualNotes;
       if (actualNotes === void 0) {
         onDiagnostic(
           "TUPLET_WITHOUT_RATIO",
@@ -82127,7 +82154,7 @@ ${xrefOffset}
                   );
                   accidentalState = newAccidentalState;
                 } else {
-                  const { svg: svg2, newAccidentalState, tieAnchor } = renderNoteOrRest(
+                  const { svg: svg2, newAccidentalState, tieAnchor, spanAnchor } = renderNoteOrRest(
                     event,
                     eventX,
                     eventCtx,
@@ -82135,6 +82162,7 @@ ${xrefOffset}
                     forcedDirection,
                     restOffset
                   );
+                  if (spanAnchor !== void 0) anchorByIndex.set(idx, spanAnchor);
                   if (event.kind === "note" && (event.slideStart === true || event.slideStop === true) && tieAnchor !== void 0) {
                     drawSlideFor(
                       event,
@@ -82208,15 +82236,6 @@ ${xrefOffset}
                       pitch: event.pitch,
                       measureNumber: measure2.number,
                       systemIndex: layout.systemIndex
-                    });
-                  }
-                  if (event.kind === "note" && tieAnchor !== void 0) {
-                    anchorByIndex.set(idx, {
-                      x: eventX,
-                      topPosition: tieAnchor.position,
-                      bottomPosition: tieAnchor.position,
-                      direction: tieAnchor.direction,
-                      noteheadGlyph: tieAnchor.noteheadGlyph
                     });
                   }
                   svgParts.push(

@@ -380,6 +380,104 @@
     );
   }
 
+  // ---- tuplets -----------------------------------------------------------
+  /**
+   * The ratio each tuplet count is written with: `count` notes in the time
+   * of this many of the same written value. A triplet is 3:2 and a
+   * quintuplet 5:4, which is what a reader expects to see; a duplet is the
+   * one case where fewer notes take MORE time (2:3). The pair is stated
+   * rather than derived so the number drawn above the bracket always
+   * matches what the notes are.
+   */
+  const TUPLET_NORMAL_NOTES = { 2: 3, 3: 2, 4: 2, 5: 4, 6: 4, 7: 4, 8: 4, 9: 8 };
+
+  /**
+   * One member of a `count`-note tuplet whose group lasts `totalTicks`.
+   *
+   * MuseScore takes the note value selected when the shortcut is pressed as
+   * the length of the WHOLE group, so a quarter with Ctrl+3 is three eighth
+   * notes. The written value is therefore the group divided by the ratio's
+   * normal count, and it has to be a value the score can actually notate --
+   * `null` says it cannot be, which is what a septuplet over a quarter is:
+   * 480 ticks do not divide by 7.
+   */
+  function tupletMemberDuration(totalTicks, count) {
+    const normalNotes = TUPLET_NORMAL_NOTES[count];
+    if (normalNotes === undefined) return null;
+    if (totalTicks <= 0 || totalTicks % count !== 0) return null;
+    const found = E.durationTypeAndDotsFromTicks(totalTicks / normalNotes, 3);
+    if (!found) return null;
+    return {
+      type: found.type,
+      dots: found.dots,
+      ticks: totalTicks / count,
+      tuplet: { actualNotes: count, normalNotes },
+    };
+  }
+
+  /**
+   * Writes a tuplet as `count` rests covering `totalTicks` from `startTick`.
+   *
+   * MuseScore shows the empty group the same way -- the writer then types
+   * over the rests and each letter takes the member's own value -- so the
+   * command's result is already a complete, invariant-respecting measure.
+   */
+  function insertTuplet(
+    doc,
+    { partId, measureNumber, voiceId = 1, staff = 1, startTick = 0, count, totalTicks },
+  ) {
+    const member = tupletMemberDuration(totalTicks, count);
+    if (!member) return doc;
+    const capacity = ticksPerMeasure(doc, partId, measureNumber);
+    return updateVoice(doc, partId, measureNumber, voiceId, (events) => {
+      const base = withoutPlaceholderRest(events, capacity);
+      const end = startTick + totalTicks;
+      const kept = [];
+      for (const current of base) {
+        const currentStart = current.startTick ?? 0;
+        const currentEnd = currentStart + current.duration.ticks;
+        if (!(currentEnd > startTick && currentStart < end)) {
+          kept.push(current);
+          continue;
+        }
+        if (current.kind !== 'rest') {
+          kept.push(current);
+          continue;
+        }
+        const onStaff = current.staff ?? staff;
+        if (currentStart < startTick) {
+          kept.push(...restsForSpan(startTick - currentStart, voiceId, onStaff, currentStart));
+        }
+        if (currentEnd > end) {
+          kept.push(...restsForSpan(currentEnd - end, voiceId, onStaff, end));
+        }
+      }
+      const members = [];
+      for (let index = 0; index < count; index += 1) {
+        members.push(
+          E.rest({
+            duration: E.duration(member.type, member.dots, member.ticks, member.tuplet),
+            voice: voiceId,
+            staff,
+            startTick: startTick + index * member.ticks,
+            ...(index === 0 ? { tupletStart: true } : {}),
+            ...(index === count - 1 ? { tupletStop: true } : {}),
+          }),
+        );
+      }
+      return fillVoice([...kept, ...members], voiceId, capacity, staff);
+    });
+  }
+
+  /** The `<tuplet>` endpoint marks an event carries, for copying one onto another. */
+  function tupletMarksOf(event) {
+    if (!event) return {};
+    return {
+      ...(event.tupletStart === true ? { tupletStart: true } : {}),
+      ...(event.tupletStop === true ? { tupletStop: true } : {}),
+    };
+  }
+
   /** Replaces a whole voice's events — used when entry rewrites one measure's line. */
   function setVoiceEvents(doc, { partId, measureNumber, voiceId = 1, events }) {
     return updateVoice(doc, partId, measureNumber, voiceId, () => sortEvents(events));
@@ -1305,6 +1403,10 @@
     setDynamic,
     dynamicAt,
     replaceEvent,
+    insertTuplet,
+    tupletMemberDuration,
+    tupletMarksOf,
+    TUPLET_NORMAL_NOTES,
     setVoiceEvents,
     setEventDuration,
     setEventVoice,

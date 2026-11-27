@@ -742,6 +742,7 @@ describe('the editor and the engine agree, end to end', () => {
       'Rest',
       'Accidentals',
       'Tie and slur',
+      'Tuplets',
       'Articulations',
       'Dynamics',
       'Stem',
@@ -4040,6 +4041,58 @@ describe('the editor and the engine agree, end to end', () => {
       // And the value reaches the written note, not just the status line.
       page.press('C');
       assert.match(page.saved(), /<type>whole<\/type>/, 'the whole note is what was written');
+    });
+
+    test('Ctrl+3 writes a triplet over the current note value', () => {
+      const page = openKeys();
+      page.press('6'); // half note: the whole GROUP is a half
+      page.press('3', { ctrlKey: true });
+      assert.equal(page.status(), 'Inserted a 3-tuplet.');
+      const xml = page.saved();
+      assert.equal((xml.match(/<time-modification>/g) ?? []).length, 3, 'three members');
+      assert.match(xml, /<actual-notes>3<\/actual-notes><normal-notes>2<\/normal-notes>/);
+      assert.equal((xml.match(/<tuplet type="start"\/>/g) ?? []).length, 1);
+      assert.equal((xml.match(/<tuplet type="stop"\/>/g) ?? []).length, 1);
+      // A half-note group of three is three quarter notes.
+      assert.equal((xml.match(/<type>quarter<\/type>/g) ?? []).length, 3);
+    });
+
+    test('a letter typed into a tuplet member keeps the member value and its marks', () => {
+      const page = openKeys();
+      page.press('5'); // quarter group
+      page.press('3', { ctrlKey: true });
+      page.press('C');
+      const xml = page.saved();
+      // The note replaces the first rest: it keeps the tuplet ratio and
+      // carries the start mark, so the group still reads as a triplet.
+      assert.match(xml, /<pitch>[\s\S]*?<time-modification>/);
+      assert.equal((xml.match(/<time-modification>/g) ?? []).length, 3, 'still three members');
+      assert.match(xml, /<tuplet type="start"\/>/);
+    });
+
+    test('Ctrl+4 writes a quadruplet as 4 in the time of 2', () => {
+      const page = openKeys();
+      page.press('5');
+      page.press('4', { ctrlKey: true });
+      const xml = page.saved();
+      assert.match(xml, /<actual-notes>4<\/actual-notes><normal-notes>2<\/normal-notes>/);
+      assert.equal((xml.match(/<type>eighth<\/type>/g) ?? []).length, 4, 'four eighths fill a quarter');
+    });
+
+    test('a tuplet that does not divide the note value is refused rather than miswritten', () => {
+      const page = openKeys();
+      page.press('5');
+      page.press('7', { ctrlKey: true });
+      assert.match(page.status(), /does not fit the current note value/);
+      assert.equal((page.saved().match(/<time-modification>/g) ?? []).length, 0, 'nothing was written');
+    });
+
+    test('undo takes the whole tuplet back in one step', () => {
+      const page = openKeys();
+      page.press('5');
+      page.press('3', { ctrlKey: true });
+      page.press('z', { ctrlKey: true });
+      assert.equal((page.saved().match(/<time-modification>/g) ?? []).length, 0);
     });
   });
 });

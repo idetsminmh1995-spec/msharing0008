@@ -38,6 +38,17 @@ export interface Rest {
   readonly fermataPlacement?: FermataPlacement;
   /** MusicXML fermata shape when a matching Bravura glyph exists; omitted means normal. */
   readonly fermataShape?: FermataShape;
+  /**
+   * `<notations><tuplet type="start">` / `type="stop"`.
+   *
+   * A tuplet's first or last member is very often a rest -- a triplet whose
+   * middle beat is silent, or one that opens on the off-beat. Those marks
+   * belong to the member that carries them whether or not it has a pitch,
+   * so a rest holds them exactly as a note does; the renderer anchors the
+   * bracket to it.
+   */
+  readonly tupletStart?: boolean;
+  readonly tupletStop?: boolean;
 }
 
 export interface RestInit {
@@ -50,6 +61,8 @@ export interface RestInit {
   hasFermata?: boolean;
   fermataPlacement?: FermataPlacement;
   fermataShape?: FermataShape;
+  tupletStart?: boolean;
+  tupletStop?: boolean;
 }
 
 export function rest(init: RestInit): Rest {

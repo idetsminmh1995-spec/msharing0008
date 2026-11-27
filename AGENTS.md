@@ -871,3 +871,15 @@ commits stay local and must be reported as unpushed.
     `main`, `studio-video.js` has no `f20d3d` and `styles.css` has no
     `.video-stage` radial gradient, while `.is-playing` keeps only its 1px
     inset ring. No pull request is open.
+- **Push blocked on 2026-11-18 (W3 pass): the injected token cannot write.**
+  `git push origin feat/guitar-video-adapter` is refused with
+  `403 Permission to idetsminmh1995-spec/msharing0008.git denied to
+  idetsminmh1995-spec`, and so is `git push` with `$GITHUB_TOKEN`,
+  `x-access-token:…`, the credential-helper's exchanged secret, and
+  `gh auth token` (all four are the same 40-char App token). The API agrees:
+  `GET /repos/…` reports `permissions.push: true`, yet
+  `POST /git/refs` and `PUT /contents/…` both answer
+  `403 Resource not accessible by integration`. So the read side is fine and
+  the write side needs a fresh user-supplied `github_pat_…`, exactly as the
+  fine-grained-PAT note above describes. `9c64fb7` (W3 tuplets) is committed
+  locally and waiting for that PAT; nothing else is unpushed.
