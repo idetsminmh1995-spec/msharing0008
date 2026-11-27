@@ -29,3 +29,4 @@ M Sharing Website ၏ လက်ရှိ implementation နှင့် မပ�
 - [SoundFont Collection R2 Asset](../Notation/Sound%20Doc/SoundFont-Collection-R2.md) — MS Basic, MuseScore General, GeneralUser GS, FluidR3 GM, and Salamander asset sources and license notes
 - [SoundFont R2 Upload Work Log](SoundFont-R2-Upload-2026-11-13.md) — upload steps, R2 object verification, and remaining playback/license/access tasks.
 - [Writer Engine Plan](../Writer/Writer%20Engine%20Plan/PLAN.md) — MuseScore ကဲ့သို့ ရေးခြင်း system ၏ အသေးစိတ် Plan (key map နှိုင်းယှဉ်ချက်၊ command အုပ်စုများ၊ W1–W11)၊ video နှင့် ဆက်စပ်သည့် အပိုင်းများကို Video Engine Plan တွင် သီးခြား ခွဲထားသည်
+- [Writer Engine W2 — Key Map](Writer-Engine-W2-Key-Map-2026-11-18.md) — Key map ကို MuseScore 4 နှင့် ညီစေခြင်း (`↑`/`↓` semitone၊ `Alt+Shift` diatonic၊ `R` repeat၊ `Backspace` ပြန်ဖျက်၊ `Esc` input mode မှထွက်) နှင့် စမ်းသပ်ချက်

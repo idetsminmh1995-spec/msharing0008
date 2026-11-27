@@ -1813,11 +1813,12 @@
   /**
    * Moves one note by whole staff steps.
    *
-   * MuseScore's Up/Down are diatonic: C becomes D, never C sharp, and the
-   * accidental that was written travels with the note. So this walks the
-   * staff's own diatonic ladder rather than adding semitones -- which is
-   * also what makes an octave exactly seven steps in both directions,
-   * whatever the key signature.
+   * The diatonic move: C becomes D, never C sharp, and the accidental that
+   * was written travels with the note. So this walks the staff's own
+   * diatonic ladder rather than adding semitones -- which is also what makes
+   * an octave exactly seven steps in both directions, whatever the key
+   * signature. MuseScore puts it on Alt+Shift+Up/Down and on Ctrl for the
+   * octave.
    */
   function transposeNote(pitch, steps, clef) {
     if (!pitch || pitch.kind === 'unpitched') return pitch;
@@ -1826,13 +1827,42 @@
     return { ...pitch, step: moved.step, octave: moved.octave };
   }
 
+  // How a semitone is spelled. MuseScore spells an upward semitone with
+  // sharps and a downward one with flats, so E up is F and C down is B, but
+  // C up is C sharp and E down is E flat -- the accidental follows the
+  // direction, not the key.
+  const SHARP_SPELLING = [
+    ['C', 0], ['C', 1], ['D', 0], ['D', 1], ['E', 0], ['F', 0],
+    ['F', 1], ['G', 0], ['G', 1], ['A', 0], ['A', 1], ['B', 0],
+  ];
+  const FLAT_SPELLING = [
+    ['C', 0], ['D', -1], ['D', 0], ['E', -1], ['E', 0], ['F', 0],
+    ['G', -1], ['G', 0], ['A', -1], ['A', 0], ['B', -1], ['B', 0],
+  ];
+
+  /** Moves one note by a semitone, spelled the way MuseScore spells it. */
+  function transposeSemitone(pitch, direction) {
+    if (!pitch || pitch.kind === 'unpitched') return pitch;
+    const midi = engine.midiNoteNumber?.(pitch);
+    if (midi === undefined) return pitch;
+    const moved = midi + direction;
+    if (moved < 0 || moved > 127) return pitch;
+    const [step, alter] = (direction > 0 ? SHARP_SPELLING : FLAT_SPELLING)[((moved % 12) + 12) % 12];
+    return { ...pitch, step, alter, octave: Math.floor(moved / 12) - 1 };
+  }
+
   /**
-   * Transposes every note in the selection. The whole range moves as one
-   * command, so a Shift-click selection and a single note behave the same
-   * and undo once.
+   * Moves every note in the selection by one command, so a Shift-click range
+   * and a single note behave the same and undo once.
+   *
+   * `movePitch` decides what one move is -- a diatonic step, a semitone or
+   * an octave -- and `describe` says what happened in the status line.
    */
-  function transposeSelection(steps) {
-    const cells = selectedCells();
+  function moveSelectedPitch(movePitch, describe) {
+    const selected = selectedCells();
+    // In note input mode the writer nudges the note just written, which is
+    // MuseScore's behaviour and needs no selection to exist.
+    const cells = selected.length > 0 ? selected : lastWrittenCells();
     if (cells.length === 0) return;
     const movable = cells.filter((cell) => {
       const event = eventFor(cell);
@@ -1845,8 +1875,8 @@
         const event = eventFor(cell);
         const clef = clefAt(cell.measureNumber);
         const patch = event.kind === 'chord'
-          ? { notes: event.notes.map((note) => ({ ...note, pitch: transposeNote(note.pitch, steps, clef) })) }
-          : { pitch: transposeNote(event.pitch, steps, clef) };
+          ? { notes: event.notes.map((note) => ({ ...note, pitch: movePitch(note.pitch, clef) })) }
+          : { pitch: movePitch(event.pitch, clef) };
         next = mirrorCounterpart(
           docTools.patchEvent(next, {
             partId: cell.partId,
@@ -1866,9 +1896,25 @@
         );
       }
       return next;
-    }, describeTranspose(steps, movable.length));
+    }, describe(movable.length));
     const first = eventFor(movable[0]);
     if (first && first.kind !== 'chord') previewPitch(first.pitch, null, movable[0].measureNumber);
+  }
+
+  /** Transposes the selection by whole staff steps (Alt+Shift, Ctrl = octave). */
+  function transposeSelection(steps) {
+    moveSelectedPitch(
+      (pitch, clef) => transposeNote(pitch, steps, clef),
+      (count) => describeTranspose(steps, count),
+    );
+  }
+
+  /** Transposes the selection by a semitone (Up/Down). */
+  function transposeSemitones(direction) {
+    moveSelectedPitch(
+      (pitch) => transposeSemitone(pitch, direction),
+      (count) => describeSemitones(direction, count),
+    );
   }
 
   /** The status line MuseScore would show: one note names the move, many count it. */
@@ -1878,6 +1924,12 @@
     if (count > 1) return `Moved ${count} notes ${direction} ${magnitude} step${magnitude === 1 ? '' : 's'}.`;
     if (magnitude === 7) return `Moved ${direction} an octave.`;
     return `Moved ${direction} ${magnitude} step${magnitude === 1 ? '' : 's'}.`;
+  }
+
+  function describeSemitones(direction, count) {
+    const way = direction > 0 ? 'up' : 'down';
+    if (count > 1) return `Moved ${count} notes ${way} a semitone.`;
+    return `Moved ${way} a semitone.`;
   }
 
   /**
@@ -1946,6 +1998,179 @@
     const anchorEvent = eventFor(anchor);
     if (anchorEvent) setSelection([anchor], anchor);
     else clearSelection();
+    render();
+  }
+
+  /**
+   * The cell the last note was written into, or an empty list.
+   *
+   * The entry cursor remembers where it wrote (`state.entry.written`), which
+   * is what Backspace and R work from when nothing is selected.
+   */
+  function lastWrittenCells() {
+    const written = state.entry?.written;
+    if (!written) return [];
+    const events = eventsIn(written.measureNumber, written.voiceId);
+    const eventIndex = indexAtTickOnStaff(events, written.tick, written.staffNumber);
+    if (eventIndex < 0 || events[eventIndex].kind === 'rest') return [];
+    return [{
+      partId: activePartId(),
+      measureNumber: written.measureNumber,
+      voiceId: written.voiceId,
+      eventIndex,
+    }];
+  }
+
+  /**
+   * Backspace in note input mode: takes back the note just written.
+   *
+   * MuseScore turns that note into a rest and walks the cursor back onto it,
+   * so a wrong note is retyped without reaching for the mouse. Repeated
+   * presses keep walking back through the notes already written.
+   */
+  function undoLastWrittenNote() {
+    const written = state.entry?.written;
+    if (!written) return false;
+    const events = eventsIn(written.measureNumber, written.voiceId);
+    const eventIndex = indexAtTickOnStaff(events, written.tick, written.staffNumber);
+    if (eventIndex < 0 || events[eventIndex].kind === 'rest') return false;
+    const cell = {
+      partId: activePartId(),
+      measureNumber: written.measureNumber,
+      voiceId: written.voiceId,
+      eventIndex,
+    };
+    commit((doc) => docTools.deleteEvents(doc, withCounterparts([cell])), 'Took back the last note.');
+    const previous = previousNoteBefore(written);
+    state.entry = {
+      ...state.entry,
+      measureNumber: written.measureNumber,
+      tick: written.tick,
+      voiceId: written.voiceId,
+      staffNumber: written.staffNumber,
+      written: previous,
+    };
+    clearSelection();
+    render();
+    return true;
+  }
+
+  /** The note before `position`, so Backspace can keep stepping back. */
+  function previousNoteBefore({ measureNumber, tick, voiceId, staffNumber }) {
+    for (let number = measureNumber; number >= 1; number -= 1) {
+      const events = eventsIn(number, voiceId);
+      const found = events.reduce((best, event) => {
+        const start = event.startTick ?? 0;
+        if (event.kind === 'rest') return best;
+        if ((event.staff ?? 1) !== staffNumber) return best;
+        if (number === measureNumber && start >= tick) return best;
+        return start >= (best?.tick ?? -1) ? { measureNumber: number, tick: start, voiceId, staffNumber } : best;
+      }, null);
+      if (found) return found;
+    }
+    return undefined;
+  }
+
+  /**
+   * MuseScore's R: writes the selection again at the beat after it.
+   *
+   * With nothing selected it repeats the note just written, which is the
+   * gesture a writer actually uses -- fill a bar, then press R for each beat
+   * that repeats it.
+   */
+  function repeatSelection() {
+    const cells = selectedCells();
+    const source = cells.length > 0 ? cells : lastWrittenCells();
+    if (source.length === 0) {
+      announce('Select a note first.');
+      return;
+    }
+    const excerpt = docTools.excerpt(state.doc, source);
+    if (!excerpt) {
+      announce('There is nothing to repeat.');
+      return;
+    }
+    // The repeat starts after the last note of the source, in reading order.
+    let last = null;
+    for (const cell of source) {
+      const event = eventFor(cell);
+      if (!event || event.kind === 'rest') continue;
+      const start = event.startTick ?? 0;
+      if (!last || cell.measureNumber > last.measureNumber
+        || (cell.measureNumber === last.measureNumber && start >= last.start)) {
+        last = {
+          measureNumber: cell.measureNumber,
+          voiceId: cell.voiceId,
+          staffNumber: event.staff ?? 1,
+          start,
+          duration: event.duration.ticks,
+          end: start + event.duration.ticks,
+        };
+      }
+    }
+    if (!last) {
+      announce('There is nothing to repeat.');
+      return;
+    }
+    const count = source.filter((cell) => {
+      const event = eventFor(cell);
+      return event && event.kind !== 'rest';
+    }).length;
+    // How far into the excerpt the last note sits, so the cursor can be put
+    // on the copy after the paste and a second R continues from there.
+    const excerptPart = excerpt.score.parts[0];
+    let offset = 0;
+    let lastAt = 0;
+    for (const measure of excerptPart.measures) {
+      for (const voice of measure.voices) {
+        for (const event of docTools.sortEvents(voice.events)) {
+          if (event.kind === 'rest') continue;
+          lastAt = offset + (event.startTick ?? 0);
+        }
+      }
+      offset += docTools.measureTicks(docTools.attributeFor(excerpt, excerptPart.id, measure.number));
+    }
+    let landed = null;
+    commit((doc) => {
+      let next = doc;
+      let number = last.measureNumber;
+      let tick = last.end;
+      for (;;) {
+        const capacity = docTools.ticksPerMeasure(next, activePartId(), number);
+        if (tick < capacity) break;
+        tick -= capacity;
+        number += 1;
+        const exists = next.score.parts
+          .find((part) => part.id === activePartId())
+          ?.measures.some((measure) => measure.number === number);
+        if (!exists) next = docTools.appendMeasure(next, activePartId());
+      }
+      landed = { measureNumber: number, tick };
+      return docTools.paste(next, excerpt, {
+        partId: activePartId(),
+        measureNumber: number,
+        voiceId: last.voiceId,
+        tick,
+      });
+    }, `Repeated ${count} note${count === 1 ? '' : 's'}.`);
+    if (landed) {
+      const copyStart = locateTick(landed.tick + lastAt, landed.measureNumber);
+      const after = locateTick(copyStart.tick + last.duration, copyStart.measureNumber);
+      state.entry = {
+        ...state.entry,
+        measureNumber: after.measureNumber,
+        tick: after.tick,
+        voiceId: last.voiceId,
+        staffNumber: last.staffNumber,
+        written: {
+          measureNumber: copyStart.measureNumber,
+          tick: copyStart.tick,
+          voiceId: last.voiceId,
+          staffNumber: last.staffNumber,
+        },
+      };
+      clearSelection();
+    }
     render();
   }
 
@@ -2082,6 +2307,17 @@
     return events.findIndex(
       (event) => (event.startTick ?? 0) === tick && (event.staff ?? 1) === staffNumber,
     );
+  }
+
+  /**
+   * Remembers where the note just written sits.
+   *
+   * `advanceEntry` records it for an inserted note; a note that replaced one
+   * already on the beat leaves the cursor where it is, so the record has to
+   * be made here or Backspace and R would act on the note before it.
+   */
+  function markWritten(measureNumber, tick, staffNumber, voiceId) {
+    state.entry = { ...state.entry, written: { measureNumber, tick, staffNumber, voiceId } };
   }
 
   /**
@@ -2224,6 +2460,7 @@
         } else {
           commit((doc) => docTools.replaceEvent(doc, { partId: activePartId(), measureNumber, voiceId, eventIndex: existingIndex, event: note }), `Replaced with ${chosen.name}.`);
         }
+        markWritten(measureNumber, existing.startTick ?? state.entry.tick, staff, voiceId);
         previewPitch(drumPitch, chosen);
         render();
         return;
@@ -2263,6 +2500,7 @@
         // pitch, replacing rather than stacking by default.
         commit((doc) => writePaired(doc, { partId: activePartId(), measureNumber, voiceId, event: note, replaceIndex: existingIndex, to }), `Replaced with ${pitchLabel(step, pitch.alter, octave)}.`);
       }
+      markWritten(measureNumber, existing.startTick ?? state.entry.tick, staff, voiceId);
       previewPitch(pitch, null, measureNumber);
       render();
       return;
@@ -5424,22 +5662,44 @@
     }
     if (event.code === 'Space') { event.preventDefault(); void togglePlay(); return; }
 
-    if (event.key === 'Escape') { clearSelection(); render(); return; }
+    if (event.key === 'Escape') {
+      // MuseScore's Esc leaves note input mode, and deselects with it.
+      if (state.noteInput) {
+        state.noteInput = false;
+        syncTools();
+        announce('Note input off.');
+      }
+      clearSelection();
+      render();
+      return;
+    }
     if (modifier && event.key.toLowerCase() === 'a') { event.preventDefault(); selectAll(); return; }
     if (event.key === 'ArrowRight') { event.preventDefault(); moveSelection(1); return; }
     if (event.key === 'ArrowLeft') { event.preventDefault(); moveSelection(-1); return; }
-    // MuseScore's Up/Down move a staff step (diatonic); Ctrl is the octave.
+    // MuseScore's Up/Down move a semitone (spelled sharp going up, flat
+    // going down), Alt+Shift is the diatonic step and Ctrl the octave.
     if (event.key === 'ArrowUp') {
       event.preventDefault();
-      transposeSelection(modifier ? 7 : 1);
+      if (modifier) transposeSelection(7);
+      else if (event.altKey && event.shiftKey) transposeSelection(1);
+      else transposeSemitones(1);
       return;
     }
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      transposeSelection(modifier ? -7 : -1);
+      if (modifier) transposeSelection(-7);
+      else if (event.altKey && event.shiftKey) transposeSelection(-1);
+      else transposeSemitones(-1);
       return;
     }
-    if (event.key === 'Delete' || event.key === 'Backspace') { event.preventDefault(); deleteSelection(); return; }
+    // In note input mode Backspace takes back the note just written; outside
+    // it, Backspace is Delete, which is where the writer's hands expect it.
+    if (event.key === 'Backspace') {
+      event.preventDefault();
+      if (!(state.noteInput && undoLastWrittenNote())) deleteSelection();
+      return;
+    }
+    if (event.key === 'Delete') { event.preventDefault(); deleteSelection(); return; }
 
     if (SHORTCUT_DURATION[event.key]) {
       state.tool.duration = SHORTCUT_DURATION[event.key];
@@ -5455,11 +5715,12 @@
       return;
     }
     if (event.key.toLowerCase() === 'm') { setMetronome(!state.metronomeOn); return; }
-    if (event.key === '0' || event.key.toLowerCase() === 'r') {
+    if (event.key === '0') {
       if (state.noteInput) insertAtEntry({ rest: true });
       else { state.tool.rest = !state.tool.rest; syncTools(); }
       return;
     }
+    if (!modifier && event.key.toLowerCase() === 'r') { event.preventDefault(); repeatSelection(); return; }
 
     const letter = event.key.toUpperCase();
     if (state.noteInput && docTools.STEPS.includes(letter)) {

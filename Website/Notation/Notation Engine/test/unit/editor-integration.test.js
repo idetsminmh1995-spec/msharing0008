@@ -3587,12 +3587,43 @@ describe('the editor and the engine agree, end to end', () => {
       page.panel.querySelector('[data-editor-inst-fret="3:0"]')
         .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
       page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
-      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+      // MuseScore's Up is a semitone, so the diatonic step is Alt+Shift+Up.
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', {
+        key: 'ArrowUp', altKey: true, shiftKey: true, bubbles: true,
+      }));
 
       // Open G3 up one step is A3, fret 2 on the same string.
       const written = pitches(page.saved());
       assert.deepEqual(written.map((note) => note.name), ['A3', 'A3'], 'both staves move up');
       assert.deepEqual(written.map((note) => note.fret), [null, '2'], 'and the tab follows the new pitch');
+    });
+
+    test('Up moves a semitone and spells it with a sharp', async () => {
+      const page = await openGuitar();
+      page.panel.querySelector('[data-editor-inst-fret="3:0"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+      assert.match(page.doc.querySelector('[data-editor-status]').textContent, /Moved 2 notes up a semitone/);
+
+      const written = pitches(page.saved());
+      assert.deepEqual(written.map((note) => note.name), ['G13', 'G13'], 'G3 up a semitone is G sharp 3');
+      assert.deepEqual(written.map((note) => note.fret), [null, '1'], 'and the tab names fret 1');
+    });
+
+    test('Down moves a semitone and spells it with a flat', async () => {
+      const page = await openGuitar();
+      page.panel.querySelector('[data-editor-inst-fret="3:0"]')
+        .dispatchEvent(new page.window.MouseEvent('click', { bubbles: true }));
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'a', ctrlKey: true, bubbles: true }));
+      page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+      assert.match(page.doc.querySelector('[data-editor-status]').textContent, /Moved 2 notes down a semitone/);
+
+      const written = pitches(page.saved());
+      assert.deepEqual(written.map((note) => note.name), ['G-13', 'G-13'], 'G3 down a semitone is G flat 3');
+      // Below the open G string, so the fretboard moves to the D string:
+      // D3 plus four frets is G flat 3.
+      assert.deepEqual(written.map((note) => note.fret), [null, '4'], 'and the tab finds the fret that sounds it');
     });
   });
 
@@ -3890,6 +3921,113 @@ describe('the editor and the engine agree, end to end', () => {
       // The keyboard is off, but the page still works: a letter key writes.
       page.doc.dispatchEvent(new page.window.KeyboardEvent('keydown', { key: 'C', bubbles: true }));
       assert.equal(page.status(), 'Inserted C4.');
+    });
+  });
+
+  describe('the MuseScore key map', () => {
+    /**
+     * The page plus the three things a key-map test reads: the status line,
+     * the notes of bar 1 as written, and the entry state the keys act on.
+     */
+    function openKeys() {
+      const { window } = loadEditorPage();
+      const doc = window.document;
+      const status = () => doc.querySelector('[data-editor-status]').textContent;
+      const press = (key, init = {}) => doc.dispatchEvent(
+        new window.KeyboardEvent('keydown', { key, bubbles: true, ...init }),
+      );
+      const saved = () => {
+        doc.querySelector('[data-editor-save]').dispatchEvent(new window.MouseEvent('click', { bubbles: true }));
+        return JSON.parse(window.localStorage.getItem('msharing-notation-scores') || '[]')[0]?.xml ?? '';
+      };
+      /** Every sounding note of bar 1, as `step+alter+octave`. */
+      const bar = () => {
+        const measure = saved().match(/<measure number="1">([\s\S]*?)<\/measure>/)?.[1] ?? '';
+        return [...measure.matchAll(/<note>([\s\S]*?)<\/note>/g)]
+          .map((match) => match[1].replace(/\s+/g, ''))
+          .filter((note) => !note.startsWith('<rest'))
+          .map((note) => `${note.match(/<step>(\w)<\/step>/)?.[1]}`
+            + `${note.match(/<alter>(-?\d+)<\/alter>/)?.[1] ?? ''}`
+            + `${note.match(/<octave>(\d)<\/octave>/)?.[1]}`);
+      };
+      return { window, doc, status, press, saved, bar };
+    }
+
+    test('Esc leaves note input mode, the way MuseScore does', () => {
+      const page = openKeys();
+      const input = page.doc.querySelector('[data-editor-note-input]');
+      assert.equal(input.getAttribute('aria-pressed'), 'true', 'the editor starts in note input');
+
+      page.press('Escape');
+      assert.equal(input.getAttribute('aria-pressed'), 'false', 'Esc turned input off');
+      assert.match(page.status(), /Note input off/);
+
+      // Off, a letter is not a note any more.
+      page.press('C');
+      assert.deepEqual(page.bar(), [], 'nothing was written with input off');
+    });
+
+    test('R repeats the note just written instead of writing a rest', () => {
+      const page = openKeys();
+      page.press('D');
+      page.press('r');
+      assert.equal(page.status(), 'Repeated 1 note.');
+      assert.deepEqual(page.bar(), ['D4', 'D4'], 'the same note lands on the next beat');
+
+      // 0 is the rest key, so R must not have become one.
+      page.press('0');
+      assert.deepEqual(page.bar(), ['D4', 'D4'], '0 wrote a rest, not a note');
+    });
+
+    test('Backspace in note input takes back the note just written', () => {
+      const page = openKeys();
+      page.press('C');
+      page.press('D');
+      assert.deepEqual(page.bar(), ['C4', 'D4']);
+
+      page.press('Backspace');
+      assert.match(page.status(), /Took back the last note/);
+      assert.deepEqual(page.bar(), ['C4'], 'the second note is a rest again');
+
+      // A second press keeps walking back rather than needing a new note.
+      page.press('Backspace');
+      assert.deepEqual(page.bar(), [], 'and the first one goes too');
+    });
+
+    test('Backspace outside note input is still Delete', () => {
+      const page = openKeys();
+      page.press('C');
+      page.press('Escape');
+      page.press('a', { ctrlKey: true });
+      assert.equal(page.status(), 'Selected 1 note.');
+      page.press('Backspace');
+      assert.equal(page.status(), 'Deleted 1 note.');
+      assert.deepEqual(page.bar(), [], 'the note became a rest');
+    });
+
+    test('Alt+Shift moves a diatonic step and Ctrl moves an octave', () => {
+      const page = openKeys();
+      page.press('C');
+      page.press('a', { ctrlKey: true });
+      page.press('ArrowUp', { altKey: true, shiftKey: true });
+      assert.equal(page.status(), 'Moved up 1 step.');
+      assert.deepEqual(page.bar(), ['D4'], 'C4 becomes D4, not C sharp');
+
+      page.press('ArrowUp', { ctrlKey: true });
+      assert.match(page.status(), /Moved up an octave/);
+      assert.deepEqual(page.bar(), ['D5'], 'and Ctrl raises it an octave');
+    });
+
+    test('Up and Down nudge the note just written without a selection', () => {
+      const page = openKeys();
+      page.press('C');
+      // Nothing is selected after a note is written, so Up has to reach the
+      // note the cursor just left -- that is how a writer fixes a wrong pitch.
+      page.press('ArrowUp');
+      assert.deepEqual(page.bar(), ['C14'], 'C4 up a semitone is C sharp 4, written <alter>1');
+      page.press('ArrowDown');
+      page.press('ArrowDown');
+      assert.deepEqual(page.bar(), ['B3'], 'and down twice crosses into the octave below');
     });
   });
 });
