@@ -1269,6 +1269,9 @@
     setFile(name);
     render();
     announce('Score ready.');
+    // The font starts arriving now, while the writer is looking at the
+    // score, rather than at the moment of the first note.
+    warmSound();
   }
 
   async function readFile(file) {
@@ -3275,43 +3278,54 @@
   /** The in-flight manifest read, so playback can wait for the host's asset list. */
   let soundFontsLoading = null;
 
-  const ensureSound = async () => {
-    if (state.sound) return state.sound;
-    if (state.soundTried) throw new Error('Playback is unavailable in this preview.');
+  /**
+   * The one sound engine for this page, created on first use.
+   *
+   * The whole load is a single promise assigned before the first `await`,
+   * so every caller that arrives while it is in flight joins it instead of
+   * being told playback is unavailable. That matters while writing: notes
+   * written in the seconds the font is downloading must still be heard.
+   */
+  const ensureSound = () => {
+    if (state.sound) return Promise.resolve(state.sound);
     if (state.soundLoading) return state.soundLoading;
-    state.soundTried = true;
+    if (state.soundTried) return Promise.reject(new Error('Playback is unavailable in this preview.'));
     const SoundFont = window.NotationSoundFont;
-    if (!SoundFont?.R2SoundFontEngine) throw new Error('The sound engine could not be loaded.');
-    // Play must not race the manifest: a writer can press Play before the
-    // asset list has arrived, and the id it carries decides which font
-    // loads. Waiting here costs nothing when the read already finished.
-    if (soundFontsLoading) await soundFontsLoading;
-    const configured = window.MSHARING_SOUNDFONT_CONFIG || {};
-    const assetId = state.soundAssetId ?? configured.assetId;
-    // One creation promise is shared by every caller (Play, the sound
-    // tests, and the note preview), so a fast writer never starts two
-    // loads of the same SoundFont.
-    state.soundLoading = SoundFont.R2SoundFontEngine.create({
-      manifestUrl: 'soundfonts/manifest.json',
-      processorUrl: 'assets/spessasynth_processor.min.js',
-      assetBaseUrl: 'soundfonts',
-      ...configured,
-      // The manifest's own paths win over the engine's built-in table, so
-      // a host that moves an asset only has to update the manifest.
-      ...(state.soundAssetPaths ? { assetPaths: state.soundAssetPaths } : {}),
-      ...(assetId ? { assetId } : {}),
-    }).then((engine) => {
-      state.sound = engine;
-      state.soundLoading = null;
-      // A note auditioned before Play needs the score's own routing, or
-      // the first note a writer places sounds as the default piano.
-      syncSoundTracks();
-      return engine;
-    }).catch((error) => {
-      state.soundLoading = null;
-      state.soundTried = false;
-      throw error;
-    });
+    if (!SoundFont?.R2SoundFontEngine) {
+      return Promise.reject(new Error('The sound engine could not be loaded.'));
+    }
+    state.soundTried = true;
+    state.soundLoading = (async () => {
+      // Play must not race the manifest: a writer can press Play before the
+      // asset list has arrived, and the id it carries decides which font
+      // loads. Waiting here costs nothing when the read already finished.
+      if (soundFontsLoading) await soundFontsLoading;
+      const configured = window.MSHARING_SOUNDFONT_CONFIG || {};
+      const assetId = state.soundAssetId ?? configured.assetId;
+      return SoundFont.R2SoundFontEngine.create({
+        manifestUrl: 'soundfonts/manifest.json',
+        processorUrl: 'assets/spessasynth_processor.min.js',
+        assetBaseUrl: 'soundfonts',
+        ...configured,
+        // The manifest's own paths win over the engine's built-in table, so
+        // a host that moves an asset only has to update the manifest.
+        ...(state.soundAssetPaths ? { assetPaths: state.soundAssetPaths } : {}),
+        ...(assetId ? { assetId } : {}),
+      });
+    })()
+      .then((engine) => {
+        state.sound = engine;
+        state.soundLoading = null;
+        // A note auditioned before Play needs the score's own routing, or
+        // the first note a writer places sounds as the default piano.
+        syncSoundTracks();
+        return engine;
+      })
+      .catch((error) => {
+        state.soundLoading = null;
+        state.soundTried = false;
+        throw error;
+      });
     return state.soundLoading;
   };
 
@@ -3324,6 +3338,35 @@
     if (!tracks || !state.sound?.setTracks) return;
     state.sound.setTracks(tracks);
   }
+
+  /**
+   * Starts the SoundFont loading as soon as there is a score to write on.
+   *
+   * A writer's first note is the one that has to be heard, and a font that
+   * only starts downloading when that note is placed arrives seconds later
+   * -- the note is written, nothing sounds, and the preview reads as broken.
+   * Warming it here means the download overlaps the time the writer spends
+   * looking at the score instead.
+   */
+  function warmSound() {
+    if (!state.previewOn || state.playing) return;
+    // The sound bundle is a script tag, so it is normally there; a page that
+    // opened without it simply writes notes silently, and must not record a
+    // failure that would also block Play later.
+    if (!window.NotationSoundFont?.R2SoundFontEngine) return;
+    void ensureSound().catch(() => {
+      /* no sound available; writing still works */
+    });
+  }
+
+  /**
+   * The audition still wanted.
+   *
+   * A note written while the font is still arriving has to wait for it, and
+   * several notes written in that time must not all sound together when it
+   * lands: each write takes a new number, and only the newest one plays.
+   */
+  let wantedPreview = 0;
 
   /**
    * Sounds a written pitch the moment it is placed, so the writer hears the
@@ -3347,8 +3390,15 @@
     // note is percussion: a note written on the violin part must not be
     // auditioned as a piano.
     const partId = activePartId();
+    const wanted = ++wantedPreview;
     void ensureSound()
-      .then((sound) => sound.preview?.([midi], undefined, partId))
+      .then(async (sound) => {
+        // `create` resolves once the engine exists, before its bank is in
+        // the synth; a note sent in that gap plays silence.
+        await sound.ready;
+        if (wanted !== wantedPreview || !state.previewOn || state.playing) return;
+        sound.preview?.([midi], undefined, partId);
+      })
       .catch(() => {
         /* no sound available; writing still works */
       });
@@ -6209,6 +6259,9 @@
   setSidebar(savedDock.open);
   setControlsEnabled(false);
   updateZoom();
+  // The manifest read starts before the score, so the asset id and paths it
+  // carries are already known when the warm-up asks for a font.
+  soundFontsLoading = loadSoundFonts();
+  void soundFontsLoading;
   restoreHandoff();
-  void (soundFontsLoading = loadSoundFonts());
 })();

@@ -103,7 +103,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 2. **Invariant test:** ဘယ် command နောက်မဆို §၁(၄) ၏ invariant ၄ ချက် မှန်ကြောင်း (property-style — command အစီအစဉ်ကို ကျပန်းလုပ်စစ်)။
 3. **Undo/redo:** command တိုင်း undo → doc အရင်နှင့်တူ၊ redo → doc အသစ်နှင့်တူ။
 4. **MuseScore parity:** §၂ ၏ ဇယားအတိုင်း key တစ်ခုချင်းစီကို Editor-level test (ရှိပြီးသား `editor-integration.test.js` ပုံစံ) ဖြင့်စစ်။
-5. အပြုအမူ မပြောင်းသော ရွှေ့ပြောင်းမှု (W5) အတွက် — ရှိပြီးသား test အားလုံး (ယခု 1558 ခု) pass ဆက်ဖြစ်ပြီး၊ Writer Engine ၏ ကိုယ်ပိုင် DOM-free test ၂၂ ခု ရှိသည်။
+5. အပြုအမူ မပြောင်းသော ရွှေ့ပြောင်းမှု (W5) အတွက် — ရှိပြီးသား test အားလုံး (ယခု 1560 ခု) pass ဆက်ဖြစ်ပြီး၊ Writer Engine ၏ ကိုယ်ပိုင် DOM-free test ၂၂ ခု ရှိသည်။
 
 ---
 
@@ -116,7 +116,7 @@ MuseScore ၏ shortcut များကို MuseScore Handbook (MuseScore 3 ၏
 | **W3** | ✅ **ပြီးစီး (2026-11-18)** — Tuplet (triplet၊ quintuplet … `Ctrl+2`–`9`); `Rest` တွင် tuplet endpoint ထည့်၍ Engine က rest ပါ group ကို render နိုင်၊ doc command (`insertTuplet`၊ `tupletMemberDuration`၊ `tupletMarksOf`)၊ toolbar panel | Triplet ရေး၍ render မှန်၊ MusicXML round trip၊ undo/redo၊ invariant — `npm run verify` 1544/1544 pass |
 | **W4** | ✅ **ပြီးစီး (2026-11-18)** — `Alt+1–9` interval၊ `J` enharmonic၊ `Shift+←/→` beat ရွှေ့၊ `Q`/`W` duration၊ `T` tie၊ `S` slur၊ `Ctrl+B` bar ထည့် | §၂ ဇယားတွင် 🟡/❌ → ✅ (Beam, chord symbol, flip မှလွဲ၍)၊ `editor-integration.test.js` ၏ key map suite pass၊ စုစုပေါင်း 1552/1552 pass |
 | **W5** | ✅ **ပြီးစီး (2026-11-18)** — `notation-doc.js` ကို `Website/Writer/Writer Engine/` package အဖြစ် ခွဲထုတ် (DOM မပါ၊ `window.WriterEngine` အဖြစ် publish)၊ Editor ၏ command logic (tie၊ slur၊ respell၊ interval၊ duration၊ transpose) ကို pure plan အဖြစ် ရွှေ့ပြီး Editor က ခေါ်သုံး | အပြုအမူ မပြောင်း — Notation Engine 1558/1558 pass၊ Writer Engine ၏ ကိုယ်ပိုင် DOM-free test ၂၂ ခု pass၊ `npm run verify` pass |
-| **W6** | ရေးစဉ် **အသံကြား** — note ထည့်သည်နှင့် Sound Engine က ဖွင့် (MuseScore ကဲ့သို့)၊ drum / pitched နှစ်မျိုးလုံး | note ရေးတိုင်း ချက်ချင်းအသံထွက်၊ အသံ delay ရည်မှန်း ~၁၀၀ ms အောက် |
+| **W6** | ✅ **ပြီးစီး (2026-11-18)** — ရေးစဉ် **အသံကြား** — score ဖွင့်သည်နှင့် SoundFont ကြိုတင် load (`warmSound`)၊ `ensureSound` က promise တစ်ခုတည်း မျှဝေ (font မရောက်သေးစိတ် ဒုတိယ note ကို "unavailable" မပြတော့)၊ audition က `ready` စောင့်ပြီး နောက်ဆုံး note တစ်ခုသာ အသံထွက် | note ရေးတိုင်း ချက်ချင်းအသံထွက် (drum / pitched)၊ delay ~၁၀၀ ms အောက်; `editor-integration.test.js` 150/150၊ Notation Engine 1560/1560 pass |
 | **W7** | Tier 2 — lyrics UI (`Ctrl+L`)၊ staff / tempo text (`Ctrl+T` / `Alt+Shift+T`)၊ chord symbol (`Ctrl+K`)၊ flip (`X`)၊ articulation key များ | §၂ ဇယားအတိုင်း |
 | **W8** | Beam ထိန်း (auto beam မှန်ကန်ကြောင်း စစ် + beam properties) | meter အလိုက် auto beam မှန် |
 | **W9** | Percussion input (MuseScore ပုံစံ percussion panel)၊ Drum ရေးခြင်းအတွက် `Inst.` box နှင့် ညှိ | Drum note ကို panel / key / MIDI ဖြင့်ရေး၊ ပုံ/အသံ ဆက်ကိုက် |
