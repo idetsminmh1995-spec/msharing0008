@@ -933,10 +933,17 @@ commits stay local and must be reported as unpushed.
   `website-bundle.test.js` regression test also guards the
   `notation-engine.js?v=` literal inside `video-engine.js`, which the build
   now re-keys.
-- **2026-11-18 — push still refused.** `$GITHUB_TOKEN` reads the repo and
-  reports `push: true`, but `POST /git/refs` answers `403 Resource not
-  accessible by integration` and `git-receive-pack` answers `403 ...
-  denied`; `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` is `401 Bad
-  credentials`. The commit for this pass stays local (`89d59c6` on
-  `feat/guitar-video-adapter`). A token with Contents: write on this repo
-  is needed to land it.
+- **2026-11-18 — push landed with the owner's PAT.** Both injected tokens
+  are read-only in practice: `$GITHUB_TOKEN` reports `push: true` yet
+  `POST /git/refs` answers `403 Resource not accessible by integration` and
+  `git-receive-pack` answers `403 ... denied`, and
+  `$OH_GIT_CREDENTIAL_ACCESS_TOKEN_GITHUB` is `401 Bad credentials`. A
+  `github_pat_…` supplied by the owner authenticates as
+  `idetsminmh1995-spec` and writes (`84c1c93..6da278d` landed). Pass it
+  through `$GH_PAT` in the transient helper, never on disk:
+
+  ```
+  git -c credential.helper= \
+      -c 'credential.helper=!f() { echo username=<owner>; echo "password=$GH_PAT"; }; f' \
+      push origin <branch>
+  ```
