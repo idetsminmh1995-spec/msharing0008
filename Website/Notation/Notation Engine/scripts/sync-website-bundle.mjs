@@ -69,6 +69,53 @@ const appAssets = [
   'assets/metronome-engine.js',
 ];
 
+const referencePattern = /(notation-engine\.js\?v=)[^"'&\s]+/g;
+const soundReferencePattern = /(sound-engine\.js\?v=)[^"'&\s]+/g;
+
+// Rewrite every key to the current one, counting only the references whose key
+// value actually changed, so the build log reports what a build moved rather
+// than what it merely touched.
+function rekey(html, pattern, render) {
+  let updated = 0;
+  let found = 0;
+  const next = html.replace(pattern, (match, ...groups) => {
+    found += 1;
+    const replacement = render(...groups);
+    if (match !== replacement) updated += 1;
+    return replacement;
+  });
+  return { next, updated, found };
+}
+
+/**
+ * The engine's own scripts are named in JavaScript as well as in HTML: the
+ * Video Engine loads the notation bundle on demand, so its address lives in a
+ * string literal. Re-keying only the pages left that literal pinned to the
+ * hash of whichever build was current when it was typed, and a returning
+ * browser then ran the video against an older engine than the editor beside
+ * it. Every file that names the bundle is re-keyed here, not just the pages.
+ */
+const scriptAssets = [
+  path.join(repoDir, 'Website', 'assets', 'video-engine.js'),
+  path.join(repoDir, 'Video', 'Video Engine', 'source', 'website', 'assets', 'video-engine.js'),
+];
+let updatedScriptReferences = 0;
+
+for (const scriptPath of scriptAssets) {
+  let text;
+  try {
+    text = await readFile(scriptPath, 'utf8');
+  } catch (error) {
+    // A standalone engine checkout has no host app next to it; nothing to key.
+    if (error?.code === 'ENOENT') continue;
+    throw error;
+  }
+  const notation = rekey(text, referencePattern, (prefix) => `${prefix}${cacheVersion}`);
+  const sound = rekey(notation.next, soundReferencePattern, (prefix) => `${prefix}${soundCacheVersion}`);
+  updatedScriptReferences += notation.updated + sound.updated;
+  if (sound.next !== text) await writeFile(scriptPath, sound.next);
+}
+
 const appAssetVersions = new Map();
 for (const relative of appAssets) {
   try {
@@ -87,28 +134,13 @@ function appAssetPattern(relative) {
   );
 }
 
-const referencePattern = /(notation-engine\.js\?v=)[^"'&\s]+/g;
-const soundReferencePattern = /(sound-engine\.js\?v=)[^"'&\s]+/g;
+
 let updatedPages = 0;
 let foundReferences = 0;
 let updatedReferences = 0;
 let updatedSoundReferences = 0;
 let updatedAppReferences = 0;
 
-// Rewrite every key to the current one, counting only the references whose key
-// value actually changed, so the build log reports what a build moved rather
-// than what it merely touched.
-function rekey(html, pattern, render) {
-  let updated = 0;
-  let found = 0;
-  const next = html.replace(pattern, (match, ...groups) => {
-    found += 1;
-    const replacement = render(...groups);
-    if (match !== replacement) updated += 1;
-    return replacement;
-  });
-  return { next, updated, found };
-}
 
 for (const root of publicRoots) {
   for (const htmlPath of await htmlFilesUnder(root)) {
@@ -149,5 +181,6 @@ console.log(
   `Published notation engine ${cacheVersion}: website bundles + maps; ` +
     `published sound engine ${soundCacheVersion}, worklet and Bravura font; ` +
     `updated ${updatedReferences} notation, ${updatedSoundReferences} sound and ` +
-    `${updatedAppReferences} app cache key(s) across ${updatedPages} HTML page(s).`,
+    `${updatedAppReferences} app cache key(s) across ${updatedPages} HTML page(s) ` +
+    `and ${updatedScriptReferences} engine address(es) in script assets.`,
 );

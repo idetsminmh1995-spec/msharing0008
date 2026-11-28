@@ -542,9 +542,16 @@
 
   /**
    * Everything a frame of this video needs, at one frame size: the parts the
-   * Plan counts as the length (count-in, score, Thank You), the sound, and
-   * the notation decoded once. The preview and the export both call this, so
-   * neither can draw a video the other would not.
+   * Plan counts as the length (count-in, score, Thank You) and the notation
+   * decoded once. The preview and the export both call this, so neither can
+   * draw a video the other would not.
+   *
+   * The sound is not part of it. Rendering a score's drum track means running
+   * an OfflineAudioContext over the whole piece, and a five-minute score takes
+   * fifteen seconds of it; a preview that waited for that would answer every
+   * keystroke in a Title field a quarter of a minute later. `attachAudio` is
+   * the separate half, so the picture can be on screen while the sound is
+   * still being made.
    */
   async function buildTimeline(settings) {
     const { hits: written, endQuarter, meta, source } = await getHits();
@@ -562,15 +569,23 @@
     }
     segments.push({ seconds: duration, draw: (ctx, at) => drawPerformance(ctx, at, settings, meta, kit, notationState) });
 
-    // The sound spans the count-in and the performance together, so it
-    // rides on the first of those two segments and starts at zero.
-    const audio = await createDrumAudio({ settings, hits, countIn, duration, meta });
-    if (audio) segments[0].audio = audio;
     // The Plan's last part of the length: the Thank You clip. The engine
     // owns its address and shape, so the page only asks for it.
     const ending = await engine.thankYouSegment(settings.size.width, settings.size.height, { instrument: 'drum', color: settings.color });
     if (ending) segments.push(ending);
-    return { segments, audio, meta, source, notationState, countIn, duration, kit };
+    return { segments, settings, meta, source, notationState, countIn, duration, kit, hits };
+  }
+
+  /**
+   * The drum track for a timeline `buildTimeline` returned. The sound spans
+   * the count-in and the performance together, so it rides on the first of
+   * those two segments and starts at zero.
+   */
+  async function attachAudio(timeline) {
+    const { settings, meta, hits, countIn, duration } = timeline;
+    const audio = await createDrumAudio({ settings, hits, countIn, duration, meta });
+    if (audio && timeline.segments.length) timeline.segments[0].audio = audio;
+    return audio;
   }
 
   // ---------------------------------------------------------------
@@ -758,7 +773,8 @@
     preview.settings = settings;
     preview.size = canvasSize;
     try {
-      const { segments } = await buildTimeline(previewSettings);
+      const built = await buildTimeline(previewSettings);
+      const { segments } = built;
       // An export that started while this was being built owns the stage.
       if (token !== preview.token || isRendering) return;
       const plan = engine.timelinePlan(segments, FPS);
@@ -780,7 +796,10 @@
       if (token !== preview.token) return;
       // §၅: the sound is built before Play is offered, however long the
       // score is. A preview that opens silent and finds its voice later
-      // would be the one thing the Plan rules out.
+      // would be the one thing the Plan rules out. The picture is already
+      // on screen by now, so a long score no longer holds up the notation.
+      await attachAudio(built);
+      if (token !== preview.token) return;
       await loadPreviewAudio(plan, token);
       if (token !== preview.token) return;
       if (autoplay) await playPreview();
@@ -857,7 +876,9 @@
     stopPreview();
     try {
       setStatus(`Preparing ${musicXmlInput?.files?.[0]?.name || 'default drum pattern'} · ${settings.ratio} · 0%`);
-      const { segments, audio, notationState, kit } = await buildTimeline(settings);
+      const built = await buildTimeline(settings);
+      const { segments, notationState, kit } = built;
+      const audio = await attachAudio(built);
       if (notationState?.error) setStatus(`Notation could not be prepared: ${notationState.error}`);
       const result = await engine.render({
         width: settings.size.width,

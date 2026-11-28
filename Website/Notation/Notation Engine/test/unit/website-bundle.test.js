@@ -125,6 +125,42 @@ test(
   },
 );
 
+/**
+ * The notation bundle's address is written in JavaScript too, not only in a
+ * page's `<script src>`. `video-engine.js` loads the engine on demand from a
+ * string literal, and nothing re-keyed that literal: the Video preview kept
+ * asking for the hash of whichever build was current when the line was typed,
+ * so a returning browser could run the video against an older engine than the
+ * editor page beside it. The build now re-keys every file that names the
+ * bundle; this test fails if one was left holding a stale address.
+ */
+test(
+  'every script that names the notation engine asks for the current bundle',
+  { skip: hasApp ? false : 'the Website app is not checked out next to the engine' },
+  () => {
+    const scriptAssets = [
+      path.join(APP_ROOT, 'assets', 'video-engine.js'),
+      path.join(repoDir, 'Video', 'Video Engine', 'source', 'website', 'assets', 'video-engine.js'),
+    ].filter((scriptPath) => fs.existsSync(scriptPath));
+
+    assert.ok(scriptAssets.length > 0, 'the Video Engine must be checked out to name the bundle');
+
+    let found = 0;
+    for (const scriptPath of scriptAssets) {
+      const text = fs.readFileSync(scriptPath, 'utf8');
+      for (const match of text.matchAll(/notation-engine\.js\?v=([a-f0-9]+)/g)) {
+        found += 1;
+        assert.equal(
+          match[1],
+          expectedCacheVersion,
+          `${path.relative(repoDir, scriptPath)} loads the notation engine at ${match[1]}, but the bundle hashes to ${expectedCacheVersion} -- run the build so the address follows the bundle`,
+        );
+      }
+    }
+    assert.ok(found > 0, 'the Video Engine must load the notation engine by a versioned address');
+  },
+);
+
 test(
   'the served Bravura font ships with its OFL license next to it',
   { skip: hasApp ? false : 'the Website app is not checked out next to the engine' },
