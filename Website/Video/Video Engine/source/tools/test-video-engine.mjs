@@ -490,6 +490,7 @@ test('an encoder that reports its own priming gets an edit list', async () => {
   assert.equal(r.i32(), AAC_FRAME, 'the priming was not trimmed');
 });
 
+
 test('the sound starting late is said as an empty edit, not by moving it', async () => {
   const late = audioChunks.map((chunk, j) => ({
     ...chunk,
@@ -502,4 +503,81 @@ test('the sound starting late is said as an empty edit, not by moving it', async
   assert.equal(r.u32(), 2, 'an empty edit and then the sound');
   assert.equal(r.u32(), 500, 'the silence is not half a second');
   assert.equal(r.i32(), -1, 'the first edit is not an empty one');
+});
+
+// ---------------------------------------------------------------
+// WebM, read the same way: by the specification, not the writer.
+// ---------------------------------------------------------------
+
+const { muxWebM } = sandbox.window.VideoEngine;
+
+/** Every EBML element at one level, as raw id, payload and children. */
+function ebmlElements(bytes, from, to) {
+  const found = [];
+  let at = from;
+  const readId = () => {
+    const first = bytes[at];
+    let length = 1;
+    while (length <= 4 && !(first & (0x80 >> (length - 1)))) length += 1;
+    assert.ok(length <= 4, `a bad element id at ${at}`);
+    let value = 0;
+    for (let i = 0; i < length; i++) value = value * 256 + bytes[at + i];
+    at += length;
+    return value;
+  };
+  const readSize = () => {
+    const first = bytes[at];
+    let length = 1;
+    while (length <= 8 && !(first & (0x80 >> (length - 1)))) length += 1;
+    assert.ok(length <= 8, `a bad element size at ${at}`);
+    let value = first & (0xff >> length);
+    for (let i = 1; i < length; i++) value = value * 256 + bytes[at + i];
+    at += length;
+    return value;
+  };
+  while (at < to) {
+    const start = at;
+    const id = readId();
+    const size = readSize();
+    const body = at;
+    assert.ok(body + size <= to, `element ${id.toString(16)} at ${start} runs past its parent`);
+    found.push({ id, start, body, end: body + size });
+    at = body + size;
+  }
+  assert.equal(at, to, 'the elements do not fill their parent exactly');
+  return found;
+}
+
+/** The unsigned integer an element's payload holds. */
+function uintOf(bytes, element) {
+  let value = 0;
+  for (let i = element.body; i < element.end; i++) value = value * 256 + bytes[i];
+  return value;
+}
+
+test('the WebM states its colour range and matrix, so it decodes as it was drawn', async () => {
+  const blob = muxWebM({
+    videoCodec: 'vp8',
+    width: 640,
+    height: 360,
+    videoChunks: [{ us: 0, key: true, data: Uint8Array.from([1, 2, 3, 4]) }],
+    audio: null,
+    durationMs: 1000,
+  });
+  const file = new Uint8Array(await blob.arrayBuffer());
+  const segment = ebmlElements(file, 0, file.length).find((e) => e.id === 0x18538067);
+  assert.ok(segment, 'the file has no Segment');
+  const tracks = ebmlElements(file, segment.body, segment.end).find((e) => e.id === 0x1654ae6b);
+  assert.ok(tracks, 'the file has no Tracks');
+  const entry = ebmlElements(file, tracks.body, tracks.end).find((e) => e.id === 0xae);
+  const video = ebmlElements(file, entry.body, entry.end).find((e) => e.id === 0xe0);
+  assert.ok(video, 'the video track has no Video block');
+  const colour = ebmlElements(file, video.body, video.end).find((e) => e.id === 0x55b0);
+  assert.ok(colour, 'the video track does not state its colour, so a player assumes limited range');
+  const children = ebmlElements(file, colour.body, colour.end);
+  const pick = (id) => children.find((e) => e.id === id);
+  assert.equal(uintOf(file, pick(0x55b9)), 2, 'the range is not stated as full');
+  assert.equal(uintOf(file, pick(0x55b1)), 1, 'the matrix is not stated as BT.709');
+  assert.equal(uintOf(file, pick(0x55ba)), 13, 'the transfer is not stated as sRGB');
+  assert.equal(uintOf(file, pick(0x55bb)), 1, 'the primaries are not stated as BT.709');
 });

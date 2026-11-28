@@ -122,6 +122,11 @@
     Video: id('E0'),
     PixelWidth: id('B0'),
     PixelHeight: id('BA'),
+    Colour: id('55B0'),
+    MatrixCoefficients: id('55B1'),
+    Range: id('55B9'),
+    TransferCharacteristics: id('55BA'),
+    Primaries: id('55BB'),
     Audio: id('E1'),
     SamplingFrequency: id('B5'),
     Channels: id('9F'),
@@ -243,7 +248,21 @@
         elem(ID.TrackType, uint(1)), // video
         elem(ID.FlagLacing, uint(0)),
         elem(ID.CodecID, ascii(videoCodec.startsWith('vp9') || videoCodec.startsWith('vp09') ? 'V_VP9' : 'V_VP8')),
-        elem(ID.Video, [elem(ID.PixelWidth, uint(width)), elem(ID.PixelHeight, uint(height))]),
+        elem(ID.Video, [
+          elem(ID.PixelWidth, uint(width)),
+          elem(ID.PixelHeight, uint(height)),
+          // The same statement the MP4's `nclx` makes, and needed for the
+          // same reason: the encoder is handed full-range canvases and
+          // BT.709. A WebM that leaves the range unstated is decoded as
+          // limited, which stretches 16..235 over the whole scale and
+          // turns a dark background into pure black.
+          elem(ID.Colour, [
+            elem(ID.MatrixCoefficients, uint(1)),
+            elem(ID.Range, uint(2)), // full
+            elem(ID.TransferCharacteristics, uint(13)), // sRGB
+            elem(ID.Primaries, uint(1)),
+          ]),
+        ]),
       ]),
     ];
     if (audio) {
