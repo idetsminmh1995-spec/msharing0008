@@ -198,7 +198,15 @@ try {
 
   // 1. Timeline. Two one-second tones; the second starts at 1s.
   const offset = await render('offset');
-  assert.equal(offset.container, 'webm');
+  // The container is MP4 wherever the browser encodes H.264: the sound may
+  // be AAC or Opus inside it, and the result has to name the one the file
+  // actually carries rather than the one the engine hoped for. A browser
+  // that encodes H.264 but no AAC used to get a WebM because of the sound
+  // codec alone, which is the fallback this file exists to rule out.
+  assert.equal(offset.container, 'mp4', `a browser with WebCodecs produced ${offset.container}`);
+  assert.equal(offset.probe.video.codec_name, 'h264', 'the MP4 does not hold H.264');
+  assert.equal(offset.probe.audio.codec_name, offset.audioCodec,
+    `the result claims ${offset.audioCodec} sound but the file holds ${offset.probe.audio.codec_name}`);
   assert.ok(offset.probe.audio, 'the two-segment render has no sound');
   assert.equal(offset.probe.audio.sample_rate, '48000', 'the sound is not mastered at 48kHz');
   assert.ok(Math.abs(offset.probe.seconds - 2) < 0.3,

@@ -458,3 +458,53 @@ One code change came out of this: `studio-metronome.js`'s `readSettings()`
 now rejects a design id the list does not hold. The engine falls back to its
 first design for an unknown id, so before this the page could quietly export
 a video for a design the panel never offered.
+
+## WebM fallback — the colour range it never stated (2026-11-18)
+
+`muxMp4` has always written a `colr`/`nclx` box saying the frames are
+full-range BT.709 with the sRGB transfer. `muxWebM` wrote only `PixelWidth`
+and `PixelHeight`, so a player had nothing to go on and decoded the file as
+limited range — 16..235 stretched across the whole scale. The export looked
+washed out and its dark background crushed to pure black. The encoder input
+was never the problem: the same canvas, drawn the same way, came back right
+through the MP4 path and wrong through the WebM one.
+
+The video `TrackEntry` now carries a `Colour` element, the same statement
+`nclx` makes:
+
+| Element | ID | Value |
+|---|---|---|
+| `MatrixCoefficients` | `55B1` | 1 — BT.709 |
+| `Range` | `55B9` | 2 — full |
+| `TransferCharacteristics` | `55BA` | 13 — sRGB |
+| `Primaries` | `55BB` | 1 — BT.709 |
+
+Measured through a browser decode of an eight-step grey ramp, before and
+after:
+
+| Source | Before | After |
+|---|---|---|
+| 0 | 0 | 0 |
+| 16 | 0 | 16 |
+| 32 | 19 | 32 |
+| 64 | 56 | 64 |
+| 128 | 130 | 128 |
+| 192 | 205 | 192 |
+| 235 | 255 | 235 |
+| 255 | 255 | 255 |
+
+`ffprobe` now reads `color_range=pc`, `color_space=bt709`,
+`color_transfer=iec61966-2-1`, `color_primaries=bt709` from a VP8 file.
+
+`tools/test-video-engine.mjs` gained an EBML reader and one test that walks
+Segment → Tracks → TrackEntry → Video → Colour and asserts all four values.
+Run against a copy of the engine with the `Colour` element removed, it fails
+with "the video track does not state its colour", so the test holds the fix
+rather than merely passing beside it.
+
+`tools/test-studio-video-browser.mjs` had the companion problem on its sync
+measurement: it counted pixels that moved by more than a fixed 20 levels.
+H.264 smooths a stroke's edge more than VP8 does, so the same stroke peaked
+lower and the count read as no stroke — a 67 ms offset that was not there.
+It now sums the deviation from the unlit band instead, which both codecs
+satisfy. With that, the best lag over 120 frames is 0 frames.

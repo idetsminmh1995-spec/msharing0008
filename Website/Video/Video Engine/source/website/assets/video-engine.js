@@ -29,9 +29,17 @@
  *
  * WHAT COMES OUT
  *
- * An MP4: H.264 video, AAC-LC sound at 48kHz, at exactly the size the
- * page asked for. That is the file every phone, editor and upload page
+ * An MP4: H.264 video at 48kHz sound, at exactly the size the page
+ * asked for. That is the file every phone, editor and upload page
  * takes without being asked twice, which a WebM is not.
+ *
+ * The sound is AAC-LC where the browser encodes it, and Opus where it
+ * does not. Chromium's WebCodecs ships H.264 but no AAC encoder on
+ * Linux, so insisting on AAC made the whole MP4 -- and with it the
+ * record of the picture's own quality -- fall back to a WebM. Opus in
+ * an MP4 is standardised (`Opus` sample entry, `dOps` configuration)
+ * and plays in every Chromium and Firefox build; the result names the
+ * sound codec it got, so a page can say which one it is.
  *
  * Nothing is converted to get there. The frames are encoded as H.264
  * in the first place and the file is written around them, so there is
@@ -41,8 +49,9 @@
  *
  * The codecs and the container are ONE decision, made in `pickFormat`
  * before a frame is drawn, because an MP4 cannot hold VP8 and a WebM
- * cannot hold H.264. A browser that will not encode H.264 and AAC gets
- * the old VP8-and-Opus WebM instead, and the result says which it got.
+ * cannot hold H.264. Only a browser that will not encode H.264 at all
+ * gets the old VP8-and-Opus WebM instead, and the result says which it
+ * got.
  *
  *
  * WHAT A PAGE HANDS OVER
@@ -113,6 +122,11 @@
     Video: id('E0'),
     PixelWidth: id('B0'),
     PixelHeight: id('BA'),
+    Colour: id('55B0'),
+    MatrixCoefficients: id('55B1'),
+    Range: id('55B9'),
+    TransferCharacteristics: id('55BA'),
+    Primaries: id('55BB'),
     Audio: id('E1'),
     SamplingFrequency: id('B5'),
     Channels: id('9F'),
@@ -234,7 +248,21 @@
         elem(ID.TrackType, uint(1)), // video
         elem(ID.FlagLacing, uint(0)),
         elem(ID.CodecID, ascii(videoCodec.startsWith('vp9') || videoCodec.startsWith('vp09') ? 'V_VP9' : 'V_VP8')),
-        elem(ID.Video, [elem(ID.PixelWidth, uint(width)), elem(ID.PixelHeight, uint(height))]),
+        elem(ID.Video, [
+          elem(ID.PixelWidth, uint(width)),
+          elem(ID.PixelHeight, uint(height)),
+          // The same statement the MP4's `nclx` makes, and needed for the
+          // same reason: the encoder is handed full-range canvases and
+          // BT.709. A WebM that leaves the range unstated is decoded as
+          // limited, which stretches 16..235 over the whole scale and
+          // turns a dark background into pure black.
+          elem(ID.Colour, [
+            elem(ID.MatrixCoefficients, uint(1)),
+            elem(ID.Range, uint(2)), // full
+            elem(ID.TransferCharacteristics, uint(13)), // sRGB
+            elem(ID.Primaries, uint(1)),
+          ]),
+        ]),
       ]),
     ];
     if (audio) {
@@ -456,14 +484,26 @@
             data: chunk.data,
           };
         });
+    // Opus carries a little encoder priming at the front that must not be
+    // played. The edit list below starts the track past it, and the track's
+    // own length keeps it, so the file still lasts as long as the sound does.
+    const preSkip = audio && audio.codec === OPUS ? opusPreSkip(audio) : 0;
 
     // An AAC frame is 1024 samples, but the encoder is believed over
     // the specification: the last frame's length is taken from the gap
-    // before it, so a file still adds up if it ever differs.
-    const audioDelta =
+    // before it, so a file still adds up if it ever differs. Opus is
+    // always 48kHz and 20ms a frame, which is 960 samples.
+    let audioDelta =
       audioSamples.length > 1
         ? audioSamples[audioSamples.length - 1].dts - audioSamples[audioSamples.length - 2].dts
-        : 1024;
+        : 960;
+    if (audio && audio.codec === OPUS && audio.samples > 0 && audioSamples.length > 0) {
+      // The file must last exactly as long as the sound that went in, once
+      // the priming is dropped. The encoder may hand over a last frame past
+      // that point, so the closing run is written as whatever is left
+      // rather than as a full 20ms -- the same table ffmpeg writes.
+      audioDelta = Math.max(1, audio.samples + preSkip - audioSamples[audioSamples.length - 1].dts);
+    }
 
     const timestampOrder = [...videoSamples, ...audioSamples].sort(
       (a, b) => a.seconds - b.seconds || a.track - b.track,
@@ -613,57 +653,89 @@
       ]),
     ]);
 
-    const mp4a = !audio
+    /**
+     * The sound track's sample entry, which says what the bytes in `mdat`
+     * are. An `mp4a` wrapping an `esds` for AAC; an `Opus` entry wrapping a
+     * `dOps` for Opus, which is the shape the Opus-in-ISOBMFF spec defines.
+     *
+     * Opus always encodes with a little priming at the front -- 312 samples
+     * at 48kHz -- and the decoder has to be told to drop it. `dOps` carries
+     * the value, and the edit list below repeats it, which is what ffmpeg
+     * writes for the same stream.
+     */
+    const opusConfig = audio && audio.codec === OPUS ? opusDPacket(audio) : null;
+    const audioEntry = !audio
       ? null
-      : box('mp4a', [
-          zeros(6), u16(1),
-          zeros(8),
-          u16(audio.channels), u16(16), u16(0), u16(0),
-          u32(audio.sampleRate * 65536), // 16.16 fixed point
-          fullBox('esds', 0, 0,
-            descriptor(0x03, [
-              u16(1), u8(0),
-              descriptor(0x04, [
-                u8(0x40), // MPEG-4 audio
-                u8(0x15), // an audio stream, not upstream of anything
-                zeros(3),
-                u32(audio.bitrate), u32(audio.bitrate),
-                descriptor(0x05, [audio.description]),
+      : audio.codec === OPUS
+        ? box('Opus', [
+            zeros(6), u16(1),
+            zeros(8),
+            u16(audio.channels), u16(16), u16(0), u16(0),
+            u32(audio.sampleRate * 65536),
+            box('dOps', opusConfig),
+          ])
+        : box('mp4a', [
+            zeros(6), u16(1),
+            zeros(8),
+            u16(audio.channels), u16(16), u16(0), u16(0),
+            u32(audio.sampleRate * 65536), // 16.16 fixed point
+            fullBox('esds', 0, 0,
+              descriptor(0x03, [
+                u16(1), u8(0),
+                descriptor(0x04, [
+                  u8(0x40), // MPEG-4 audio
+                  u8(0x15), // an audio stream, not upstream of anything
+                  zeros(3),
+                  u32(audio.bitrate), u32(audio.bitrate),
+                  descriptor(0x05, [audio.description]),
+                ]),
+                descriptor(0x06, [u8(0x02)]),
               ]),
-              descriptor(0x06, [u8(0x02)]),
-            ]),
-          ),
-        ]);
+            ),
+          ]);
 
     /**
      * One track. `base` is where `mdat`'s payload begins, which is the
      * only thing in here that cannot be known until `moov` has a length.
+     *
+     * `editStart` is priming the container records rather than the sample
+     * times: Opus keeps its pre-skip in `dOps`, and the edit list repeats
+     * it, so the decoder drops that much sound instead of playing it.
      */
-    const trak = ({ id, handler, label, timescale, span, trackMs, samples, lastDelta, entry }, base) => {
+    const trak = ({ id, handler, label, timescale, span, trackMs, samples, lastDelta, entry, editStart }, base) => {
       // An encoder that reports its own priming -- a first sample timed
       // before zero -- is saying to throw that much away before playing.
       // An edit list is how an MP4 says so, and is why the sound and the
       // picture still start together when it does.
       const first = samples.length > 0 ? samples[0].pts : 0;
-      const edits =
-        first === 0
-          ? []
-          : [
-              box('edts', [
-                fullBox(
-                  'elst',
-                  0,
-                  0,
-                  first < 0
-                    ? [u32(1), u32(trackMs), i32(-first), u16(1), u16(0)]
-                    : [
-                        u32(2),
-                        u32(asMs(first, timescale)), i32(-1), u16(1), u16(0),
-                        u32(trackMs), i32(0), u16(1), u16(0),
-                      ],
-                ),
-              ]),
-            ];
+      const edits = [];
+      if (editStart > 0) {
+        // The edit covers only what is left once the priming is gone, so
+        // the track plays for the length of the sound that went in.
+        edits.push(
+          box('edts', [
+            fullBox('elst', 0, 0, [
+              u32(1), u32(asMs(span - editStart, timescale)), i32(editStart), u16(1), u16(0),
+            ]),
+          ]),
+        );
+      } else if (first < 0) {
+        edits.push(
+          box('edts', [
+            fullBox('elst', 0, 0, [u32(1), u32(trackMs), i32(-first), u16(1), u16(0)]),
+          ]),
+        );
+      } else if (first > 0) {
+        edits.push(
+          box('edts', [
+            fullBox('elst', 0, 0, [
+              u32(2),
+              u32(asMs(first, timescale)), i32(-1), u16(1), u16(0),
+              u32(trackMs), i32(0), u16(1), u16(0),
+            ]),
+          ]),
+        );
+      }
 
       return box('trak', [
         fullBox('tkhd', 0, 7, [
@@ -705,7 +777,8 @@
       tracks.push({
         id: 2, handler: 'soun', label: 'SoundHandler',
         timescale: audio.sampleRate, span: audioSpan, trackMs: audioMs,
-        samples: audioSamples, lastDelta: audioDelta, entry: mp4a,
+        samples: audioSamples, lastDelta: audioDelta, entry: audioEntry,
+        editStart: preSkip,
       });
     }
 
@@ -806,8 +879,10 @@
     return ['6400', '4d40', '42e0'].map((profile) => `avc1.${profile}${level.hex}`);
   }
 
-  /** AAC-LC, the only audio an MP4 is guaranteed to be played with. */
+  /** AAC-LC: the sound every MP4 player has, where the browser encodes it. */
   const AAC = 'mp4a.40.2';
+  /** Opus in an MP4, for a browser that ships H.264 but no AAC encoder. */
+  const OPUS = 'opus';
   const AAC_BITRATE = 192000;
   const OPUS_BITRATE = 128000;
 
@@ -817,9 +892,12 @@
    *
    * It has to be one decision: an MP4 cannot hold VP8 and a WebM cannot
    * hold H.264, so there is no choosing a codec and then asking what to
-   * put it in. MP4 with H.264 and AAC is what every phone, editor and
-   * upload page takes without being asked twice, so it is tried first,
-   * and WebM is what a browser that will not encode it falls back to.
+   * put it in. MP4 is what every phone, editor and upload page takes
+   * without being asked twice, so it is tried first: with AAC-LC sound
+   * where the browser encodes it, and with Opus where it does not --
+   * Chromium on Linux encodes H.264 and Opus but no AAC, and demanding
+   * AAC put every export on that machine into a WebM instead. WebM is
+   * what is left for a browser that will not encode H.264 at all.
    */
   async function pickFormat(width, height, fps, bitrate, audioChannels) {
     const encodesVideo = async (codec) => {
@@ -852,17 +930,22 @@
       }
     };
 
-    if (await encodesAudio(AAC, AAC_BITRATE)) {
-      for (const codec of avcCodecs(width, height, fps)) {
-        if (await encodesVideo(codec)) {
-          return { container: 'mp4', video: codec, audio: AAC, audioBitrate: AAC_BITRATE };
-        }
+    const h264 = [];
+    for (const codec of avcCodecs(width, height, fps)) {
+      if (await encodesVideo(codec)) h264.push(codec);
+    }
+    if (h264.length > 0) {
+      if (await encodesAudio(AAC, AAC_BITRATE)) {
+        return { container: 'mp4', video: h264[0], audio: AAC, audioBitrate: AAC_BITRATE };
+      }
+      if (await encodesAudio(OPUS, OPUS_BITRATE)) {
+        return { container: 'mp4', video: h264[0], audio: OPUS, audioBitrate: OPUS_BITRATE };
       }
     }
-    if (await encodesAudio('opus', OPUS_BITRATE)) {
+    if (await encodesAudio(OPUS, OPUS_BITRATE)) {
       for (const codec of ['vp8', 'vp09.00.10.08']) {
         if (await encodesVideo(codec)) {
-          return { container: 'webm', video: codec, audio: 'opus', audioBitrate: OPUS_BITRATE };
+          return { container: 'webm', video: codec, audio: OPUS, audioBitrate: OPUS_BITRATE };
         }
       }
     }
@@ -976,6 +1059,10 @@
         sampleRate: buffer.sampleRate,
         channels,
         bitrate: format.audioBitrate,
+        codec: format.audio,
+        // What the muxer needs to state the sound's own length: Opus pads
+        // its last frame, so the samples that went in are the truth.
+        samples: buffer.length,
       };
     } finally {
       if (encoder.state !== 'closed') {
@@ -1001,6 +1088,46 @@
     const index = RATES.indexOf(sampleRate);
     if (index < 0) return undefined;
     return Uint8Array.from([(2 << 3) | (index >> 1), ((index & 1) << 7) | (channels << 3)]);
+  }
+
+  /** Opus's encoder priming at 48kHz, for an encoder that did not report it. */
+  const OPUS_PRE_SKIP = 312;
+
+  /**
+   * Samples the Opus decoder must throw away before playing.
+   *
+   * The encoder describes itself with an `OpusHead` block, whose pre-skip
+   * is two bytes little-endian at offset 10. The value is used as handed
+   * over rather than assumed, since an encoder may pad differently; the
+   * specification's 312 is the fallback.
+   */
+  function opusPreSkip(audio) {
+    const head = audio.description;
+    if (head && head.length >= 12
+      && String.fromCharCode(...head.subarray(0, 8)) === 'OpusHead') {
+      return head[10] | (head[11] << 8);
+    }
+    return OPUS_PRE_SKIP;
+  }
+
+  /**
+   * The `dOps` payload: the Opus configuration an MP4 carries in the
+   * sample entry, since an ISO BMFF file has no `OpusHead` header to read.
+   *
+   * Version, channel count, pre-skip, input rate, gain and channel
+   * mapping, all big-endian because that is the side of the fence an
+   * MP4 is written on. ffmpeg writes exactly these bytes for the same
+   * stream.
+   */
+  function opusDPacket(audio) {
+    return concat([
+      u8(0), // version
+      u8(audio.channels),
+      u16(opusPreSkip(audio)),
+      u32(audio.sampleRate),
+      u16(0), // output gain
+      u8(0), // channel mapping family
+    ]);
   }
 
   /** 48kHz: what an MP4 is mastered at, and what every encoder here takes. */

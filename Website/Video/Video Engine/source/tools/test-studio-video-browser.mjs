@@ -721,19 +721,26 @@ image = Image.open(${JSON.stringify(framePath)}).convert('RGB')
 width, height = image.size
 pixels = image.load()
 dark = red = white = 0
+red_x = []
 for y in range(int(height * 0.15), int(height * 0.55)):
     for x in range(0, width, 2):
         r, g, b = pixels[x, y]
         if r < 130 and g < 130 and b < 130: dark += 1
-        elif r > 140 and g < 90 and b < 90: red += 1
+        elif r > 140 and g < 90 and b < 90:
+            red += 1
+            red_x.append(x)
         elif r > 240 and g > 240 and b > 240: white += 1
-print(dark, red, white)
+# Where the red is, not how much of it there is: the cursor is a fixed-width
+# bar, so its pixel count barely changes as it travels, and an encoder can
+# shift it by a couple of pixels on its own.
+print(dark, red, white, round(sum(red_x) / len(red_x)) if red_x else -1)
 `])));
   const [firstInk, secondInk] = inkAndCursor.map(({ stdout }) => stdout.trim().split(/\s+/).map(Number));
   assert.ok(firstInk[0] > 3000, `Notation notes are missing from the frame: ${firstInk}`);
   assert.ok(firstInk[2] > 50000, `Notation sheet is not drawn: ${firstInk}`);
   assert.ok(firstInk[1] > 0 && secondInk[1] > 0, `Notation cursor is not drawn: ${firstInk} / ${secondInk}`);
-  assert.notEqual(firstInk[1], secondInk[1], 'The notation cursor did not move with playback');
+  assert.ok(Math.abs(secondInk[3] - firstInk[3]) > 20,
+    `The notation cursor did not move with playback: x ${firstInk[3]} then ${secondInk[3]}`);
 
   // The instrument band carries the R2 kit photo, not the lane chart. A
   // photograph has hundreds of distinct colours in a band; three lanes on
@@ -1385,14 +1392,19 @@ for path in paths:
 reference = [sorted(column)[len(column) // 2] for column in zip(*bands)]
 lit = []
 for band in bands:
-    count = 0
+    # How far the band moved from its unlit state, not how many pixels
+    # crossed a fixed threshold. A codec smooths a stroke's edge, so the
+    # same stroke arrives with a different peak in H.264 and in VP8 and a
+    # threshold that suits one reads the other as no stroke at all.
+    total = 0
     for index, value in enumerate(band):
-        if abs(value - reference[index]) > 20:
-            count += 1
-    lit.append(count)
+        total += abs(value - reference[index])
+    lit.append(round(total / len(band), 4))
 print(json.dumps({'frames': len(lit), 'lit': lit}))
 `])).stdout);
   assert.ok(picture.frames > 30, `The drum export is too short to measure sync: ${picture.frames} frames`);
+  assert.ok(Math.max(...picture.lit) - Math.min(...picture.lit) > 0.05,
+    `The picture never changed, so there is no sync to measure: ${JSON.stringify(picture.lit.slice(0, 20))}`);
 
   const audio = JSON.parse((await exec('python3', ['-c', `
 import json, struct, wave
@@ -1407,10 +1419,10 @@ for index in range(0, len(samples) // window):
 print(json.dumps({'level': level}))
 `])).stdout);
 
-  // The picture is a count of changed pixels and the sound a peak per frame;
-  // both are scaled to their own range so the overlap compares shape, not
-  // loudness. The lag is searched one frame either side, which is more than
-  // the Plan's ~40 ms budget allows.
+  // The picture is how far the instrument band moved and the sound a peak per
+  // frame; both are scaled to their own range so the overlap compares shape,
+  // not loudness. The lag is searched one frame either side, which is more
+  // than the Plan's ~40 ms budget allows.
   const normalise = (values) => {
     const min = Math.min(...values);
     const max = Math.max(...values);
