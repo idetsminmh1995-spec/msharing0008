@@ -26,7 +26,7 @@ Grey ramp တိုင်းတာမှု (1280×160၊ `0,16,32,64,128,192,23
 | 235 | **255** | 235 |
 | 255 | 255 | 255 |
 
-မတိုင်မီတွင် tone နှစ်ဖက်စွန်း ပျက်၍ ခြောက်သွေ့သည်။ နောက်ခံအမှောင် `(8,13,22)` သည် လုံးဝ အမည်း `(0,0,6)` ဖြစ်သွားသည်။ MP4 လမ်းကြောင်းတွင်မူ `colr`/`nclx` ရှိပြီးဖြစ်၍ မှန်နေသည်။
+မတိုင်မီတွင် tone နှစ်ဖက်စွန်း ပျက်၍ ခြောက်သွေ့သည်။ နောက်ခံအမှောင် `(8,13,22)` သည် လုံးဝ အမည်း `(0,0,7)` ဖြစ်သွားသည်။ MP4 လမ်းကြောင်းတွင်မူ `colr`/`nclx` ရှိပြီးဖြစ်၍ မှန်နေသည်။
 
 ### ပြင်ဆင်မှု
 
@@ -43,14 +43,17 @@ MP4 ၏ `nclx` နှင့် တူညီသော ကြေညာချက်
 
 နမူနာ ၁၉၂၀×၁၀၈၀ export တွင် frame တစ်ခုချင်း pixel ရေတွက်မှု (`|Δ| > 20` ဖြတ်သော pixel အရေအတွက်) ကို သုံးခဲ့သည်။ H.264 က VP8 ထက် stroke အနားသတ်ကို ပိုချောမွေ့စွာ encode လုပ်သဖြင့် တူညီသော stroke ၏ peak နိမ့်သည်။ Threshold က "stroke မရှိ" ဟု မှားဖတ်ပြီး ကွာဟမှု 67 ms ဟု ထင်ရသည်။
 
-| Metric | MP4 (H.264) | VP8 |
+| Metric | VP8 run | H.264 run |
 |---|---|---|
-| Band ပြောင်းလဲမှု ပျမ်းမျှ | 0.598 | 0.318 |
-| `abs(Δ) > 10` ဖြတ်သော pixel | 470 | **0** |
+| Band ပြောင်းလဲမှု ပျမ်းမျှ | 0.218 | 0.324 |
+| `abs(Δ) > 20` ဖြတ်သော pixel (အများဆုံး frame) | 64 | **0** |
+| `abs(Δ) > 10` ဖြတ်သော pixel (အများဆုံး frame) | 856 | 137 |
 
-ယခု deviation ပမာဏ (`Σ abs(value − median) / pixel count`) ကို သုံးသည် — codec နှစ်ခုလုံးအတွက် တူညီစွာ အလုပ်လုပ်သည်။
+H.264 run တွင် threshold 20 ကို ဖြတ်သော pixel တစ်ခုမှ မရှိသဖြင့် ရုပ်ပိုင်း signal သည် လုံးဝ ပြားနေသည်။ ထို signal ကို အသံနှင့် ဆွဲတိုက်သည့်အခါ အဓိပ္ပာယ်မရှိသော lag ထွက်လာသည်။
 
-Notation cursor ကိုလည်း အလားတူ ပြင်သည်။ Cursor သည် ရွေ့နေသော်လည်း အနီ pixel အရေအတွက် မပြောင်းလဲသဖြင့် (`922` နှင့် `922`) `assert.notEqual` က မမှန်ကန်စွာ ကျခဲ့သည်။ ယခု အနီ pixel အုပ်စု၏ **x centroid** ကို တိုင်းသည် — `713` နှင့် `981`။
+ယခု deviation ပမာဏ (`Σ abs(value − median) / pixel count`) ကို သုံးသည် — codec နှစ်ခုလုံးအတွက် ရုပ်ပိုင်း signal ရှိသည်။
+
+Notation cursor ကိုလည်း အလားတူ ပြင်သည်။ Cursor သည် ရွေ့နေသော်လည်း အနီ pixel အရေအတွက် မပြောင်းလဲသဖြင့် (`934` နှင့် `960`) `assert.notEqual` က မမှန်ကန်စွာ ကျခဲ့သည်။ ယခု အနီ pixel အုပ်စု၏ **x centroid** ကို တိုင်းသည် — `723` နှင့် `979`။
 
 ## ပြောင်းလဲခဲ့သော ဖိုင်များ
 
@@ -60,6 +63,9 @@ Notation cursor ကိုလည်း အလားတူ ပြင်သည်�
 | `Website/Website/assets/video-engine.js` | `sync-video-engine.mjs` ဖြင့် ကူးထားသော production copy |
 | `Website/Video/Video Engine/source/tools/test-video-engine.mjs` | EBML reader နှင့် WebM colour unit test အသစ် |
 | `Website/Video/Video Engine/source/tools/test-studio-video-browser.mjs` | Sync metric ကို deviation သို့၊ notation cursor ကို centroid သို့ |
+| `Website/Video/Video Engine Doc/README.md` | ဤပြင်ဆင်မှု၏ တိုင်းတာချက်များနှင့် ရှင်းလင်းချက် |
+| `Website/Doc/WebM-Colour-Range-2026-11-18.md` | ဤမှတ်တမ်း |
+| `Website/Doc/README.md` | Doc index တွင် ဤမှတ်တမ်း ထည့်ခြင်း |
 
 ## စမ်းသပ်မှု ရလဒ်
 
@@ -82,14 +88,15 @@ Notation cursor ကိုလည်း အလားတူ ပြင်သည်�
 | `test-mxl-score-browser.mjs` | pass |
 | `test-piano-studio-browser.mjs` | **fail** — မပြင်ရသေးသော base ကုဒ် (`ef4fdcc`) တွင်လည်း အတူတူ ကျသည်။ ဤပြောင်းလဲမှုနှင့် မဆိုင်ပါ |
 
-### Sync နှင့် အရောင် တိုင်းတာချက် (MP4)
+### Sync နှင့် အရောင် တိုင်းတာချက်
 
 | အချက် | ရလဒ် |
 |---|---|
-| Best lag (120 frame အပေါ် correlation) | **0 frame** — sync error 0 ms |
-| Grey ramp round trip | `0,16,32,64,128,192,235,255` အတိအကျ |
-| Source → decoded (drum frame) | background `(15,22,38)`→`(14,22,36)`, orange `(246,168,0)`→`(242,167,0)`, red `(209,51,46)`→`(206,50,45)` |
-| MP4 bitrate (4 s, 1080p) | 770 kbps၊ VP8 က 1.80 Mbps (တူညီသော အရည်အသွေးအတွက် ပိုသေး) |
+| Best lag (120 frame အပေါ် correlation) | **0 frame** — sync error 0 ms (score 7.39)၊ VP8 run တွင်လည်း lag 0 (score 12.17) |
+| Grey ramp round trip (VP8/WebM) | `0,16,32,64,128,192,235,255` အတိအကျ (မတိုင်မီ `0,0,19,56,130,205,255,255`) |
+| Source → decoded, H.264/MP4 (six-swatch frame, BT.709 full range) | background `(15,22,38)`→`(14,23,37)`, orange `(246,168,0)`→`(243,168,0)`, panel `(238,241,247)`→`(238,241,247)`, red `(209,51,46)`→`(209,51,45)`, green `(46,158,91)`→`(45,158,90)`, blue `(47,111,208)`→`(47,112,207)` |
+| Source → decoded, VP8/WebM (တူညီသော ခြောက်ကွက်) | အားလုံး H.264 နှင့် တူသည်၊ orange သာ `(246,168,0)`→`(245,168,0)` |
+| Bitrate (4 s, 1080p audible drum export) | H.264/MP4 770 kbps (video 635 kbps + Opus 129 kbps)၊ မတိုင်မီ VP8 export က 1.80 Mbps |
 
 ### Negative check
 
